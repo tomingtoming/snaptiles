@@ -3,7 +3,7 @@
 //   Val    { NAME(default=0, min=-30, max=30, step=5, disp=0) ... }
 //   Key    { 0:NAME(step=5), OTHER(step=-5)  1:... }
 //   Body   { Core(){ N:Chip(angle=HANDLE){ ... } } }
-//   Script { ...lua... }
+//   Script { ...legacy RC script... }   Lua { ...lua... }   (Lua wins when both exist)
 //
 // Attribute values are kept as expression strings and evaluated later
 // against the Val table, so `angle=-HANDLE` or `power=ENGINE*2` work.
@@ -208,8 +208,8 @@ function parseVal(inner: string, baseLine: number): ValDecl[] {
     out.push({
       name,
       default: num(a.default, 0),
-      min: num(a.min, -Infinity),
-      max: num(a.max, Infinity),
+      min: num(a.min, 0),
+      max: num(a.max, 3.4e38),
       step: num(a.step, 0),
       disp: a.disp !== undefined ? num(a.disp, 0) : undefined,
     });
@@ -232,7 +232,7 @@ function parseKey(inner: string, baseLine: number): KeyBinding[] {
     const name = p.ident();
     const a = p.peek()?.v === '(' ? p.args() : {};
     if (key < 0) throw new RcParseError(`key binding '${name}' before any key number`, p.line());
-    out.push({ key, var: name, step: num(a.step, 0) });
+    out.push({ key, var: name, step: num(a.step, 1) });
   }
   return out;
 }
@@ -270,12 +270,17 @@ export function parseRc(source: string): RcModel {
   const blocks = findBlocks(text);
   for (const b of blocks) {
     const name = b.name.toLowerCase();
-    if (name === 'script') {
+    if (name === 'lua') {
       model.script = { lang: 'lua', source: b.inner };
       continue;
     }
+    if (name === 'script') {
+      // legacy RC script; a Lua block (if present) takes precedence
+      if (!model.script || model.script.lang !== 'lua') model.script = { lang: 'rc', source: b.inner };
+      continue;
+    }
     const inner = stripComments(b.inner);
-    if (name === 'val') model.vals.push(...parseVal(inner, b.line));
+    if (name === 'val' || name === 'var') model.vals.push(...parseVal(inner, b.line));
     else if (name === 'key') model.keys.push(...parseKey(inner, b.line));
     else if (name === 'body') model.body = parseBody(inner, b.line);
   }

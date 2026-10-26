@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SnapTiles</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <aside id="side">
+      <header id="bar">
+        <nav id="samples"></nav>
+        <button id="run" type="button" aria-label="run">▶</button>
+      </header>
+      <textarea id="source" spellcheck="false" wrap="off"></textarea>
+      <footer id="status"></footer>
+    </aside>
+    <main id="stage">
+      <canvas id="view"></canvas>
+      <pre id="vals"></pre>
+      <pre id="out"></pre>
+      <div id="keys"></div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
