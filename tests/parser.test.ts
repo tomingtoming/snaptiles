@@ -28,6 +28,10 @@ Body {
 }
 Script
 {
+  if _KEY(0)=1 { x = 1 }
+}
+Lua
+{
   local t = { a = 1 } -- braces inside lua { }
   if _KEY(0) > 0 then print("go") end
 }
@@ -38,7 +42,7 @@ describe('parseRc', () => {
     const m = parseRc(CAR);
     expect(m.vals.map((v) => v.name)).toEqual(['HANDLE', 'ENGINE', 'BRAKE']);
     expect(m.vals[0]).toMatchObject({ default: 0, min: -30, max: 30, step: 5 });
-    expect(m.vals[2]).toMatchObject({ min: -Infinity, max: 100 });
+    expect(m.vals[2]).toMatchObject({ min: 0, max: 100 });
     expect(m.keys).toEqual([
       { key: 0, var: 'ENGINE', step: 100 },
       { key: 1, var: 'ENGINE', step: -100 },

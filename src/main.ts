@@ -30,6 +30,7 @@ async function load(source: string): Promise<void> {
     const next = new Simulation(R, source, keys);
     await next.start();
     sim = next;
+    (window as unknown as { __sim: Simulation }).__sim = next; // probe hook for tools/
     scene.rebuild(next.assembly!.tiles);
     scene.camYaw = 0.7;
     buildKeyCaps(next);
@@ -84,6 +85,7 @@ window.addEventListener('keydown', (e) => {
 
 // ---- camera orbit ----
 let dragging = false;
+let lastDrag = -1e9;
 let lastX = 0;
 let lastY = 0;
 canvas.addEventListener('pointerdown', (e) => {
@@ -95,6 +97,7 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 canvas.addEventListener('pointermove', (e) => {
   if (!dragging) return;
+  lastDrag = performance.now();
   scene.camYaw -= (e.clientX - lastX) * 0.006;
   scene.camPitch = Math.max(0.05, Math.min(1.4, scene.camPitch + (e.clientY - lastY) * 0.006));
   lastX = e.clientX;
@@ -124,6 +127,7 @@ function frame(now: number): void {
     }
     if (n === 4) acc = 0;
     scene.sync(sim.physics);
+    if (!dragging && performance.now() - lastDrag > 3000) scene.chaseYaw(sim.coreHeading());
     scene.follow(sim.corePosition());
     updateOverlay(sim);
   }

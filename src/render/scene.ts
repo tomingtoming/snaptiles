@@ -116,27 +116,22 @@ export class SceneView {
     }
   }
 
+  private tmpPose = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
   sync(world: PhysicsWorld): void {
     for (const tb of world.tiles) {
       const obj = this.meshes.get(tb.tile.id);
       if (!obj) continue;
-      if (tb.tile.spec.merge) {
-        // merged tile: offset from parent's body using rest-relative transform
-        const parentTb = world.byId.get(tb.tile.parent!.id)!;
-        const pt = parentTb.body.translation();
-        const pr = parentTb.body.rotation();
-        const pq = new THREE.Quaternion(pr.x, pr.y, pr.z, pr.w);
-        const restParentQ = tb.tile.parent!.quaternion;
-        const rel = tb.tile.position.clone().sub(tb.tile.parent!.position).applyQuaternion(restParentQ.clone().invert());
-        obj.position.set(pt.x, pt.y, pt.z).add(rel.applyQuaternion(pq));
-        obj.quaternion.copy(pq).multiply(restParentQ.clone().invert()).multiply(tb.tile.quaternion);
-        continue;
-      }
-      const p = tb.body.translation();
-      const r = tb.body.rotation();
-      obj.position.set(p.x, p.y, p.z);
-      obj.quaternion.set(r.x, r.y, r.z, r.w);
+      const pose = world.pose(tb, this.tmpPose);
+      obj.position.copy(pose.position);
+      obj.quaternion.copy(pose.quaternion);
     }
+  }
+
+  /** chase: ease the orbit yaw toward the model's heading (set by main when not dragging) */
+  chaseYaw(headingYaw: number, rate = 0.03): void {
+    let d = headingYaw - this.camYaw;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    this.camYaw += d * rate;
   }
 
   follow(target: THREE.Vector3, smooth = 0.08): void {

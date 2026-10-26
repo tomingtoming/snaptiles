@@ -18,13 +18,15 @@ Body
   Core(color=#f2b705){
     N:Chip(){
       N:Chip(){
-        W:Rudder(angle=HANDLE){ W:Chip(angle=90){ W:Wheel(power=-ENGINE, brake=BRAKE) } }
-        E:Rudder(angle=HANDLE){ E:Chip(angle=90){ E:Wheel(power=ENGINE, brake=BRAKE) } }
+        W:Chip(){ W:Rudder(angle=HANDLE){ W:Frame(angle=90){ W:Wheel(power=-ENGINE, brake=BRAKE) } } }
+        E:Chip(){ E:Rudder(angle=HANDLE){ E:Frame(angle=90){ E:Wheel(power=ENGINE, brake=BRAKE) } } }
       }
     }
     S:Chip(){
-      W:Chip(angle=90){ W:Wheel(power=-ENGINE, brake=BRAKE) }
-      E:Chip(angle=90){ E:Wheel(power=ENGINE, brake=BRAKE) }
+      S:Chip(){
+        W:Chip(){ W:Frame(angle=90){ W:Wheel(power=-ENGINE, brake=BRAKE) } }
+        E:Chip(){ E:Frame(angle=90){ E:Wheel(power=ENGINE, brake=BRAKE) } }
+      }
     }
   }
 }

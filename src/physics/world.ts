@@ -1,11 +1,30 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import { TILE, TILE_T, assemblyBottom, attr, type Assembly, type TileInstance, type ValEnv } from '../model/assemble';
+import { exprIsConstant } from '../rc/expr';
 
+/**
+ * Tiles whose angle never changes are welded into their parent's rigid body
+ * (one body = one rigid group). Only wheels and tiles whose angle is an
+ * expression (steering, control surfaces) get a joint. That is what makes
+ * the chips rigid.
+ */
 export interface TileBody {
   tile: TileInstance;
   body: RAPIER.RigidBody;
+  /** the tile that owns `body` (itself when this tile starts a group) */
+  groupRoot: TileInstance;
+  /** rest transform of this tile relative to the group root */
+  relPos: THREE.Vector3;
+  relQuat: THREE.Quaternion;
   joint: RAPIER.RevoluteImpulseJoint | null;
+  animated: boolean;
+  /** rest orientation of `body` (model frame). Every body in a joint chain shares its
+   *  parent's orientation so rapier's single joint axis means the same thing in both. */
+  bodyRestQuat: THREE.Quaternion;
+  bodyRestPos: THREE.Vector3;
+  /** assembled angle (deg) of an animated joint; the joint measures 0 there */
+  restAngle: number;
 }
 
 export interface PhysicsOptions {
@@ -16,7 +35,8 @@ export interface PhysicsOptions {
 export const WHEEL_TORQUE_PER_POWER = 0.25; // N·m per power unit
 /** spec: 6 power = 1 N */
 export const JET_NEWTON_PER_POWER = 1 / 6;
-export const AIR_DRAG = 0.9; // N per (m/s)² per unit drag coefficient of a tile
+/** flat-plate aero: N per (m/s)² of normal velocity, per unit drag coefficient of a tile */
+export const AIR_DRAG = 0.9;
 
 // Tiles of a model never collide with each other (only with the ground / objects).
 const MODEL_GROUP = 0x0001_0002; // membership 1, filter 2
@@ -28,18 +48,22 @@ export function initRapier(): Promise<typeof RAPIER> {
   return ready;
 }
 
+export interface Pose {
+  position: THREE.Vector3;
+  quaternion: THREE.Quaternion;
+}
+
 export class PhysicsWorld {
   world: RAPIER.World;
   tiles: TileBody[] = [];
   byId = new Map<number, TileBody>();
   readonly dt = 1 / 60;
   tick = 0;
-  private tmpQ = new THREE.Quaternion();
 
   constructor(private R: typeof RAPIER, opts: PhysicsOptions = {}) {
     this.world = new R.World({ x: 0, y: opts.gravity ?? -9.8, z: 0 });
     this.world.timestep = this.dt;
-    this.world.numSolverIterations = 12;
+    this.world.numSolverIterations = 8;
     const groundDesc = R.ColliderDesc.cuboid(2000, 1, 2000).setTranslation(0, -1, 0).setFriction(1.0).setCollisionGroups(GROUND_GROUP);
     this.world.createCollider(groundDesc);
   }
@@ -62,103 +86,124 @@ export class PhysicsWorld {
     const R = this.R;
     const lift = -assemblyBottom(a) + 0.02;
     const offset = spawn.clone().add(new THREE.Vector3(0, lift, 0));
-    const bodyOf = new Map<number, RAPIER.RigidBody>();
 
     for (const tile of a.tiles) {
-      const p = tile.position.clone().add(offset);
-      const q = tile.quaternion;
+      const parentTb = tile.parent ? this.byId.get(tile.parent.id)! : null;
+      const angleExpr = tile.node.attrs.angle ?? '';
+      const animated = !!tile.parent && !exprIsConstant(angleExpr) && tile.spec.joint !== 'wheel' && tile.spec.joint !== 'fixed';
+      const startsGroup = !parentTb || tile.spec.joint === 'wheel' || animated;
 
-      if (tile.spec.merge && tile.parent) {
-        // Cowl: massless decoration glued to the parent body
-        const parentBody = bodyOf.get(tile.parent.id)!;
-        bodyOf.set(tile.id, parentBody);
-        const tb: TileBody = { tile, body: parentBody, joint: null };
-        this.tiles.push(tb);
-        this.byId.set(tile.id, tb);
-        continue;
-      }
-
-      const rb = R.RigidBodyDesc.dynamic()
-        .setTranslation(p.x, p.y, p.z)
-        .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w })
-        .setLinearDamping(0.02)
-        .setAngularDamping(0.05)
-        .setCcdEnabled(true);
-      const body = this.world.createRigidBody(rb);
-      const mass = Math.max(0.5, tile.mass);
-      if (tile.spec.wheel) {
-        const r = TILE / 2;
-        const cd = R.ColliderDesc.cylinder(TILE_T / 2, r).setMass(mass).setFriction(tile.spec.friction).setCollisionGroups(MODEL_GROUP);
-        this.world.createCollider(cd, body); // cylinder axis = local Y = tile normal
+      let body: RAPIER.RigidBody;
+      let groupRoot: TileInstance;
+      let bodyRestQuat: THREE.Quaternion;
+      let bodyRestPos: THREE.Vector3;
+      if (startsGroup) {
+        bodyRestQuat = parentTb ? parentTb.bodyRestQuat.clone() : tile.quaternion.clone();
+        bodyRestPos = tile.position.clone();
+        const p = bodyRestPos.clone().add(offset);
+        const q = bodyRestQuat;
+        const rb = R.RigidBodyDesc.dynamic()
+          .setTranslation(p.x, p.y, p.z)
+          .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w })
+          .setLinearDamping(0.02)
+          .setAngularDamping(tile.spec.wheel ? 0.2 : 0.05)
+          .setCcdEnabled(true);
+        body = this.world.createRigidBody(rb);
+        groupRoot = tile;
       } else {
-        const cd = R.ColliderDesc.cuboid(TILE / 2, TILE_T / 2, TILE / 2).setMass(mass).setFriction(tile.spec.friction).setCollisionGroups(MODEL_GROUP);
-        if (tile.ghost) cd.setSensor(true);
+        body = parentTb!.body;
+        groupRoot = parentTb!.groupRoot;
+        bodyRestQuat = parentTb!.bodyRestQuat;
+        bodyRestPos = parentTb!.bodyRestPos;
+      }
+      const invQ = bodyRestQuat.clone().invert();
+      const relQuat = invQ.clone().multiply(tile.quaternion);
+      const relPos = tile.position.clone().sub(bodyRestPos).applyQuaternion(invQ);
+
+      // collider
+      const mass = tile.mass;
+      if (mass > 0 || tile.spec.collides) {
+        const cd = tile.spec.wheel
+          ? R.ColliderDesc.cylinder(TILE_T / 2, TILE / 2)
+          : R.ColliderDesc.cuboid(TILE / 2, TILE_T / 2, TILE / 2);
+        cd.setMass(Math.max(0.1, mass)).setFriction(tile.spec.friction).setCollisionGroups(MODEL_GROUP);
+        cd.setTranslation(relPos.x, relPos.y, relPos.z).setRotation({ x: relQuat.x, y: relQuat.y, z: relQuat.z, w: relQuat.w });
+        if (tile.ghost || !tile.spec.collides) cd.setSensor(true);
         this.world.createCollider(cd, body);
       }
-      bodyOf.set(tile.id, body);
 
       let joint: RAPIER.RevoluteImpulseJoint | null = null;
-      if (tile.parent) {
-        const parentBody = bodyOf.get(tile.parent.id)!;
+      if (startsGroup && parentTb) {
         const anchorW = tile.anchor.clone().add(offset);
         const axisW = tile.axis.clone().normalize();
-        // The child's rest rotation relative to the parent is purely about the joint axis,
-        // so the axis has the same local coordinates in both bodies and the measured joint
-        // angle at rest equals the assembled angle.
-        const jd = R.JointData.revolute(toLocal(parentBody, anchorW), toLocal(body, anchorW), toLocalDir(parentBody, axisW));
-        joint = this.world.createImpulseJoint(jd, parentBody, body, true) as RAPIER.RevoluteImpulseJoint;
-        if (tile.spec.joint !== 'wheel') {
-          // Hinges hold their angle as a hard limit (rigid chips); the motor adds
-          // the spring/damper feel on top. Rudder/Trim steer by moving the limits.
-          const a = attr(tile.node, 'angle', env, 0) * (Math.PI / 180);
-          joint.setLimits(a, a);
-        } else {
-          // light rolling resistance so a free wheel does not spin forever
-          body.setAngularDamping(0.2);
-        }
+        // Both bodies share the same rest orientation, so rapier's single joint axis has the
+        // same coordinates in both local frames and the joint measures 0 at the rest pose.
+        const jd = R.JointData.revolute(toLocal(parentTb.body, anchorW), toLocal(body, anchorW), toLocalDir(parentTb.body, axisW));
+        joint = this.world.createImpulseJoint(jd, parentTb.body, body, true) as RAPIER.RevoluteImpulseJoint;
+        if (animated) joint.setLimits(0, 0);
       }
-      const tb: TileBody = { tile, body, joint };
+      const restAngle = animated ? attr(tile.node, 'angle', env, 0) : 0;
+      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, bodyRestQuat, bodyRestPos, restAngle };
       this.tiles.push(tb);
       this.byId.set(tile.id, tb);
     }
   }
 
+  /** world pose of a tile (its group body pose composed with the rest offset) */
+  pose(tb: TileBody, out?: Pose): Pose {
+    const t = tb.body.translation();
+    const r = tb.body.rotation();
+    const q = (out?.quaternion ?? new THREE.Quaternion()).set(r.x, r.y, r.z, r.w);
+    const p = (out?.position ?? new THREE.Vector3()).copy(tb.relPos).applyQuaternion(q).add(new THREE.Vector3(t.x, t.y, t.z));
+    q.multiply(tb.relQuat);
+    return { position: p, quaternion: q };
+  }
+
+  /** velocity of a tile's center */
+  velocity(tb: TileBody, pose: Pose): THREE.Vector3 {
+    const v = tb.body.linvel();
+    const w = tb.body.angvel();
+    const c = tb.body.translation();
+    const r = pose.position.clone().sub(new THREE.Vector3(c.x, c.y, c.z));
+    return new THREE.Vector3(w.x, w.y, w.z).cross(r).add(new THREE.Vector3(v.x, v.y, v.z));
+  }
+
   /** Drive joints toward attribute values, apply wheel torque, jets and air drag. */
   applyControls(env: ValEnv): void {
     const DEG = Math.PI / 180;
-    // forces/torques accumulate across steps in rapier; start every step from zero
+    const seen = new Set<number>();
     for (const tb of this.tiles) {
-      if (tb.tile.spec.merge) continue;
+      if (seen.has(tb.body.handle)) continue;
+      seen.add(tb.body.handle);
+      // forces/torques accumulate across steps in rapier; start every step from zero
       tb.body.resetForces(false);
       tb.body.resetTorques(false);
     }
+    const UP = new THREE.Vector3(0, 1, 0);
     for (const tb of this.tiles) {
       const { tile, joint, body } = tb;
-      if (tile.spec.merge) continue;
-      const rot = body.rotation();
-      const q = this.tmpQ.set(rot.x, rot.y, rot.z, rot.w);
+      const pose = this.pose(tb);
+      const normal = UP.clone().applyQuaternion(pose.quaternion);
 
       if (joint && tile.parent) {
         if (tile.spec.joint === 'wheel') {
           const power = attr(tile.node, 'power', env, 0);
           const brake = attr(tile.node, 'brake', env, 0);
-          const axis = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
           const parentBody = this.byId.get(tile.parent.id)!.body;
           let torque = power * WHEEL_TORQUE_PER_POWER;
           if (brake > 0) {
             const w = body.angvel();
             const pw = parentBody.angvel();
-            const rel = (w.x - pw.x) * axis.x + (w.y - pw.y) * axis.y + (w.z - pw.z) * axis.z;
+            const rel = (w.x - pw.x) * normal.x + (w.y - pw.y) * normal.y + (w.z - pw.z) * normal.z;
             torque -= rel * brake * 2;
           }
           if (torque !== 0) {
-            const t = axis.clone().multiplyScalar(torque);
+            const t = normal.clone().multiplyScalar(torque);
             body.addTorque({ x: t.x, y: t.y, z: t.z }, true);
             if (!tile.spec.noReaction) parentBody.addTorque({ x: -t.x, y: -t.y, z: -t.z }, true);
           }
-        } else {
-          // angle is a hard limit; animated angles (steering) move the limit each step
-          const a = attr(tile.node, 'angle', env, 0) * DEG;
+        } else if (tb.animated) {
+          const a = (attr(tile.node, 'angle', env, 0) - tb.restAngle) * DEG;
           joint.setLimits(a, a);
         }
       }
@@ -166,18 +211,23 @@ export class PhysicsWorld {
       if (tile.spec.jet) {
         const power = attr(tile.node, 'power', env, 0);
         if (power !== 0) {
-          const n = new THREE.Vector3(0, 1, 0).applyQuaternion(q).multiplyScalar(power * JET_NEWTON_PER_POWER);
-          body.addForce({ x: n.x, y: n.y, z: n.z }, true);
+          const f = normal.clone().multiplyScalar(power * JET_NEWTON_PER_POWER);
+          body.addForceAtPoint({ x: f.x, y: f.y, z: f.z }, { x: pose.position.x, y: pose.position.y, z: pose.position.z }, true);
         }
       }
 
       if (tile.spec.drag > 0) {
-        // quadratic drag along the tile normal only (plates slip edge-on)
-        const v = body.linvel();
-        const n = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
-        const vn = v.x * n.x + v.y * n.y + v.z * n.z;
+        // quadratic drag along the tile normal only (plates slip edge-on) → also the lift model
+        const v = this.velocity(tb, pose);
+        const vn = v.dot(normal);
         const f = -AIR_DRAG * tile.spec.drag * vn * Math.abs(vn);
-        if (Math.abs(f) > 1e-6) body.addForce({ x: n.x * f, y: n.y * f, z: n.z * f }, true);
+        if (Math.abs(f) > 1e-4) {
+          body.addForceAtPoint(
+            { x: normal.x * f, y: normal.y * f, z: normal.z * f },
+            { x: pose.position.x, y: pose.position.y, z: pose.position.z },
+            true,
+          );
+        }
       }
     }
   }

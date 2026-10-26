@@ -111,7 +111,7 @@ function tokenize(src: string): Tok[] {
 /** Find top-level `Name { ... }` blocks, returning raw inner text (brace-balanced). */
 function findBlocks(src: string): { name: string; inner: string; line: number }[] {
   const blocks: { name: string; inner: string; line: number }[] = [];
-  const re = /(^|\n)[ \t]*([A-Za-z_][A-Za-z0-9_]*)[ \t\r\n]*\{/g;
+  const re = /(^|[\s}])([A-Za-z_][A-Za-z0-9_]*)\s*\{/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(src))) {
     const name = m[2];

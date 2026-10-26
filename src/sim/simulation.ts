@@ -161,11 +161,18 @@ export class Simulation {
     this.ticks++;
   }
 
+  /** yaw of the core's forward (-Z) axis, for the chase camera */
+  coreHeading(): number {
+    const tb = this.physics.tiles[0];
+    if (!tb) return 0;
+    const f = new THREE.Vector3(0, 0, -1).applyQuaternion(this.physics.pose(tb).quaternion);
+    // camera sits behind the model: orbit yaw such that offset = -forward
+    return Math.atan2(-f.x, -f.z);
+  }
+
   corePosition(): THREE.Vector3 {
     const tb = this.physics.tiles[0];
-    if (!tb) return new THREE.Vector3();
-    const p = tb.body.translation();
-    return new THREE.Vector3(p.x, p.y, p.z);
+    return tb ? this.physics.pose(tb).position : new THREE.Vector3();
   }
 
   private tileOf(n: number): TileInstance | undefined {
@@ -175,33 +182,38 @@ export class Simulation {
     const t = this.tileOf(n);
     return t ? this.physics.byId.get(t.id)?.body : undefined;
   }
+  private tbOf(n: number) {
+    const t = this.tileOf(n);
+    return t ? this.physics.byId.get(t.id) : undefined;
+  }
+  /** world pose of chip n (tiles welded into a group still report their own pose) */
+  private poseOf(n: number) {
+    const tb = this.tbOf(n);
+    return tb ? this.physics.pose(tb) : undefined;
+  }
 
   /** Script API shared by Lua and legacy Script. */
   api(): LuaApi {
     const key = (n: number) => (this.keysNow.has(n) ? 1 : 0);
     const keydown = (n: number) => (this.keysNow.has(n) && !this.keysPrev.has(n) ? 1 : 0);
     const keyup = (n: number) => (!this.keysNow.has(n) && this.keysPrev.has(n) ? 1 : 0);
-    const pos = (n: number, c: 'x' | 'y' | 'z') => this.bodyOf(n)?.translation()[c] ?? 0;
+    const pos = (n: number, c: 'x' | 'y' | 'z') => this.poseOf(n)?.position[c] ?? 0;
     const localVel = (n: number, axis: THREE.Vector3) => {
-      const b = this.bodyOf(n);
-      if (!b) return 0;
-      const v = b.linvel();
-      const r = b.rotation();
-      const a = axis.clone().applyQuaternion(new THREE.Quaternion(r.x, r.y, r.z, r.w));
-      return v.x * a.x + v.y * a.y + v.z * a.z;
+      const tb = this.tbOf(n);
+      if (!tb) return 0;
+      const pose = this.physics.pose(tb);
+      const v = this.physics.velocity(tb, pose);
+      return v.dot(axis.clone().applyQuaternion(pose.quaternion));
     };
     const worldAxis = (n: number, local: THREE.Vector3, c: 'x' | 'y' | 'z') => {
-      const b = this.bodyOf(n);
-      if (!b) return 0;
-      const r = b.rotation();
-      return local.clone().applyQuaternion(new THREE.Quaternion(r.x, r.y, r.z, r.w))[c];
+      const pose = this.poseOf(n);
+      return pose ? local.clone().applyQuaternion(pose.quaternion)[c] : 0;
     };
     const euler = (n: number) => {
-      const b = this.bodyOf(n);
-      if (!b) return new THREE.Euler();
-      const r = b.rotation();
-      return new THREE.Euler().setFromQuaternion(new THREE.Quaternion(r.x, r.y, r.z, r.w), 'YXZ');
+      const pose = this.poseOf(n);
+      return pose ? new THREE.Euler().setFromQuaternion(pose.quaternion, 'YXZ') : new THREE.Euler();
     };
+    const quat = (n: number, c: 'x' | 'y' | 'z' | 'w') => this.poseOf(n)?.quaternion[c] ?? (c === 'w' ? 1 : 0);
     const angvel = (n: number, c: 'x' | 'y' | 'z') => this.bodyOf(n)?.angvel()[c] ?? 0;
     const attrOf = (n: number, name: string, d = 0) => {
       const t = this.tileOf(n);
@@ -215,8 +227,9 @@ export class Simulation {
     const FWD = new THREE.Vector3(0, 0, -1);
     const h = (n: number) => {
       const b = this.bodyOf(n);
-      if (!b) return -100000;
-      const p = b.translation();
+      const pose = this.poseOf(n);
+      if (!b || !pose) return -100000;
+      const p = pose.position;
       const ray = new this.R.Ray({ x: p.x, y: p.y, z: p.z }, { x: 0, y: -1, z: 0 });
       const hit = this.physics.world.castRay(ray, 10, true, undefined, undefined, undefined, b);
       return hit ? hit.timeOfImpact : -100000;
@@ -252,7 +265,7 @@ export class Simulation {
       _VX: (n: number) => localVel(n, RIGHT),
       _VY: (n: number) => localVel(n, UP),
       _VZ: (n: number) => localVel(n, FWD),
-      _VEL: (n: number) => { const b = this.bodyOf(n); if (!b) return 0; const v = b.linvel(); return Math.hypot(v.x, v.y, v.z); },
+      _VEL: (n: number) => { const tb = this.tbOf(n); if (!tb) return 0; return this.physics.velocity(tb, this.physics.pose(tb)).length(); },
       _WX: (n: number) => angvel(n, 'x'),
       _WY: (n: number) => angvel(n, 'y'),
       _WZ: (n: number) => angvel(n, 'z'),
@@ -274,10 +287,10 @@ export class Simulation {
       _ZX: (n: number) => worldAxis(n, FWD, 'x'),
       _ZY: (n: number) => worldAxis(n, FWD, 'y'),
       _ZZ: (n: number) => worldAxis(n, FWD, 'z'),
-      _QX: (n: number) => this.bodyOf(n)?.rotation().x ?? 0,
-      _QY: (n: number) => this.bodyOf(n)?.rotation().y ?? 0,
-      _QZ: (n: number) => this.bodyOf(n)?.rotation().z ?? 0,
-      _QW: (n: number) => this.bodyOf(n)?.rotation().w ?? 1,
+      _QX: (n: number) => quat(n, 'x'),
+      _QY: (n: number) => quat(n, 'y'),
+      _QZ: (n: number) => quat(n, 'z'),
+      _QW: (n: number) => quat(n, 'w'),
       _GX: (n: number) => pos(n, 'x'),
       _GY: (n: number) => pos(n, 'y'),
       _GZ: (n: number) => pos(n, 'z'),
