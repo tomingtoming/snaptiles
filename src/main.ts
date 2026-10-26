@@ -65,18 +65,18 @@ for (const [i, s] of SAMPLES.entries()) {
     current = i;
     sourceEl.value = s.source;
     refreshSampleButtons();
-    void load(s.source);
+    void loadAndShare(s.source);
   });
   samplesEl.append(b);
 }
 function refreshSampleButtons(): void {
   [...samplesEl.children].forEach((c, i) => c.setAttribute('aria-current', String(i === current)));
 }
-runBtn.addEventListener('click', () => void load(sourceEl.value));
+runBtn.addEventListener('click', () => void loadAndShare(sourceEl.value));
 sourceEl.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     e.preventDefault();
-    void load(sourceEl.value);
+    void loadAndShare(sourceEl.value);
   }
 });
 window.addEventListener('keydown', (e) => {
@@ -147,6 +147,79 @@ function fmt(v: number): string {
 new ResizeObserver(() => scene.resize()).observe(canvas);
 requestAnimationFrame(frame);
 
-sourceEl.value = SAMPLES[0].source;
-refreshSampleButtons();
-void load(SAMPLES[0].source);
+// ---- files in, links out ----
+// Drop a .rc/.txt onto the editor to load it; the model travels in the URL hash so a link is a share.
+sourceEl.addEventListener('dragover', (e) => e.preventDefault());
+sourceEl.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  const f = e.dataTransfer?.files?.[0];
+  if (!f) return;
+  const text = await readModelFile(f);
+  sourceEl.value = text;
+  current = -1;
+  refreshSampleButtons();
+  void loadAndShare(text);
+});
+async function readModelFile(f: File): Promise<string> {
+  const buf = await f.arrayBuffer();
+  const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(buf);
+  if (!/�/.test(utf8)) return utf8;
+  try {
+    return new TextDecoder('shift_jis').decode(buf); // original tool's files are often Shift-JIS
+  } catch {
+    return utf8;
+  }
+}
+async function encodeHash(text: string): Promise<string> {
+  const cs = new CompressionStream('deflate-raw');
+  const w = cs.writable.getWriter();
+  void w.write(new TextEncoder().encode(text));
+  void w.close();
+  const bytes = new Uint8Array(await new Response(cs.readable).arrayBuffer());
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+async function decodeHash(h: string): Promise<string> {
+  const b64 = h.replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
+  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  const ds = new DecompressionStream('deflate-raw');
+  const w = ds.writable.getWriter();
+  void w.write(bytes);
+  void w.close();
+  return new TextDecoder().decode(await new Response(ds.readable).arrayBuffer());
+}
+async function publishHash(text: string): Promise<void> {
+  const sample = SAMPLES.find((s) => s.source === text);
+  const h = sample ? `#${sample.name}` : `#m=${await encodeHash(text)}`;
+  if (location.hash !== h) history.replaceState(null, '', h);
+}
+
+const origLoad = load;
+const loadAndShare = async (text: string) => {
+  await origLoad(text);
+  await publishHash(text);
+};
+
+async function boot(): Promise<void> {
+  const h = location.hash.slice(1);
+  if (h.startsWith('m=')) {
+    try {
+      const text = await decodeHash(h.slice(2));
+      sourceEl.value = text;
+      current = -1;
+      refreshSampleButtons();
+      await origLoad(text);
+      return;
+    } catch {
+      /* fall through to the sample */
+    }
+  }
+  const idx = Math.max(0, SAMPLES.findIndex((s) => s.name === h));
+  current = idx;
+  sourceEl.value = SAMPLES[idx].source;
+  refreshSampleButtons();
+  await loadAndShare(SAMPLES[idx].source);
+}
+void boot();
