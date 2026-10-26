@@ -1,0 +1,25 @@
+{
+  "name": "snaptiles",
+  "private": true,
+  "version": "0.0.0",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.21.0",
+    "three": "^0.186.1",
+    "wasmoon": "^1.16.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "typescript": "^5.9.2",
+    "vite": "^6.0.0",
+    "vitest": "^4.1.9",
+    "playwright": "^1.59.0"
+  }
+}
