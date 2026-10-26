@@ -1,0 +1,15 @@
+import { chromium } from 'playwright';
+const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const page = await browser.newPage();
+await page.goto('http://127.0.0.1:5173/', { waitUntil: 'networkidle' });
+await page.waitForTimeout(1000);
+await page.fill('#source', 'Val{}\nKey{}\nBody{ Core(){ N:Chip(){} } }\n');
+await page.click('#run');
+await page.waitForTimeout(800);
+const hash = await page.evaluate(() => location.hash);
+console.log('hash length', hash.length, hash.slice(0, 20));
+const page2 = await browser.newPage();
+await page2.goto('http://127.0.0.1:5173/' + hash, { waitUntil: 'networkidle' });
+await page2.waitForTimeout(1000);
+console.log(JSON.stringify(await page2.evaluate(() => ({ src: document.getElementById('source').value, status: document.getElementById('status').textContent, chips: window.__sim?.assembly?.chipCount }))));
+await browser.close();

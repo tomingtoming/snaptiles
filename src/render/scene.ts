@@ -28,7 +28,7 @@ export class SceneView {
   private group = new THREE.Group();
   camYaw = 0.6;
   camPitch = 0.35;
-  camDist = 9;
+  camDist = 12;
   private camTarget = new THREE.Vector3();
 
   constructor(public canvas: HTMLCanvasElement) {
