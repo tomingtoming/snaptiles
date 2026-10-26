@@ -1,5 +1,5 @@
 // Screenshot / probe harness: node tools/shot.mjs <url> <outPrefix> [keys...]
-// keys: sequences like "ArrowUp:1500" (hold ms). Takes a screenshot after each.
+// keys: "ArrowUp:1500" (hold ms) or "ArrowUp+ArrowLeft:1500" for chords. Screenshot after each.
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 
@@ -13,14 +13,22 @@ page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
 await page.goto(url, { waitUntil: 'networkidle' });
 await page.waitForTimeout(1500);
+// "@name" selects a sample by its button text before the key sequence
+const sampleArg = keySpecs.find((k) => k.startsWith('@'));
+if (sampleArg) {
+  await page.getByRole('button', { name: sampleArg.slice(1), exact: true }).click();
+  await page.waitForTimeout(1500);
+  keySpecs.splice(keySpecs.indexOf(sampleArg), 1);
+}
 await page.screenshot({ path: `${prefix}-0.png` });
 let i = 1;
 for (const spec of keySpecs) {
-  const [code, ms = '1000'] = spec.split(':');
+  const [codes, ms = '1000'] = spec.split(':');
+  const list = codes.split('+').filter(Boolean);
   await page.focus('#view');
-  await page.keyboard.down(code);
+  for (const c of list) await page.keyboard.down(c);
   await page.waitForTimeout(Number(ms));
-  await page.keyboard.up(code);
+  for (const c of list) await page.keyboard.up(c);
   await page.waitForTimeout(200);
   await page.screenshot({ path: `${prefix}-${i++}.png` });
 }

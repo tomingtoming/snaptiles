@@ -13,12 +13,9 @@ export interface PhysicsOptions {
 }
 
 /** power → torque scale for wheels: spec only says "TRQ≈1000" drives a car. */
-export const WHEEL_TORQUE_PER_POWER = 0.08; // N·m per power unit
+export const WHEEL_TORQUE_PER_POWER = 0.25; // N·m per power unit
 /** spec: 6 power = 1 N */
 export const JET_NEWTON_PER_POWER = 1 / 6;
-/** hinge position motor: spring 0..1 → stiffness, damper 0..1 → damping */
-export const HINGE_STIFFNESS = 6000;
-export const HINGE_DAMPING = 400;
 export const AIR_DRAG = 0.9; // N per (m/s)² per unit drag coefficient of a tile
 
 // Tiles of a model never collide with each other (only with the ground / objects).
@@ -115,10 +112,6 @@ export class PhysicsWorld {
           // the spring/damper feel on top. Rudder/Trim steer by moving the limits.
           const a = attr(tile.node, 'angle', env, 0) * (Math.PI / 180);
           joint.setLimits(a, a);
-          const spring = clamp01(attr(tile.node, 'spring', env, 1));
-          const damper = clamp01(attr(tile.node, 'damper', env, 0.5));
-          joint.configureMotorModel(R.MotorModel.ForceBased);
-          joint.configureMotorPosition(a, HINGE_STIFFNESS * (0.05 + spring), HINGE_DAMPING * (0.1 + damper));
         } else {
           // light rolling resistance so a free wheel does not spin forever
           body.setAngularDamping(0.2);
@@ -133,6 +126,12 @@ export class PhysicsWorld {
   /** Drive joints toward attribute values, apply wheel torque, jets and air drag. */
   applyControls(env: ValEnv): void {
     const DEG = Math.PI / 180;
+    // forces/torques accumulate across steps in rapier; start every step from zero
+    for (const tb of this.tiles) {
+      if (tb.tile.spec.merge) continue;
+      tb.body.resetForces(false);
+      tb.body.resetTorques(false);
+    }
     for (const tb of this.tiles) {
       const { tile, joint, body } = tb;
       if (tile.spec.merge) continue;
@@ -158,14 +157,9 @@ export class PhysicsWorld {
             if (!tile.spec.noReaction) parentBody.addTorque({ x: -t.x, y: -t.y, z: -t.z }, true);
           }
         } else {
+          // angle is a hard limit; animated angles (steering) move the limit each step
           const a = attr(tile.node, 'angle', env, 0) * DEG;
-          if (tile.spec.joint === 'yaw' || tile.spec.joint === 'roll') {
-            // steerable joints: slew the hard limit toward the requested angle
-            joint.setLimits(a, a);
-          }
-          const spring = clamp01(attr(tile.node, 'spring', env, 1));
-          const damper = clamp01(attr(tile.node, 'damper', env, 0.5));
-          joint.configureMotorPosition(a, HINGE_STIFFNESS * (0.05 + spring), HINGE_DAMPING * (0.1 + damper));
+          joint.setLimits(a, a);
         }
       }
 
@@ -192,10 +186,6 @@ export class PhysicsWorld {
     this.world.step();
     this.tick++;
   }
-}
-
-function clamp01(v: number): number {
-  return Math.max(0, Math.min(1, v));
 }
 
 function toLocal(body: RAPIER.RigidBody, worldPoint: THREE.Vector3) {
