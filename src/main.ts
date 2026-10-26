@@ -43,7 +43,9 @@ async function load(source: string): Promise<void> {
 function buildKeyCaps(s: Simulation): void {
   keysEl.replaceChildren();
   keyCaps = [];
-  const used = [...new Set(s.model.keys.map((k) => k.key))].sort((a, b) => a - b);
+  // keys bound in Key{} plus any _KEY(n) literal the script polls
+  const polled = [...(s.model.script?.source.matchAll(/_KEY(?:DOWN|UP)?\s*\(\s*(\d+)\s*\)/g) ?? [])].map((m) => Number(m[1]));
+  const used = [...new Set([...s.model.keys.map((k) => k.key), ...polled])].sort((a, b) => a - b);
   for (const n of used) {
     const def = KEY_TABLE[n];
     if (!def) continue;

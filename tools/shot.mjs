@@ -13,6 +13,18 @@ page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
 await page.goto(url, { waitUntil: 'networkidle' });
 await page.waitForTimeout(1500);
+// "--file=path" pastes a model file into the editor and runs it (utf-8, falling back to shift_jis)
+const fileArg = keySpecs.find((k) => k.startsWith('--file='));
+if (fileArg) {
+  const { readFileSync } = await import('node:fs');
+  const buf = readFileSync(fileArg.slice(7));
+  let text = new TextDecoder('utf-8', { fatal: false }).decode(buf);
+  if (/�/.test(text)) text = new TextDecoder('shift_jis').decode(buf);
+  await page.fill('#source', text);
+  await page.click('#run');
+  await page.waitForTimeout(1500);
+  keySpecs.splice(keySpecs.indexOf(fileArg), 1);
+}
 // "@name" selects a sample by its button text before the key sequence
 const sampleArg = keySpecs.find((k) => k.startsWith('@'));
 if (sampleArg) {
