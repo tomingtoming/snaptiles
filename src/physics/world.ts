@@ -55,6 +55,9 @@ export const WHEEL_TORQUE_PER_POWER = 0.13; // N·m per power unit (measured: Ba
 export const WHEEL_SPIN_FADE = 180; // rad/s at which the torque would reach zero
 /** rapier velocity-solver iterations per step (joint chains sag less with more) */
 export const SOLVER_ITERATIONS = 16; // 8 let the 3-wheeler's joint chain sag 0.4 m under its own weight; 32 settles it at the original's height
+/** brake: deceleration in g per brake unit and its cap (measured on the original, 4-wheel car) */
+export const BRAKE_G_PER_UNIT = 0.022;
+export const BRAKE_G_MAX = 0.8;
 /** lateral grip: fraction of the sideways contact velocity removed per step (1 = dead stop) */
 export const TYRE_LATERAL_GAIN = 0.25;
 /** the tyre still grips this far above the ground (the unsprung front lifts a few cm under power) */
@@ -552,11 +555,18 @@ export class PhysicsWorld {
         const vl = vP.dot(l);
         tb.spin = vf / r;
         const k = (globalThis as unknown as { __tune?: { wheelTorque?: number } }).__tune?.wheelTorque ?? WHEEL_TORQUE_PER_POWER;
-        let Ff = (power * k) / r;
-        if (power !== 0) Ff *= Math.max(0, 1 - Math.max(0, Math.sign(power) * tb.spin) / WHEEL_SPIN_FADE);
-        if (brake > 0) Ff -= (2 * brake * vf) / (r * r);
         const wheels = this.assembly ? this.assembly.tiles.filter((t) => t.spec.wheel).length : 1;
         const load = (this.totalMass * 9.8 * TYRE_LOAD_SHARE) / Math.max(1, wheels);
+        let Ff = (power * k) / r;
+        if (power !== 0) Ff *= Math.max(0, 1 - Math.max(0, Math.sign(power) * tb.spin) / WHEEL_SPIN_FADE);
+        if (brake > 0) {
+          // measured: a 530 kg car with brake=10 on four wheels sheds 2.2 m/s² (0.22 g), brake=50 7.7 m/s²
+          // (0.78 g) at any speed — Coulomb, ≈0.022 g per brake unit, saturating near 0.8 g
+          const frac = Math.min(BRAKE_G_PER_UNIT * brake, BRAKE_G_MAX);
+          const ramp = Math.min(1, Math.abs(vf) / 0.5); // no chatter at rest
+          Ff -= Math.sign(vf) * frac * load * ramp;
+        }
+
         const mu = (globalThis as unknown as { __tune?: { wheelFriction?: number } }).__tune?.wheelFriction ?? WHEEL_FRICTION;
         const limit = mu * load;
         Ff = Math.max(-limit, Math.min(limit, Ff));
