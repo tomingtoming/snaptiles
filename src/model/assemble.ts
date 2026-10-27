@@ -20,7 +20,7 @@ import { evalExpr } from '../rc/expr';
 // Measured against the original 1.5B26 (2026-10-27): chip centers are 0.6 m apart, wheel option 0
 // rolls at v/ω = 0.30 m, a 90°-folded wheel hangs 0.3 m below and 0.3 m beyond its hinge.
 export const TILE = 0.6;
-export const TILE_T = 0.06;
+export const TILE_T = 0.03; // a chip lying flat rests with its center 0.015 m above the ground (measured)
 
 export type JointKind = 'hinge' | 'yaw' | 'roll' | 'wheel' | 'fixed';
 
