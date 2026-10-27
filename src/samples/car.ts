@@ -2,13 +2,13 @@ export const CAR = `// four wheel car
 Val
 {
   HANDLE(default=0, min=-30, max=30, step=3)
-  ENGINE(default=0, min=-4000, max=4000, step=100)
+  ENGINE(default=0, min=-1500, max=1500, step=100)
   BRAKE(default=0, min=0, max=100, step=100)
 }
 Key
 {
-  0:ENGINE(step=150)
-  1:ENGINE(step=-150)
+  0:ENGINE(step=100)
+  1:ENGINE(step=-100)
   2:HANDLE(step=-3)
   3:HANDLE(step=3)
   4:BRAKE(step=100)
