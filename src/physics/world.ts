@@ -509,6 +509,8 @@ function toLocalDir(body: RAPIER.RigidBody, worldDir: THREE.Vector3) {
 export function wheelRadius(option: number): number {
   const tune = (globalThis as unknown as { __tune?: { wheelRadius?: number } }).__tune?.wheelRadius;
   const base = tune ?? WHEEL_RADIUS0;
-  return base * (option >= 2 ? 1.5 : option >= 1 ? 1.25 : 1);
+  // measured 2026-10-27: option 1 rolls at 0.45 m, option 2 at 0.60 m (1.5× and 2× option 0)
+  return base * (option >= 2 ? 2 : option >= 1 ? 1.5 : 1);
 }
-export const WHEEL_RADIUS0 = 0.5;
+/** measured: the Basic car (option 0) rolls at v/ω = 0.30 m in the original */
+export const WHEEL_RADIUS0 = 0.3;

@@ -95,17 +95,17 @@ describe('measured conventions', () => {
   it('segway idiom: side wheels Frame(-30){Wheel(angle=120)} sit lowest, the mast folds up', () => {
     const { a, lo, hi } = lowestHighest('Core(){ W:Frame(angle=-30){ W:Wheel(angle=120){} } E:Frame(angle=-30){ E:Wheel(angle=120){} } N:Frame(angle=-70){ N:Frame(angle=-20){ N:Frame(){} } } S:Weight(angle=-90){} }');
     const wheels = a.tiles.filter((t) => t.spec.wheel);
-    for (const w of wheels) expect(w.position.y - lo).toBeLessThan(0.6);
+    for (const w of wheels) expect(w.position.y - lo).toBeLessThan(0.6 * TILE);
     const mastTip = a.tiles[a.tiles.length - 2]; // last N frame
-    expect(mastTip.position.y).toBeGreaterThan(1.5);
-    expect(hi).toBeGreaterThan(1.5);
+    expect(mastTip.position.y).toBeGreaterThan(1.5 * TILE);
+    expect(hi).toBeGreaterThan(1.5 * TILE);
   });
 
   it('car1 idiom: Trim(90) then Frame(90) Frame(50) Frame(-140) hangs the wheel below the core', () => {
     const { a, lo } = lowestHighest('Core(){ N:Chip(){ N:Trim(angle=90){ E:Frame(angle=90){ E:Frame(angle=50){ E:Frame(angle=-140){ N:Wheel(){} } } } } } }');
     const w = a.tiles.find((t) => t.spec.wheel)!;
-    expect(w.position.y).toBeLessThan(-0.2);
-    expect(w.position.y - lo).toBeLessThan(0.6);
+    expect(w.position.y).toBeLessThan(-0.2 * TILE);
+    expect(w.position.y - lo).toBeLessThan(0.6 * TILE);
   });
 
   it('bike idiom: TrimF(angle=-90){ S:Wheel } stands the rear wheel up (normal sideways)', () => {
@@ -116,6 +116,6 @@ describe('measured conventions', () => {
 
   it('rudder sign: Rudder(angle=90) on N swings the tile toward +X', () => {
     const a = build('Core(){ N:Rudder(angle=90){} }');
-    expect(a.tiles[1].position.x).toBeGreaterThan(0.4);
+    expect(a.tiles[1].position.x).toBeGreaterThan(0.4 * TILE);
   });
 });

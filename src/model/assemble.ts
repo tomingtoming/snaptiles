@@ -17,8 +17,10 @@ import * as THREE from 'three';
 import type { ChipNode, RcModel } from '../rc/parser';
 import { evalExpr } from '../rc/expr';
 
-export const TILE = 1;
-export const TILE_T = 0.1;
+// Measured against the original 1.5B26 (2026-10-27): chip centers are 0.6 m apart, wheel option 0
+// rolls at v/ω = 0.30 m, a 90°-folded wheel hangs 0.3 m below and 0.3 m beyond its hinge.
+export const TILE = 0.6;
+export const TILE_T = 0.06;
 
 export type JointKind = 'hinge' | 'yaw' | 'roll' | 'wheel' | 'fixed';
 
