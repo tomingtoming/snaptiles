@@ -242,10 +242,10 @@ export class Simulation {
     const quat = (n: number, c: 'x' | 'y' | 'z' | 'w') => this.poseOf(n)?.quaternion[c] ?? (c === 'w' ? 1 : 0);
     // Sign / frame conventions of the original are undocumented; `window.__tune` lets probes
     // flip them at runtime (see tools/tune-probe.mjs). Defaults are the current best guess.
-    // Measured 2026-10-27 with the segway model (stands only when _AX is negated): the original
-    // reports pitch with the opposite sign of a right-handed rotation about +X, so the whole
-    // handedness is flipped (left-handed DirectX world).
-    const tune = ((globalThis as unknown as { __tune?: Tune }).__tune ??= { ax: -1, ay: 1, az: -1, w: -1, wLocal: true });
+    // Measured 2026-10-27 by driving the corpus' self-balancing models (unicycle, segway, drum,
+    // bike) through tools/tune-probe.mjs + drive-probe.mjs: all four stay upright only with pitch
+    // negated and angular velocity taken in the world frame with its sign flipped.
+    const tune = ((globalThis as unknown as { __tune?: Tune }).__tune ??= { ax: -1, ay: 1, az: 1, w: -1, wLocal: false });
     const angvel = (n: number, c: 'x' | 'y' | 'z') => {
       const b = this.bodyOf(n);
       if (!b) return 0;
