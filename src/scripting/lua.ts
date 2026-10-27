@@ -98,7 +98,8 @@ export class ScriptRunner {
   private print(row: number, args: unknown[]): void {
     const text = args
       .map((a) => (typeof a === 'number' ? (Number.isInteger(a) ? String(a) : a.toFixed(2)) : String(a)))
-      .join(' ');
+      .join(' ')
+      .replace(/&\s*$/, ''); // a trailing & asks the original for a fixed-width font
     const r = Math.max(0, Math.min(24, Math.floor(row)));
     while (this.outLines.length <= r) this.outLines.push('');
     this.outLines[r] = text;

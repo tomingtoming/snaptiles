@@ -26,6 +26,7 @@ paintMute();
 (window as unknown as { __sfx: Sfx }).__sfx = sfx; // probe hook
 let lastShells = 0;
 let lastCoreVel: { x: number; y: number; z: number } | null = null;
+const crateVel: ({ x: number; y: number; z: number } | null)[] = [];
 const scene = new SceneView(canvas);
 let sim: Simulation | null = null;
 let keyCaps: { el: HTMLElement; n: number }[] = [];
@@ -227,6 +228,16 @@ function updateSound(s: Simulation): void {
   const shells = s.physics.projectiles.length;
   if (shells > lastShells) sfx.fire();
   lastShells = shells;
+  // crates being hit: a thud scaled by how hard they were kicked
+  s.physics.crates.forEach((b, i) => {
+    const v = b.linvel();
+    const prev = crateVel[i];
+    if (prev) {
+      const dv = Math.hypot(v.x - prev.x, v.y - prev.y, v.z - prev.z);
+      if (dv > 2) sfx.thud(Math.min(1, (dv - 2) / 10));
+    }
+    crateVel[i] = { x: v.x, y: v.y, z: v.z };
+  });
   const core = s.physics.tiles[0];
   if (core) {
     const v = core.body.linvel();
