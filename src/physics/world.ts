@@ -45,7 +45,7 @@ export interface PhysicsOptions {
 }
 
 /** power → torque scale for wheels: spec only says "TRQ≈1000" drives a car. */
-export const WHEEL_TORQUE_PER_POWER = 0.066; // N·m per power unit (measured: Basic car, 4 wheels, a0 = 4.89 m/s² at power 2500)
+export const WHEEL_TORQUE_PER_POWER = 0.13; // N·m per power unit (measured: Basic car with all four wheels at power 2500 accelerates at 8.5 m/s²; attributes bound to a Val ignore _SET, so the first runs only drove the two front wheels)
 /** motor torque falls linearly with the wheel's spin: T = k·power·(1 − ω/WHEEL_SPIN_FADE)
  *  (measured on the original 1.5B26: Basic car at power 2500, a/a0 = 0.877 at ω≈22 rad/s, 0.62 at ω≈69;
  *  no hard speed cap and no measurable air/rolling drag while coasting at 22 m/s) */
@@ -376,7 +376,15 @@ export class PhysicsWorld {
    * decays in the air.
    */
   private driveWheel(tb: TileBody, pose: Pose, normal: THREE.Vector3, env: ValEnv): void {
-    const { tile, body } = tb;
+    const { tile } = tb;
+    // a wheel on a folding rim applies its tyre forces to the chassis the rim hangs from: the rim body
+    // is light and its hard-limited joint would otherwise chatter under the grip forces
+    let body = tb.rim && tile.parent ? (this.byId.get(tile.parent.id)?.body ?? tb.body) : tb.body;
+    if ((globalThis as unknown as { __tune?: { tyreToRoot?: boolean } }).__tune?.tyreToRoot) {
+      let t = tile;
+      while (t.parent && !t.detached) t = t.parent;
+      body = this.byId.get(t.id)?.body ?? body;
+    }
     const DEG = Math.PI / 180;
     const power = tile.powerless ? 0 : attr(tile.node, 'power', env, 0);
     const brake = attr(tile.node, 'brake', env, 0);
@@ -422,10 +430,12 @@ export class PhysicsWorld {
         let Fl = (-lateralGain * vl * (this.totalMass / Math.max(1, wheels))) / this.dt;
         Fl = Math.max(-limit, Math.min(limit, Fl));
         const F = f.clone().multiplyScalar(Ff).addScaledVector(l, Fl);
-        if ((globalThis as unknown as { __tune?: { debugWheels?: boolean } }).__tune?.debugWheels) console.log('wheel', tile.chipIndex, 'toi', hit.timeOfImpact.toFixed(3), 'n', normal.toArray().map((x) => x.toFixed(2)).join(','), 'f', f.toArray().map((x) => x.toFixed(2)).join(','), 'vf', vf.toFixed(3), 'power', power, 'Ff', Ff.toFixed(1), 'Fl', Fl.toFixed(1), 'spin', tb.spin.toFixed(2));
-        // applied at the hub, not the contact patch: no pitch/roll moment from grip (keeps the welded, unsprung
-        // chassis from rocking; yaw moments are kept because the hub is off the centreline)
-        body.addForceAtPoint({ x: F.x, y: F.y, z: F.z }, { x: o.x, y: o.y, z: o.z }, true);
+        if ((globalThis as unknown as { __tune?: { debugWheels?: boolean } }).__tune?.debugWheels) console.log('wheel', tile.chipIndex, 'toi', hit.timeOfImpact.toFixed(3), 'n', normal.toArray().map((x) => x.toFixed(2)).join(','), 'f', f.toArray().map((x) => x.toFixed(2)).join(','), 'vf', vf.toFixed(3), 'power', power, 'Ff', Ff.toFixed(1), 'Fl', Fl.toFixed(1), 'spin', tb.spin.toFixed(2), 'bodyv', [body.linvel().x, body.linvel().y, body.linvel().z].map((x) => x.toFixed(2)).join(','), 'mass', body.mass().toFixed(0), 'brake', brake, 'P', P.toArray().map((x) => x.toFixed(2)).join(','));
+        // applied at the contact patch: the ground force below the hub is what pitches a segway's body back
+        // when its wheels drive forward (self-balancers need it); the chassis rocking seen earlier came
+        // from the cylinder tyre, not from this moment
+        const at = (globalThis as unknown as { __tune?: { tyreAtHub?: boolean } }).__tune?.tyreAtHub ? o : P;
+        body.addForceAtPoint({ x: F.x, y: F.y, z: F.z }, { x: at.x, y: at.y, z: at.z }, true);
       }
     }
     if (!contact) { tb.spin *= 0.9; if ((globalThis as unknown as { __tune?: { debugWheels?: boolean } }).__tune?.debugWheels) console.log('wheel', tile.chipIndex, 'no contact; d', d.toArray().map((x) => x.toFixed(2)).join(','), 'y', pose.position.y.toFixed(3)); }

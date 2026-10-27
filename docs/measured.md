@@ -19,7 +19,7 @@ columns. Raw logs: `D:\snaptiles-models\quarantine\original\runs\*.csv` (not in 
 | mass table | Core/Chip/Rudder 25.2, Frame 12.6, Wheel 79.17 (hub+tire) → Basic = 467.87 kg | HUD `Weight=467.87` for 16 chips, SnapTiles table gives 467.88 |
 | chip numbering | a Wheel takes two numbers: first `_TYPE` 3 (hub, does not spin), second `_TYPE` 4 (spins) | rest dump |
 | wheel radius | option 0 **0.30 m**, option 1 **0.45**, option 2 **0.60** | v / `_WY(wheel)` = 0.300 / 0.455 / 0.611 while rolling |
-| wheel drive | force ∝ power, independent of radius: torque-equivalent **0.066–0.069 N·m per power unit** (Basic, 4 wheels: a₀ = 4.89 m/s² at power 2500, 0.90 at 500 → linear) | power sweep 500…2500 |
+| wheel drive | force ∝ power, independent of radius: torque-equivalent **0.13 N·m per power unit** (Basic with all four wheels at power 2500: a₀ = 8.5 m/s²; linear in power from 500 to 2500) | power sweep 500…2500 (two front wheels), basic_nopower (four) |
 | drive fade | the push falls linearly with wheel spin: a/a₀ = 0.877 at ω≈22 rad/s, 0.62 at ω≈69 → zero at ≈ **180 rad/s** | 180-frame run to 22 m/s |
 | drag | **none measurable** coasting at 22 m/s (Δv = 0.02 m/s over 1 s) | turn_basic frames 210–240 |
 | wheel in the air | a powered wheel folded up into the air does **not** spin up (`_WY` stays 0) | wheel_up at power 2500 and 1000 |
@@ -35,7 +35,7 @@ columns. Raw logs: `D:\snaptiles-models\quarantine\original\runs\*.csv` (not in 
 | Trim / Rudder signs | consistent with `JOINT_SIGN` (+1 / −1) | trimrudder30 positions |
 | arrow keys | 0 ↑ 1 ↓ 2 ← 3 → (then Z X C A S D V B F G Q W E) | bike (0 engine, 1 brake), tonbo, zrobo |
 | script cadence | 30 frames/s, scripts see `_FPS()` 30 | HUD, docs |
-| scenario file I/O | `_FOPEN/_FPUTS/_FCLOSE` work only within one call (open, write, close in the same `OnFrame`); handles kept across frames write nothing; `_SET(chip,"ANGLE",v)` is overridden by the model's `angle=Val` each frame, `_SET(...,"POWER",v)` is not | harness attempts |
+| scenario file I/O | `_FOPEN/_FPUTS/_FCLOSE` work only within one call (open, write, close in the same `OnFrame`); handles kept across frames write nothing. **`_SET(chip, attr, v)` is overridden every frame when the model binds that attribute to a Val** (`power=Engine`, `angle=Handle`): the first drive runs only moved the two front wheels of Basic (constant attributes). Probe models must use constant attributes or Val defaults | harness attempts |
 | `_VEL` | not available in scenario scripts (nil) | harness error |
 | triangle cowls | option 3 keeps the attached edge and the east edge, 4 the west edge | corpus census (unchanged) |
 | Jet option 1/2 | balloon: buoyancy straight up | airship corpus (unchanged) |
@@ -43,19 +43,42 @@ columns. Raw logs: `D:\snaptiles-models\quarantine\original\runs\*.csv` (not in 
 
 ## Implemented from these (SnapTiles)
 
-`TILE` 0.6, `TILE_T` 0.03, `WHEEL_RADIUS0` 0.3 with ×1.5 / ×2, `WHEEL_TORQUE_PER_POWER` 0.066,
-`WHEEL_SPIN_FADE` 180, no linear/angular damping, rotor spin inertia 0.3 kg·m², `TUNE_DEFAULTS`
+`TILE` 0.6, `TILE_T` 0.03, `WHEEL_RADIUS0` 0.3 with ×1.5 / ×2, `WHEEL_TORQUE_PER_POWER` 0.13,
+`WHEEL_SPIN_FADE` 180, no linear/angular damping, contact-force tyres, `TUNE_DEFAULTS`
 (ex −1, ey −1, ez −1, ax +1, ay −1, az +1, wy −1, local frame).
 
-## Known gap: rapier caps angular velocity
+## Wheel model (implemented 2026-10-27 night, `driveWheel()` in `world.ts`)
+
+The tyre is a frictionless sphere that only carries load. Each step a ray from the hub, down within
+the wheel plane, finds the ground; the push is power × 0.13 / r along the rolling direction (fading
+to zero at a kinematic spin v/r of 180 rad/s), the brake damps the rolling speed, sideways slip is
+damped (`TYRE_LATERAL_GAIN`) — all applied at the contact patch (a segway needs the pitch moment of
+the ground force; forces on a folding rim go to the chassis the rim hangs from) and limited by
+μ × (weight / wheels). Spin is integrated for the render and `_WY`. Result against the original
+(Basic car, all four wheels at power 2500 until frame 150, bare ground):
+
+| frame | original v (m/s) | SnapTiles v | original z | SnapTiles z |
+|---|---|---|---|---|
+| 59 | 7.89 | 8.14 | 3.6 | 4.1 |
+| 119 | 21.57 | 21.47 | 33.6 | 34.7 |
+| 149 | 27.13 | 26.61 | 57.9 | 58.9 |
+| 199 (coasting) | 27.22 | 26.84 | 103.4 | 103.6 |
+
+Community models after the rewrite: bike, bike2 (jet-balanced), segway (self-balancing with `_AX`
+as measured) and car1 ride; corpus 94/95 load. The jet-levitated 3-wheeler sits on a plate corner
+and does not move — jets are being measured next.
+
+With the Rudder fixed at 20° and power 1000 both cars drive a circle of radius ≈ 5 m toward the E
+side, one lap in ≈ 150 frames, `_EY` falling. A frictionless *cylinder* tyre instead of the sphere
+made the chassis wander and roll over (edge contacts) — keep the sphere.
+
+## Rapier caps angular velocity (why the tyre is not a spinning body)
 
 Rapier limits a body's rotation to **π/4 per step**: at the 1/60 s step a rotor cannot exceed
 47.1 rad/s, i.e. 14.1 m/s on a 0.3 m wheel (`tools/orig-compare.ts` shows `_WY` pinned at 47.1239).
 The original reaches 74 rad/s in the same test and racers go far beyond. The original also shows
 that its wheel is **not** a spinning rigid body (no spin-up in the air, no inertia in the
-acceleration, `_WY` = v/r): the right model is a contact force at the tyre with a kinematic
-spin readout. That rewrite (raycast / contact-force wheels, hub as the only rigid part) is the
-next step; until then cars top out near 14 m/s.
+acceleration, `_WY` = v/r). Hence the contact-force wheel above.
 
 ## Still guesses
 
