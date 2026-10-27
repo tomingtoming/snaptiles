@@ -279,7 +279,8 @@ export class Simulation {
       if (!b || !pose) return -100000;
       const p = pose.position;
       const ray = new this.R.Ray({ x: p.x, y: p.y, z: p.z }, { x: 0, y: -1, z: 0 });
-      const hit = this.physics.world.castRay(ray, 10, true, undefined, undefined, undefined, b);
+      // only ground-like things count (collision filter: membership 1, hits group 2), never the model itself
+      const hit = this.physics.world.castRay(ray, 10, true, undefined, 0x0001_0002, undefined, b);
       return hit ? hit.timeOfImpact : -100000;
     };
     return {
