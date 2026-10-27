@@ -119,3 +119,26 @@ describe('walker and tank samples', () => {
     await sim.lua.dispose();
   });
 });
+
+import { PLANE } from '../src/samples/plane';
+
+describe('plane sample', () => {
+  it('takes off when ↓ (pull up) is held at full throttle', async () => {
+    const R = await initRapier();
+    const keys = fakeKeys();
+    const sim = new Simulation(R, PLANE, keys);
+    await sim.start();
+    for (let i = 0; i < 30; i++) sim.step();
+    const y0 = sim.corePosition().y;
+    keys.press(4); // Z throttle
+    keys.press(1); // ↓ pull up
+    let maxY = y0;
+    for (let i = 0; i < 240; i++) {
+      sim.step();
+      maxY = Math.max(maxY, sim.corePosition().y);
+    }
+    expect(maxY).toBeGreaterThan(y0 + 4);
+    expect(sim.scriptError).toBeNull();
+    await sim.lua.dispose();
+  });
+});
