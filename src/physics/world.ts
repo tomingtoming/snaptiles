@@ -38,6 +38,13 @@ export interface TileBody {
    *  wheel does not spin up in the air and reads _WY = v/r while rolling). */
   spin: number;
   spinAngle: number;
+  /** wheels: ground contact point of the last step (null in the air) and the static load (N) this wheel
+   *  carries, distributed over the touching wheels by the lever rule about the model's centre of mass */
+  contactPoint: THREE.Vector3 | null;
+  load: number;
+  /** the tyre collider (wheels) and the smoothed normal force it measured in the last steps */
+  collider: import('@dimforge/rapier3d-compat').Collider | null;
+  contactForce: number;
   /** revolute axis in the parent body's local frame (for measuring the current joint angle) */
   jointAxisLocal: THREE.Vector3 | null;
   jointAnchorLocal: THREE.Vector3 | null;
@@ -60,10 +67,27 @@ export const BRAKE_G_PER_UNIT = 0.022;
 export const BRAKE_G_MAX = 0.8;
 /** lateral grip: fraction of the sideways contact velocity removed per step (1 = dead stop) */
 export const TYRE_LATERAL_GAIN = 0.25;
+/** drive and lateral tyre force share one friction circle of radius mu*load (measured, see driveWheel) */
+export const TYRE_FRICTION_CIRCLE = true;
+/** lateral grip per wheel as a fraction of its load. Measured on the original (steered Basic-layout car,
+ *  10 and 20 deg, 468 kg and 871 kg): the lateral acceleration tops out at 1.05-1.13 g with little drive
+ *  (docs/measured.md); 1.2 of the dynamic load reproduces 1.08 / 0.85 / 0.97 g in the three reference turns */
+export const TYRE_LATERAL_MU = 1.2;
+/** which force wins inside the ellipse when both saturate (see driveWheel) */
+export const TYRE_LATERAL_FIRST = false;
 /** the tyre still grips this far above the ground (the unsprung front lifts a few cm under power) */
 export const TYRE_CONTACT_MARGIN = 0.1;
 /** load the tyre forces may transmit: μ × (model weight / number of wheels) */
 export const TYRE_LOAD_SHARE = 1;
+/** per-wheel load from the static lever rule about the centre of mass (false: total mass / wheel count);
+ *  only the fallback before the tyre has measured a contact force (TYRE_DYNAMIC_LOAD) */
+export const TYRE_STATIC_LOAD = true;
+/** use the normal force the tyre collider actually carried (contact impulses of the last step, smoothed) instead
+ *  of the static lever rule: load transfer under acceleration, braking and cornering. Measured: the corpus bike
+ *  reaches 14.4 m/s in 3 s at power 5000 on a rear wheel whose static share could not carry that drive, while the
+ *  steered car's powered (leading) axle saturates at 1030 N per wheel on ~990 N of contact load */
+export const TYRE_DYNAMIC_LOAD = true;
+export const TYRE_LOAD_SMOOTH = 0.3;
 /** spec: 6 power = 1 N */
 export const JET_NEWTON_PER_POWER = 0.145; // measured 2026-10-28: a 530 kg wheeled car pushed by a jet at power 10000 accelerates at 2.74 m/s² (1452 N); the same at 5000 (1.38 m/s²); wheel option makes no difference
 /** plate aero (per 1 m² tile): broadside drag N per (m/s)², and the lift slope N per (m/s)² per sin α.
@@ -84,7 +108,7 @@ export const AERO_K2 = 9.3;
 export const AERO_P2 = 8;
 /** compliant joints (spring<1): N·m/rad at spring=1 and N·m·s/rad at damper=1 — guesses */
 /** tyre friction coefficient (rapier combines with the ground's 1.0 by averaging) */
-export const WHEEL_FRICTION = 1.15; // measured: the Basic car saturates near 1.1 g of drive (power 5000 on four wheels gives ~11 m/s², not 17); at 10000 the original flips
+export const WHEEL_FRICTION = 1.1; // measured against the dynamic (contact) load: the Basic layout drives S-first, so its powered axle leads and unloads to ~990 N under acceleration where it saturates at 1030 N; corpus bike unsaturated at power 5000
 /** max servo slew of an animated joint, degrees per physics step (60 Hz) — 6°/step = 360°/s */
 /** measured 2026-10-27: the original applies a commanded joint angle within one frame (a Rudder reads
  *  60° one frame after the Val changes), so the servo is instant by default (deg per physics step) */
@@ -283,6 +307,7 @@ export class PhysicsWorld {
     this.assembly = a;
     this.env = env;
     this.totalMass = a.tiles.reduce((m, t) => m + t.mass, 0);
+    const tyreColliders = new Map<number, import('@dimforge/rapier3d-compat').Collider>();
 
     for (const tile of a.tiles) {
       const parentTb = tile.parent && !tile.detached ? this.byId.get(tile.parent.id)! : null;
@@ -372,7 +397,8 @@ export class PhysicsWorld {
         cd.setFrictionCombineRule(R.CoefficientCombineRule.Min);
         cd.setTranslation(relPos.x, relPos.y, relPos.z).setRotation({ x: relQuat.x, y: relQuat.y, z: relQuat.z, w: relQuat.w });
         if (tile.ghost || !tile.spec.collides) cd.setSensor(true);
-        this.world.createCollider(cd, body);
+        const col = this.world.createCollider(cd, body);
+        if (tile.spec.wheel) tyreColliders.set(tile.id, col);
       }
 
       let joint: RAPIER.RevoluteImpulseJoint | null = null;
@@ -398,7 +424,8 @@ export class PhysicsWorld {
         }
       }
       const restAngle = angleAnimated ? attr(tile.node, 'angle', env, 0) : 0;
-      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0, servoAngle: 0, spin: 0, spinAngle: 0, jointAxisLocal, jointAnchorLocal };
+      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0, servoAngle: 0, spin: 0, spinAngle: 0, contactPoint: null, load: 0, collider: null, contactForce: 0, jointAxisLocal, jointAnchorLocal };
+      tb.collider = tyreColliders.get(tile.id) ?? null;
       this.tiles.push(tb);
       this.byId.set(tile.id, tb);
     }
@@ -556,7 +583,8 @@ export class PhysicsWorld {
         tb.spin = vf / r;
         const k = (globalThis as unknown as { __tune?: { wheelTorque?: number } }).__tune?.wheelTorque ?? WHEEL_TORQUE_PER_POWER;
         const wheels = this.assembly ? this.assembly.tiles.filter((t) => t.spec.wheel).length : 1;
-        const load = (this.totalMass * 9.8 * TYRE_LOAD_SHARE) / Math.max(1, wheels);
+        tb.contactPoint = P;
+        const load = (((globalThis as unknown as { __tune?: { tyreStaticLoad?: boolean } }).__tune?.tyreStaticLoad ?? TYRE_STATIC_LOAD) && tb.load > 0 ? tb.load : (this.totalMass * 9.8) / Math.max(1, wheels)) * TYRE_LOAD_SHARE;
         let Ff = (power * k) / r;
         if (power !== 0) Ff *= Math.max(0, 1 - Math.max(0, Math.sign(power) * tb.spin) / WHEEL_SPIN_FADE);
         if (brake > 0) {
@@ -571,10 +599,24 @@ export class PhysicsWorld {
         const limit = mu * load;
         Ff = Math.max(-limit, Math.min(limit, Ff));
         const lateralGain = (globalThis as unknown as { __tune?: { tyreLateral?: number } }).__tune?.tyreLateral ?? TYRE_LATERAL_GAIN;
-        let Fl = (-lateralGain * vl * (this.totalMass / Math.max(1, wheels))) / this.dt;
-        Fl = Math.max(-limit, Math.min(limit, Fl));
+        let Fl = (-lateralGain * vl * (load / 9.8)) / this.dt;
+        // friction circle, drive first (measured on the original, steered car at steer 10/20 deg: the lateral
+        // acceleration tops out near 1.1 g with little drive, 0.9-1.0 g with rear drive at 0.7 of the cap, and
+        // the rear axle slides freely once its drive saturates - the car then drifts along the front wheels)
+        const circle = (globalThis as unknown as { __tune?: { frictionCircle?: boolean } }).__tune?.frictionCircle ?? TYRE_FRICTION_CIRCLE;
+        const muL = (globalThis as unknown as { __tune?: { tyreLateralMu?: number } }).__tune?.tyreLateralMu ?? TYRE_LATERAL_MU;
+        const lateralFirst = (globalThis as unknown as { __tune?: { tyreLateralFirst?: boolean } }).__tune?.tyreLateralFirst ?? TYRE_LATERAL_FIRST;
+        if (circle && lateralFirst) {
+          // lateral grip first, the drive gets what is left of the ellipse
+          Fl = Math.max(-muL * load, Math.min(muL * load, Fl));
+          const driveLimit = limit * Math.sqrt(Math.max(0, 1 - (Fl / (muL * load)) * (Fl / (muL * load))));
+          Ff = Math.max(-driveLimit, Math.min(driveLimit, Ff));
+        } else {
+          const lateralLimit = muL * load * (circle ? Math.sqrt(Math.max(0, 1 - (Ff / limit) * (Ff / limit))) : 1);
+          Fl = Math.max(-lateralLimit, Math.min(lateralLimit, Fl));
+        }
         const F = f.clone().multiplyScalar(Ff).addScaledVector(l, Fl);
-        if ((globalThis as unknown as { __tune?: { debugWheels?: boolean } }).__tune?.debugWheels) console.log('wheel', tile.chipIndex, 'toi', hit.timeOfImpact.toFixed(3), 'n', normal.toArray().map((x) => x.toFixed(2)).join(','), 'f', f.toArray().map((x) => x.toFixed(2)).join(','), 'vf', vf.toFixed(3), 'power', power, 'Ff', Ff.toFixed(1), 'Fl', Fl.toFixed(1), 'spin', tb.spin.toFixed(2), 'bodyv', [body.linvel().x, body.linvel().y, body.linvel().z].map((x) => x.toFixed(2)).join(','), 'mass', body.mass().toFixed(0), 'brake', brake, 'P', P.toArray().map((x) => x.toFixed(2)).join(','));
+        if ((globalThis as unknown as { __tune?: { debugWheels?: boolean } }).__tune?.debugWheels) console.log('wheel', tile.chipIndex, 'toi', hit.timeOfImpact.toFixed(3), 'n', normal.toArray().map((x) => x.toFixed(2)).join(','), 'f', f.toArray().map((x) => x.toFixed(2)).join(','), 'vf', vf.toFixed(3), 'power', power, 'Ff', Ff.toFixed(1), 'Fl', Fl.toFixed(1), 'spin', tb.spin.toFixed(2), 'bodyv', [body.linvel().x, body.linvel().y, body.linvel().z].map((x) => x.toFixed(2)).join(','), 'mass', body.mass().toFixed(0), 'load', load.toFixed(0), 'brake', brake, 'P', P.toArray().map((x) => x.toFixed(2)).join(','));
         // applied at the contact patch: the ground force below the hub is what pitches a segway's body back
         // when its wheels drive forward (self-balancers need it); the chassis rocking seen earlier came
         // from the cylinder tyre, not from this moment
@@ -582,7 +624,7 @@ export class PhysicsWorld {
         body.addForceAtPoint({ x: F.x, y: F.y, z: F.z }, { x: at.x, y: at.y, z: at.z }, true);
       }
     }
-    if (!contact) { tb.spin *= 0.9; if ((globalThis as unknown as { __tune?: { debugWheels?: boolean } }).__tune?.debugWheels) console.log('wheel', tile.chipIndex, 'no contact; d', d.toArray().map((x) => x.toFixed(2)).join(','), 'y', pose.position.y.toFixed(3)); }
+    if (!contact) { tb.contactPoint = null; tb.spin *= 0.9; if ((globalThis as unknown as { __tune?: { debugWheels?: boolean } }).__tune?.debugWheels) console.log('wheel', tile.chipIndex, 'no contact; d', d.toArray().map((x) => x.toFixed(2)).join(','), 'y', pose.position.y.toFixed(3)); }
     tb.spinAngle += tb.spin * this.dt;
   }
 
@@ -605,9 +647,74 @@ export class PhysicsWorld {
     return new THREE.Vector3(w.x, w.y, w.z).cross(r).add(new THREE.Vector3(v.x, v.y, v.z));
   }
 
+  /** Static load of each touching wheel: minimum-norm solution of weight and moment balance about the
+   *  centre of mass over the contact points of the last step (lever rule for two axles, equal shares for a
+   *  symmetric four), negatives clamped and the rest rescaled to the full weight. Wheels in the air get 0. */
+  distributeLoads(): void {
+    const wheels = this.tiles.filter((t) => t.tile.spec.wheel && t.contactPoint);
+    for (const t of this.tiles) if (t.tile.spec.wheel) t.load = 0;
+    if (wheels.length === 0) return;
+    const W = this.totalMass * 9.8;
+    if (wheels.length === 1) { wheels[0].load = W; return; }
+    let cx = 0, cz = 0, m = 0;
+    for (const tb of this.tiles) {
+      const p = this.pose(tb).position;
+      cx += p.x * tb.tile.mass; cz += p.z * tb.tile.mass; m += tb.tile.mass;
+    }
+    cx /= m; cz /= m;
+    // rows: sum N = W, sum N·(x−cx) = 0, sum N·(z−cz) = 0; min-norm N = Aᵀ(AAᵀ+εI)⁻¹ b
+    // lever arms from the current hub positions (the contact points are one step old, which at speed
+    // shifts them all backwards relative to the centre of mass and loads the rear axle too much)
+    const hubs = wheels.map((w) => this.pose(w).position);
+    const xs = hubs.map((h) => h.x - cx);
+    const zs = hubs.map((h) => h.z - cz);
+    const n = wheels.length;
+    const eps = 1e-4 * n;
+    const M = [
+      [n + eps, xs.reduce((a, b) => a + b, 0), zs.reduce((a, b) => a + b, 0)],
+      [xs.reduce((a, b) => a + b, 0), xs.reduce((a, b) => a + b * b, 0) + eps, xs.reduce((a, b, i) => a + b * zs[i], 0)],
+      [zs.reduce((a, b) => a + b, 0), xs.reduce((a, b, i) => a + b * zs[i], 0), zs.reduce((a, b) => a + b * b, 0) + eps],
+    ];
+    const b = [W, 0, 0];
+    // solve M y = b (3×3, Gaussian elimination)
+    for (let i = 0; i < 3; i++) {
+      let piv = i;
+      for (let r = i + 1; r < 3; r++) if (Math.abs(M[r][i]) > Math.abs(M[piv][i])) piv = r;
+      [M[i], M[piv]] = [M[piv], M[i]]; [b[i], b[piv]] = [b[piv], b[i]];
+      for (let r = i + 1; r < 3; r++) {
+        const f = M[r][i] / M[i][i];
+        for (let c = i; c < 3; c++) M[r][c] -= f * M[i][c];
+        b[r] -= f * b[i];
+      }
+    }
+    const y = [0, 0, 0];
+    for (let i = 2; i >= 0; i--) { let acc = b[i]; for (let c = i + 1; c < 3; c++) acc -= M[i][c] * y[c]; y[i] = acc / M[i][i]; }
+    let sum = 0;
+    wheels.forEach((w, i) => { w.load = Math.max(0, y[0] + y[1] * xs[i] + y[2] * zs[i]); sum += w.load; });
+    if (sum > 0) for (const w of wheels) w.load *= W / sum;
+    const dynamic = (globalThis as unknown as { __tune?: { tyreDynamicLoad?: boolean } }).__tune?.tyreDynamicLoad ?? TYRE_DYNAMIC_LOAD;
+    if (dynamic) for (const w of wheels) if (w.contactForce > 0) w.load = w.contactForce;
+  }
+
+  /** normal force each tyre carried in the step just taken (sum of contact impulses / dt), smoothed */
+  measureTyreLoads(): void {
+    for (const tb of this.tiles) {
+      if (!tb.tile.spec.wheel || !tb.collider) continue;
+      let impulse = 0;
+      this.world.contactPairsWith(tb.collider, (other) => {
+        this.world.contactPair(tb.collider!, other, (m) => {
+          for (let i = 0; i < m.numContacts(); i++) impulse += Math.abs(m.contactImpulse(i));
+        });
+      });
+      const f = impulse / this.dt;
+      tb.contactForce = f > 0 ? (tb.contactForce > 0 ? tb.contactForce + TYRE_LOAD_SMOOTH * (f - tb.contactForce) : f) : 0;
+    }
+  }
+
   /** Drive joints toward attribute values, apply wheel torque, jets and air drag. */
   applyControls(env: ValEnv): void {
     const DEG = Math.PI / 180;
+    this.distributeLoads();
     const seen = new Set<number>();
     for (const tb of this.tiles) {
       if (seen.has(tb.body.handle)) continue;
@@ -742,6 +849,7 @@ export class PhysicsWorld {
 
   step(): void {
     this.world.step();
+    this.measureTyreLoads();
     this.tick++;
     if (this.projectiles.length) this.cullProjectiles();
   }

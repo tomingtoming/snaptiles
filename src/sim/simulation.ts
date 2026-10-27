@@ -286,9 +286,9 @@ export class Simulation {
       const raw = t.node.attrs[name];
       return raw === undefined ? d : evalExpr(raw, this.env);
     };
-    const RIGHT = new THREE.Vector3(1, 0, 0);
+    const LEFT = new THREE.Vector3(-1, 0, 0);
+    const BACK = new THREE.Vector3(0, 0, 1);
     const UP = new THREE.Vector3(0, 1, 0);
-    const FWD = new THREE.Vector3(0, 0, -1);
     const h = (n: number) => {
       const b = this.bodyOf(n);
       const pose = this.poseOf(n);
@@ -323,13 +323,13 @@ export class Simulation {
       _FUELMAX: () => 1_000_000,
       _E: (n: number) => { const t = this.tileOf(n); return t ? this.physics.armCharge.get(t.id) ?? 0 : 0; },
       _T: (n: number) => (this.tileOf(n) ? 10000 : -1),
-      _X: (n: number) => pos(n, 'x'),
+      _X: (n: number) => -pos(n, 'x'), // the original is left-handed: W = +x (rest geometry of Basic measured)
       _Y: (n: number) => pos(n, 'y'),
       _Z: (n: number) => pos(n, 'z'),
       _H: h,
-      _VX: (n: number) => localVel(n, RIGHT),
+      _VX: (n: number) => localVel(n, LEFT), // W-positive, S-positive like the original (turn and straight runs)
       _VY: (n: number) => localVel(n, UP),
-      _VZ: (n: number) => localVel(n, FWD),
+      _VZ: (n: number) => localVel(n, BACK),
       _VEL: (n: number) => { const tb = this.tbOf(n); if (!tb) return 0; return this.physics.velocity(tb, this.physics.pose(tb)).length(); },
       _WX: (n: number) => angvel(n, 'x'),
       _WY: (n: number) => angvel(n, 'y'),
@@ -343,20 +343,22 @@ export class Simulation {
       _AX: (n: number) => tune.ax * euler(n).x,
       _AY: (n: number) => tune.ay * euler(n).y,
       _AZ: (n: number) => tune.az * euler(n).z,
-      _XX: (n: number) => worldAxis(n, RIGHT, 'x'),
-      _XY: (n: number) => worldAxis(n, RIGHT, 'y'),
-      _XZ: (n: number) => worldAxis(n, RIGHT, 'z'),
-      _YX: (n: number) => worldAxis(n, UP, 'x'),
+      // axis vectors in the original's left-handed frame (local x = W, local z = S, world x mirrored); the
+      // mirror is measured for _X/_VX/_VZ, these follow by construction and are not measured themselves
+      _XX: (n: number) => -worldAxis(n, LEFT, 'x'),
+      _XY: (n: number) => worldAxis(n, LEFT, 'y'),
+      _XZ: (n: number) => worldAxis(n, LEFT, 'z'),
+      _YX: (n: number) => -worldAxis(n, UP, 'x'),
       _YY: (n: number) => worldAxis(n, UP, 'y'),
       _YZ: (n: number) => worldAxis(n, UP, 'z'),
-      _ZX: (n: number) => worldAxis(n, FWD, 'x'),
-      _ZY: (n: number) => worldAxis(n, FWD, 'y'),
-      _ZZ: (n: number) => worldAxis(n, FWD, 'z'),
+      _ZX: (n: number) => -worldAxis(n, BACK, 'x'),
+      _ZY: (n: number) => worldAxis(n, BACK, 'y'),
+      _ZZ: (n: number) => worldAxis(n, BACK, 'z'),
       _QX: (n: number) => quat(n, 'x'),
       _QY: (n: number) => quat(n, 'y'),
       _QZ: (n: number) => quat(n, 'z'),
       _QW: (n: number) => quat(n, 'w'),
-      _GX: (n: number) => pos(n, 'x'),
+      _GX: (n: number) => -pos(n, 'x'),
       _GY: (n: number) => pos(n, 'y'),
       _GZ: (n: number) => pos(n, 'z'),
       // a Wheel takes two numbers: the first (hub) reads type 3, the second (the tyre) 4/5 — measured on the original

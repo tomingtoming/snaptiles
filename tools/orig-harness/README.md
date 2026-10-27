@@ -9,6 +9,10 @@ model and `Resources/System.rcs` as the default scenario, so experiments replace
   (written once at frame 330; file handles do not survive across frames in the original).
 - `harness_turn.rcs` — same with power until 210 and the first Rudder set to 20° (note: the model's
   own `angle=Val` overrides `_SET ANGLE` each frame; use a model with a constant angle instead).
+- `harness_turn2.rcs` — log only (same columns as `harness_turn.rcs`); the model drives and steers itself
+  (Val defaults + its own Lua, see `rc_models17.sh`/`rc_models18.sh`). Replay with
+  `bun tools/orig-compare.ts <model> <out.csv> --self --turn --tune='{"noCourse":true}'` and compare both
+  logs with `turndiff.py <csv…>` (speed, yaw rate, radius, lateral g, body slip per 20-frame window).
 - `rc_launch.sh <secs>` — one run with a screenshot. `rc_batch.sh name:model:power ...` — batch
   runs, copies `log.txt`/`geom.txt`/screenshot to `D:\snaptiles-models\quarantine\original\runs\`.
   `HARNESS=<path>` picks the scenario. `rc_models.sh` writes the probe models.

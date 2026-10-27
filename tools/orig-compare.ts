@@ -21,7 +21,9 @@ const ON = opt('on', 31);
 const OFF = opt('off', 150);
 const FRAMES = opt('frames', 330);
 const GEOM_AT = opt('geomAt', 30);
-const CHIPS6 = args.includes('--chips6'); // log chips 0..5 (x,y,z,ex,ey,ez) per frame instead, like harness_servo.rcs
+const CHIPS6 = args.includes('--chips6');
+const SELF = args.includes('--self'); // leave ENGINE to the model's own Lua/defaults
+const TURN = args.includes('--turn'); // harness_turn2.rcs columns: core pose, chip 1 xz, _V*, _W*, _A*, _E* // log chips 0..5 (x,y,z,ex,ey,ez) per frame instead, like harness_servo.rcs
 const tuneArg = args.find((x) => x.startsWith('--tune='));
 if (tuneArg) (globalThis as unknown as { __tune?: unknown }).__tune = JSON.parse(tuneArg.slice(7)); // same knobs as window.__tune (merged over TUNE_DEFAULTS)
 
@@ -50,13 +52,18 @@ const geomDump = (): string => {
   return g.join('\n') + '\n';
 };
 const engine = sim.vals.get('ENGINE');
-if (!engine && !CHIPS6) throw new Error('model has no ENGINE val');
-const rows: string[] = [CHIPS6 ? 'frame,' + [0, 1, 2, 3, 4, 5].map((c) => `x${c},y${c},z${c},ex${c},ey${c},ez${c}`).join(',') : 'frame,x,y,z,vx,vy,vz,ex,ey,ez,chips,wheel,wheelpow,wheelwy,wheely'];
+if (!engine && !CHIPS6 && !SELF) throw new Error('model has no ENGINE val');
+const rows: string[] = [TURN ? 'frame,x,y,z,c1x,c1z,vx,vy,vz,wx,wy,wz,ax,ay,az,ex,ey,ez' : CHIPS6 ? 'frame,' + [0, 1, 2, 3, 4, 5].map((c) => `x${c},y${c},z${c},ex${c},ey${c},ez${c}`).join(',') : 'frame,x,y,z,vx,vy,vz,ex,ey,ez,chips,wheel,wheelpow,wheelwy,wheely'];
 let prev = sim.corePosition().clone();
 for (let n = 1; n <= FRAMES; n++) {
   const p = n >= ON && n <= OFF ? POWER : 0;
-  if (engine) { engine.default = p; engine.value = p; }
+  if (engine && !SELF) { engine.default = p; engine.value = p; }
   sim.step();
+  if (TURN) {
+    const a = api;
+    rows.push([n, ...[a._X(0), a._Y(0), a._Z(0), a._X(1), a._Z(1), a._VX(0), a._VY(0), a._VZ(0), a._WX(0), a._WY(0), a._WZ(0), a._AX(0), a._AY(0), a._AZ(0), a._EX(0), a._EY(0), a._EZ(0)].map(f4)].join(','));
+    continue;
+  }
   if (CHIPS6) {
     const m = api._CHIPS(0) - 1;
     rows.push([n, ...[0, 1, 2, 3, 4, 5].map((c) => (c <= m ? [api._X(c), api._Y(c), api._Z(c), api._EX(c), api._EY(c), api._EZ(c)].map(f4).join(',') : ',,,,,'))].join(','));

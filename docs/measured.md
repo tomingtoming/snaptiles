@@ -36,12 +36,15 @@ columns. Raw logs: `D:\snaptiles-models\quarantine\original\runs\*.csv` (not in 
 | servo | a commanded joint angle is applied **within one frame** (Rudder: 60° one frame after the Val changes), **without momentum**: snapping a Frame holding two Weights 45° pitches the light core 31° and the arm −14° (inertia-weighted split about the hinge), the load then swings from rest and the model settles with the core at 45° | servo_rudder, servo_hinge_load |
 | joint stiffness | rigid: a Frame(spring=0.5) holding a 4× Weight at 1.2 m does not sag; spring=0.1 sags 0.1° | sag_arm, sag_arm_spring05/01 |
 | plate aero | drag per chip / v² from a jet-pushed **rolling** car (no sliding contact): **0.22 at 15°, 1.2 at 30°, 2.85 at 45°, ≈4 at 50°**, constant over 5–19 m/s (∝ v²). At 60–90° the original's car stalls near 1–3 m/s and oscillates (coefficient jumps 7 → 27 → 400 between 5 and 6 m/s: not a v² law, the readme's "steep rise toward 90°"). Normal force per chip ≈ v²·(6.7·sin^1.5 α + 9.3·sin^8 α) reproduces 0–45° within the mass offset; flat plates feel nothing to 40 m/s; a flat 3-plate sled lifts off at ≈40 m/s with 9–18° of pitch | rollb_* (0/15/30/45/50/60/75/90), sled_*, aero_* |
-| drive limit | the Basic car with all four wheels at power 5000 accelerates at ≈11 m/s² instead of the linear 17 (**≈1.1 g** of traction); at power 10000 the original wheelies and flips | basic_nopower_p5000/10000/20000 |
+| drive limit | per wheel **1.1 × its dynamic (contact) load**: the Basic-layout car (468 kg, two powered wheels) saturates at 4.4 m/s² at power 5000 and 4.2 at 10000 (≈1030 N per wheel). Its powered axle is the S one and `+Engine` drives it toward S, so that axle **leads** and unloads to ~990 N under acceleration (rapier contact impulses) — 1030/990 ≈ 1.05. The 871 kg version (four Weights) is not saturated at 5000 (4.0 m/s², fade-limited); the corpus bike (RCModel1, power 5000 on a 0.45 m rear wheel) accelerates like the original (14.4 m/s at 3 s, 22.5 at 5 s) only with the load transfer, with a static share it saturates and falls. The earlier 4-wheel "1.1 g" was mostly drive fade | turn_a10_p5000/p10000, heavy4_a10_p5000, bike_e5000, basic_nopower_p5000 |
+| lateral grip | per wheel **1.2 × its dynamic load**, shared with the drive in a **friction circle, drive first**: steered at 10°/20° the lateral acceleration tops out at 1.05–1.13 g with little drive (power 1000), 0.9–1.0 g with the powered axle at 0.7 of its cap (2500), and once that axle's drive saturates (5000/10000) it slides freely and the car drifts along its steered wheels (body slip angle = steer angle, 10°/20°, yaw rate near zero); same 1.0–1.1 g on the 871 kg car. SnapTiles with 1.2: 1.08 / 0.85 / 0.97 g. Lateral-first priority makes the car spin out; drive-first drifts like the original | turn_a10/a20_p1000…10000, heavy4_a10_p1000…5000 (`tools/orig-harness/turndiff.py`) |
+| wheel load | the load each tyre carries is the contact normal force rapier measured in the last step (`measureTyreLoads()`, smoothed 0.3), falling back to the static lever rule about the centre of mass over the current hub positions before the first contact (the contact points of the previous step lag at speed and load the trailing axle too much) | turn runs, bike_e5000 |
+| `_VX`/`_VZ` signs | `_VZ` is **positive toward +z (S)**, `_VX` positive toward **+x = W**: the original is left-handed (W = +x), so a car driving S with its nose yawing toward E and the velocity lagging outward reads `_VX` > 0, `_VZ` > 0. SnapTiles mirrors `_X/_GX/_VX/_VZ` (and the `_XX…_ZZ` axis vectors, unmeasured) so model Lua sees the original's numbers | turn_a10_p1000 (orig `vx` +0.6…+1.8 while sliding outward), basic_p1000 (`vz` > 0 while z grows) |
 | brake | Coulomb: a 530 kg four-wheel car with `brake=10` sheds **2.2 m/s² (0.22 g)**, with `brake=50` **7.7 m/s² (0.78 g)**, at any speed — ≈0.022 g per brake unit, saturating near 0.8 g | brake3_10/50 (thrust kept on) |
 | Lua globals | a Val is reachable from Lua only by its **upper-case** name (`Engine=0` in Lua did nothing; `A=60` worked) | brake3 runs |
 | sliding friction | plates pushed along the ground by a stand-up jet (1452 N): **Chip ≈ 0** (7.8 m/s² for 7.7 available), **Frame ≈ 0.1** (9.2 for 10.6), **Weight does not move** (μ ≥ 0.3) — the readme's ordering Chip < Frame < Weight. The earlier 0.23 came from a sled whose hanging jet dragged on the ground | fric_chip/frame/weight |
 | settling | the 3-wheeler rests with its core 0.65 m above ground; SnapTiles needed 16 rapier solver iterations (8 let the chain of six servo joints sag 0.4 m and the belly plate touched the ground) | wheel3 rest dump, lowest-corner.ts |
-| axes | W is **+x**, N is −z, y up in the original (SnapTiles keeps W = −x, i.e. a mirrored x; the Euler readouts above are matched numerically, not by mirroring) | rest dumps |
+| axes | W is **+x**, N is −z, y up in the original (SnapTiles keeps W = −x internally and mirrors the x of `_X/_GX/_VX` and the axis vectors in the Lua API; the Euler and angular-velocity readouts are matched numerically, not by mirroring) | rest dumps, turn runs |
 | Trim / Rudder signs | consistent with `JOINT_SIGN` (+1 / −1) | trimrudder30 positions |
 | arrow keys | 0 ↑ 1 ↓ 2 ← 3 → (then Z X C A S D V B F G Q W E) | bike (0 engine, 1 brake), tonbo, zrobo |
 | script cadence | 30 frames/s, scripts see `_FPS()` 30 | HUD, docs |
@@ -63,8 +66,12 @@ The tyre is a frictionless sphere that only carries load. Each step a ray from t
 the wheel plane, finds the ground; the push is power × 0.13 / r along the rolling direction (fading
 to zero at a kinematic spin v/r of 180 rad/s), the brake damps the rolling speed, sideways slip is
 damped (`TYRE_LATERAL_GAIN`) — all applied at the contact patch (a segway needs the pitch moment of
-the ground force; forces on a folding rim go to the chassis the rim hangs from) and limited by
-μ × (weight / wheels). Spin is integrated for the render and `_WY`. Result against the original
+the ground force; forces on a folding rim go to the chassis the rim hangs from). The drive/brake force
+is limited to 1.1 × the wheel's load and the lateral force to 1.2 × load, sharing a friction ellipse
+with the drive taking priority (`TYRE_FRICTION_CIRCLE`, `TYRE_LATERAL_MU`, measured 2026-10-28 with the
+steered car, see the table). The load is the normal force the tyre collider carried in the last step
+(`measureTyreLoads()`), so acceleration, braking and cornering shift grip between the wheels as in the
+original; before the first contact the static lever rule (`distributeLoads()`) fills in. Spin is integrated for the render and `_WY`. Result against the original
 (Basic car, all four wheels at power 2500 until frame 150, bare ground):
 
 | frame | original v (m/s) | SnapTiles v | original z | SnapTiles z |
@@ -107,10 +114,9 @@ acceleration, `_WY` = v/r). Hence the contact-force wheel above.
 | item | current value | where |
 |---|---|---|
 | gravity | 9.8 | `world.ts` |
-| tyre friction | 1.4 | `WHEEL_FRICTION` |
 | plate aero at 60–90° | the original stalls and oscillates (drag far above v²·sin²); SnapTiles rolls on at 4–7 m/s | `AERO_K2/AERO_P2` |
 | Arm shell | 80 m/s, 2 kg, 4 s | `ARM_*` |
-| lateral tyre limit | drive saturates near 1.1 g (measured); the lateral limit shares `WHEEL_FRICTION` 1.15 but is not measured | `WHEEL_FRICTION` |
+| friction-ellipse priority at high drive | the original keeps 0.4–0.9 g of lateral acceleration while its powered axle is saturated at 25–35 m/s; drive-first gives 0.2–0.7 (right trend, low early). At power 10000 the original is also 12% slower in a straight line than at 5000 (wheelspin?), SnapTiles is not | `TYRE_LATERAL_FIRST` |
 | cowl option 5 / 1 / 2 | bulging ribbon / plate / plate | `scene.ts` |
 | `_T`, `_FUEL`, network, CCD | stubs | `simulation.ts` |
 
