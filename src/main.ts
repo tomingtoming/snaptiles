@@ -114,22 +114,46 @@ let dragging = false;
 let lastDrag = -1e9;
 let lastX = 0;
 let lastY = 0;
+// one finger orbits, two fingers pinch to zoom
+const touches = new Map<number, { x: number; y: number }>();
+let pinchDist = 0;
 canvas.addEventListener('pointerdown', (e) => {
-  dragging = true;
+  touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  dragging = touches.size === 1;
   lastX = e.clientX;
   lastY = e.clientY;
+  if (touches.size === 2) {
+    const [a, b] = [...touches.values()];
+    pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+  }
   canvas.setPointerCapture(e.pointerId);
   canvas.focus();
 });
 canvas.addEventListener('pointermove', (e) => {
-  if (!dragging) return;
+  if (!touches.has(e.pointerId)) return;
+  touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
   lastDrag = performance.now();
+  if (touches.size >= 2) {
+    const [a, b] = [...touches.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    if (pinchDist > 0) scene.camDist = Math.max(3, Math.min(60, scene.camDist * (pinchDist / Math.max(1, d))));
+    pinchDist = d;
+    return;
+  }
+  if (!dragging) return;
   scene.camYaw -= (e.clientX - lastX) * 0.006;
   scene.camPitch = Math.max(0.05, Math.min(1.4, scene.camPitch + (e.clientY - lastY) * 0.006));
   lastX = e.clientX;
   lastY = e.clientY;
 });
-canvas.addEventListener('pointerup', () => (dragging = false));
+const endPointer = (e: PointerEvent) => {
+  touches.delete(e.pointerId);
+  dragging = false;
+  pinchDist = 0;
+};
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+(window as unknown as { __scene: SceneView }).__scene = scene; // probe hook
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
   scene.camDist = Math.max(3, Math.min(60, scene.camDist * Math.exp(e.deltaY * 0.001)));
