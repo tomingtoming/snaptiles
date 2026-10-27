@@ -84,7 +84,7 @@ export const AERO_K2 = 9.3;
 export const AERO_P2 = 8;
 /** compliant joints (spring<1): N·m/rad at spring=1 and N·m·s/rad at damper=1 — guesses */
 /** tyre friction coefficient (rapier combines with the ground's 1.0 by averaging) */
-export const WHEEL_FRICTION = 1.4;
+export const WHEEL_FRICTION = 1.15; // measured: the Basic car saturates near 1.1 g of drive (power 5000 on four wheels gives ~11 m/s², not 17); at 10000 the original flips
 /** max servo slew of an animated joint, degrees per physics step (60 Hz) — 6°/step = 360°/s */
 /** measured 2026-10-27: the original applies a commanded joint angle within one frame (a Rudder reads
  *  60° one frame after the Val changes), so the servo is instant by default (deg per physics step) */
