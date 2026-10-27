@@ -4,13 +4,13 @@ Val
   FWD(default=0, min=-1, max=1, step=0.1)
   SIDE(default=0, min=-1, max=1, step=0.1)
   TURN(default=0, min=-1, max=1, step=0.1)
-  J_FL(default=0, min=0, max=60000)
-  J_FR(default=0, min=0, max=60000)
-  J_RL(default=0, min=0, max=60000)
-  J_RR(default=0, min=0, max=60000)
-  YAWJ(default=0, min=-20000, max=20000)
-  K_P(default=1, min=-5, max=5)
-  K_R(default=-1, min=-5, max=5)
+  J_FL(default=0, min=0, max=60000, disp=0)
+  J_FR(default=0, min=0, max=60000, disp=0)
+  J_RL(default=0, min=0, max=60000, disp=0)
+  J_RR(default=0, min=0, max=60000, disp=0)
+  YAWJ(default=0, min=-20000, max=20000, disp=0)
+  K_P(default=1, min=-5, max=5, disp=0)
+  K_R(default=-1, min=-5, max=5, disp=0)
 }
 Key
 {
