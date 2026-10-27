@@ -33,11 +33,11 @@ export class KeyState {
   down = new Set<number>();
   private byCode = new Map<string, number>();
 
-  constructor(private target: HTMLElement | Window = window) {
+  constructor(private target: EventTarget = window) {
     KEY_TABLE.forEach((k, i) => this.byCode.set(k.code, i));
     this.target.addEventListener('keydown', this.onDown as EventListener);
     this.target.addEventListener('keyup', this.onUp as EventListener);
-    window.addEventListener('blur', () => this.down.clear());
+    if (typeof window !== 'undefined') window.addEventListener('blur', () => this.down.clear());
   }
 
   private onDown = (e: KeyboardEvent) => {
