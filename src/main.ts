@@ -2,6 +2,7 @@ import { initRapier } from './physics/world';
 import { SceneView } from './render/scene';
 import { KeyState, KEY_TABLE } from './input/keys';
 import { Simulation } from './sim/simulation';
+import { Sfx } from './audio/sfx';
 import { SAMPLES } from './samples';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -15,6 +16,16 @@ const samplesEl = $('samples');
 const runBtn = $<HTMLButtonElement>('run');
 
 const keys = new KeyState(window);
+const sfx = new Sfx();
+window.addEventListener('pointerdown', () => sfx.unlock(), { capture: true });
+window.addEventListener('keydown', () => sfx.unlock(), { capture: true });
+const muteBtn = $<HTMLButtonElement>('mute');
+const paintMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; muteBtn.setAttribute('aria-pressed', String(sfx.muted)); };
+muteBtn.addEventListener('click', () => { sfx.setMuted(!sfx.muted); paintMute(); });
+paintMute();
+(window as unknown as { __sfx: Sfx }).__sfx = sfx; // probe hook
+let lastShells = 0;
+let lastCoreVel: { x: number; y: number; z: number } | null = null;
 const scene = new SceneView(canvas);
 let sim: Simulation | null = null;
 let keyCaps: { el: HTMLElement; n: number }[] = [];
@@ -184,8 +195,33 @@ function frame(now: number): void {
     if (!dragging && performance.now() - lastDrag > 3000) scene.chaseYaw(sim.coreHeading());
     scene.follow(sim.corePosition());
     updateOverlay(sim);
+    updateSound(sim);
   }
   scene.render();
+}
+function updateSound(s: Simulation): void {
+  let spin = 0;
+  let jet = 0;
+  for (const tb of s.physics.tiles) {
+    if (tb.tile.spec.wheel) {
+      const w = tb.body.angvel();
+      spin = Math.max(spin, Math.hypot(w.x, w.y, w.z));
+    }
+    if (tb.tile.spec.jet) jet += Math.abs(tb.jetPower);
+  }
+  sfx.update(spin, jet);
+  const shells = s.physics.projectiles.length;
+  if (shells > lastShells) sfx.fire();
+  lastShells = shells;
+  const core = s.physics.tiles[0];
+  if (core) {
+    const v = core.body.linvel();
+    if (lastCoreVel) {
+      const dv = Math.hypot(v.x - lastCoreVel.x, v.y - lastCoreVel.y, v.z - lastCoreVel.z);
+      if (dv > 4) sfx.thud((dv - 4) / 12); // a sudden speed change of more than 4 m/s in one frame
+    }
+    lastCoreVel = { x: v.x, y: v.y, z: v.z };
+  } else lastCoreVel = null;
 }
 function updateOverlay(s: Simulation): void {
   const lines: string[] = [];
@@ -299,3 +335,4 @@ async function boot(): Promise<void> {
   await loadAndShare(SAMPLES[idx].source);
 }
 void boot();
+window.addEventListener('hashchange', () => void boot()); // #car / #plane / #m=... links switch models
