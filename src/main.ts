@@ -38,11 +38,16 @@ async function load(source: string): Promise<void> {
   sim = null;
   if (old) await old.lua.dispose();
   try {
+    const t0 = performance.now();
     const next = new Simulation(R, source, keys);
+    const t1 = performance.now();
     await next.start();
+    const t2 = performance.now();
     sim = next;
     (window as unknown as { __sim: Simulation }).__sim = next; // probe hook for tools/
     scene.rebuild(next.assembly!.tiles, next.env);
+    const t3 = performance.now();
+    (window as unknown as { __loadTimes: number[] }).__loadTimes = [t1 - t0, t2 - t1, t3 - t2].map((v) => Math.round(v)); // parse, physics+script, meshes
     scene.camYaw = 0.7;
     buildKeyCaps(next);
     if (next.scriptError) statusEl.textContent = next.scriptError;
