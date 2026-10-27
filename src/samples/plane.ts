@@ -21,11 +21,11 @@ Body
 {
   Core(color=#f2b705){
     N:Chip(){
-      N:Chip(){ N:Chip(color=#2b2b2b){ N:Jet(power=-THROTTLE, angle=-90, color=#ff6a3d){ } } }
+      N:Chip(){ N:Chip(color=#2b2b2b){ N:Jet(power=THROTTLE, angle=90, color=#ff6a3d){ } N:Jet(power=-THROTTLE, angle=-90, color=#ff6a3d){ } } }
     }
-    W:Chip(){ W:Chip(){ W:Chip(){ W:Trim(angle=-AIL){ } } } }
-    E:Chip(){ E:Chip(){ E:Chip(){ E:Trim(angle=AIL){ } } } }
     S:Chip(){
+      W:Chip(){ W:Chip(){ W:Chip(){ W:Trim(angle=-AIL){ } } } }
+      E:Chip(){ E:Chip(){ E:Chip(){ E:Trim(angle=AIL){ } } } }
       S:Chip(){
         S:Chip(){
           W:Chip(){ W:Trim(angle=ELEV){ } }
