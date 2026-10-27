@@ -97,9 +97,8 @@ describe('walker and tank samples', () => {
     const z0 = sim.corePosition().z;
     keys.press(0);
     for (let i = 0; i < 180; i++) sim.step(); // 6 s
-    // 0.8 m before 2026-10-27; with 16 solver iterations (joint chains no longer sag) the crawl gait
-    // slips and only manages ~0.25 m. Rework the gait once the original's servo stiffness is measured.
-    expect(sim.corePosition().z).toBeLessThan(z0 - 0.2);
+    // one-leg-at-a-time crawl with the instant (teleporting) servo: ~1.3 m in 6 s
+    expect(sim.corePosition().z).toBeLessThan(z0 - 0.8);
     const q = sim.physics.pose(sim.physics.tiles[0]).quaternion;
     expect(1 - 2 * (q.x * q.x + q.z * q.z)).toBeGreaterThan(0.9); // up vector still up
     await sim.lua.dispose();

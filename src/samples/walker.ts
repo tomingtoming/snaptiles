@@ -30,16 +30,17 @@ Body
 }
 Lua
 {
-  -- crawl gait: the hip (Rudder) swings the leg fore/aft, the knee (Frame) lifts it
+  -- crawl gait (one leg swings at a time, the other three push): a quarter of the cycle lifted and
+  -- swinging forward, three quarters planted and sweeping back. STRIDE flips the walking direction.
+  STRIDE = -30
   phase = 0
   function leg(t)
-    -- t in [0,1): first half swings forward lifted, second half pushes back planted
-    if t < 0.5 then
-      local u = t / 0.5
-      return -30 + 60 * u, 35 + 45 * math.sin(u * math.pi)
+    if t < 0.25 then
+      local u = t / 0.25
+      return -STRIDE + 2 * STRIDE * u, 35 + 40 * math.sin(u * math.pi)
     end
-    local u = (t - 0.5) / 0.5
-    return 30 - 60 * u, 35
+    local u = (t - 0.25) / 0.75
+    return STRIDE - 2 * STRIDE * u, 35
   end
   function OnFrame()
     local speed = GO + math.abs(TURN) * 0.6
@@ -49,8 +50,8 @@ Lua
     local r = 1 - TURN * 0.8
     local h, k
     h, k = leg((phase + 0.00) % 1) FL_H, FL_K = h * l, k
-    h, k = leg((phase + 0.50) % 1) FR_H, FR_K = h * r, k
     h, k = leg((phase + 0.25) % 1) RR_H, RR_K = h * r, k
+    h, k = leg((phase + 0.50) % 1) FR_H, FR_K = h * r, k
     h, k = leg((phase + 0.75) % 1) RL_H, RL_K = h * l, k
     out(0, "step", math.floor(phase * 4))
   end

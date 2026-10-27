@@ -33,6 +33,8 @@ columns. Raw logs: `D:\snaptiles-models\quarantine\original\runs\*.csv` (not in 
 | `_WX/_WY/_WZ` | model-local angular velocity; the yaw rate `_WY` has the sign of d`_EY`/dt. `_WX` = +ω_x and `_WZ` = −ω_z (three.js local frame): the corpus segway (`E = −(_AX + _WX·4 …)`) balances only with `_WX` +, the jet-balanced bike2 (`_AZ·8 − _WZ/30·6`) only with `_WZ` − | turn20, segway, bike2 |
 | Jet | thrust **power / 6 N along +normal** (the 3-wheeler's script levitates with `9.82·6·_WEIGHT()`; the plane sample at 35000 accelerates at 10 m/s² with no measurable drag up to 53 m/s) | plane_full, jet_flat_val |
 | attribute evaluation | a literal `power=5000` on a Jet produced no thrust; `power=Engine` with a Val default did. Attributes bound to a Val are re-evaluated every frame (so `_SET` on them is lost) | jetc_* vs jet_*_val runs |
+| servo | a commanded joint angle is applied **within one frame** (Rudder: 60° one frame after the Val changes), **without momentum**: snapping a Frame holding two Weights 45° pitches the light core 31° and the arm −14° (inertia-weighted split about the hinge), the load then swings from rest and the model settles with the core at 45° | servo_rudder, servo_hinge_load |
+| joint stiffness | rigid: a Frame(spring=0.5) holding a 4× Weight at 1.2 m does not sag; spring=0.1 sags 0.1° | sag_arm, sag_arm_spring05/01 |
 | settling | the 3-wheeler rests with its core 0.65 m above ground; SnapTiles needed 16 rapier solver iterations (8 let the chain of six servo joints sag 0.4 m and the belly plate touched the ground) | wheel3 rest dump, lowest-corner.ts |
 | axes | W is **+x**, N is −z, y up in the original (SnapTiles keeps W = −x, i.e. a mirrored x; the Euler readouts above are matched numerically, not by mirroring) | rest dumps |
 | Trim / Rudder signs | consistent with `JOINT_SIGN` (+1 / −1) | trimrudder30 positions |
@@ -75,6 +77,18 @@ With the Rudder fixed at 20° and power 1000 both cars drive a circle of radius 
 side, one lap in ≈ 150 frames, `_EY` falling. A frictionless *cylinder* tyre instead of the sphere
 made the chassis wander and roll over (edge contacts) — keep the sphere.
 
+## Servo model (implemented 2026-10-28 early, `servoTeleport()` in `world.ts`)
+
+Rapier joint limits catch up with a moved target at only ~6°/frame (any solver setting), velocity
+motors inject momentum and break the limits under load. The servo therefore **rotates both sides of
+the hinge rigidly** by the remaining angle each step, split inversely to each side's moment of
+inertia about the hinge, keeping velocities; limits then hold the angle. A grounded body that the
+rotation would drag along the ground or push into it counts as very heavy (`SERVO_HOLD`), so a
+planted foot stays and the body moves — that is what makes walkers walk (the corpus `zrobo` stands
+and walks for the first time; `4leg1`/`2walk` still fall). The loaded-hinge probe matches the
+original frame by frame (31.4°/−13.6° at frame 35, 45°/0° at 60, 15.5°/15.4° at 121, 0 at 140).
+Spring joints (`spring<1`) are welded (measured rigid).
+
 ## Rapier caps angular velocity (why the tyre is not a spinning body)
 
 Rapier limits a body's rotation to **π/4 per step**: at the 1/60 s step a rotor cannot exceed
@@ -90,15 +104,13 @@ acceleration, `_WY` = v/r). Hence the contact-force wheel above.
 | gravity | 9.8 | `world.ts` |
 | tyre friction | 1.4 | `WHEEL_FRICTION` |
 | plate aero | lift slope 3.8 per sin α, broadside cap 0.7 (per tile, not per area) | `world.ts` — measure with Data/plane.txt next |
-| servo | hard limits slewed at 6°/step | `SOFT_SERVO` |
-| spring<1 joints | motor 4000·spring, ±8° travel | `SPRING_*` |
 | Arm shell | 80 m/s, 2 kg, 4 s | `ARM_*` |
 | cowl option 5 / 1 / 2 | bulging ribbon / plate / plate | `scene.ts` |
 | `_T`, `_FUEL`, network, CCD | stubs | `simulation.ts` |
 
 ## Known failures
 
-- Self-balancing models and some walkers tip over when driven (servo stiffness unknown).
+- Walkers `4leg1` and `2walk` from the corpus still tip over when driven (segway, bike2, zrobo are fine).
 - The plane sample no longer takes off with the 0.6 m tile (test skipped; aero unmeasured).
 - `weapon/cannon.rcd` indexes an undefined Val (`math.mod(nil)`): the model itself.
 

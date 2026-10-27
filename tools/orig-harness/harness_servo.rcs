@@ -1,0 +1,42 @@
+-- servo/sag probe: logs chips 0..5 (x,y,z,ex,ey,ez) every frame for 240 frames (written once at 240).
+-- The model's own Lua drives its Vals (the scenario cannot touch them).
+n=0
+buf=""
+wrote=-9
+lasterr="none"
+function OnInit()
+	n=0
+	local h="frame"
+	for c=0,5 do h=h..",x"..c..",y"..c..",z"..c..",ex"..c..",ey"..c..",ez"..c end
+	buf=h.."\n"
+end
+
+function step()
+	if n<=240 then
+		local row=""..n
+		local m=_CHIPS()-1
+		for c=0,5 do
+			if c<=m then
+				row=row..",".._X(c)..",".._Y(c)..",".._Z(c)..",".._EX(c)..",".._EY(c)..",".._EZ(c)
+			else
+				row=row..",,,,,,"
+			end
+		end
+		buf=buf..row.."\n"
+	end
+	if n==240 then
+		local h=_FOPEN("log.txt","w")
+		if h>=0 then _FPUTS(h,buf) _FCLOSE(h) wrote=h else wrote=-1 end
+	end
+end
+
+function OnFrame()
+	n=n+1
+	local ok,err=pcall(step)
+	if not ok then lasterr=tostring(err) end
+	out(0,"frame ",n," wrote ",wrote)
+	out(1,"err ",lasterr)
+end
+
+function OnReset()
+end
