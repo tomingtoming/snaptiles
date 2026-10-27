@@ -112,10 +112,12 @@ export class PhysicsWorld {
     }
     const charges = new Map(this.armCharge);
     const shells = this.projectiles;
+    const tick = this.tick;
     this.projectiles = [];
     this.build(this.assembly, this.env, new THREE.Vector3(), { inPlace: true, velocities });
     this.armCharge = charges;
     this.projectiles = shells;
+    this.tick = tick;
   }
 
   constructor(private R: typeof RAPIER, opts: PhysicsOptions = {}) {
