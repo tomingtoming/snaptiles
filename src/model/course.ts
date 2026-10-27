@@ -40,6 +40,7 @@ export const CRATES: { pos: [number, number, number]; size: number; color: numbe
   { pos: [0, 2.5, 34], size: 1, color: 0xb97e4e },
   { pos: [0, 0.5, -14], size: 1, color: 0xd9a066 },
   { pos: [0, 1.5, -14], size: 1, color: 0xc98e5a },
+  { pos: [0, 2.5, -14], size: 1, color: 0xb97e4e },
   { pos: [8, 0.5, -8], size: 1, color: 0xd9a066 },
   { pos: [9.2, 0.5, -8], size: 1, color: 0xd9a066 },
   { pos: [8.6, 1.5, -8], size: 1, color: 0xc98e5a },
