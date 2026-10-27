@@ -96,3 +96,37 @@ describe('Lua runner', () => {
     await r.dispose();
   });
 });
+
+describe('legacy Script idioms from community files', () => {
+  it('several statements on one line, goto with a colon, lowercase functions', () => {
+    const s = new RcScript(`
+      if S_SP=0 | fuel=0 {goto A:}
+      S=S+S_SP
+      if S>=360 {S=S-360}
+      F_1=_sin(_torad(S))*10
+      label A
+      if F_B=1 {Z_A=90 DUMMY=_BYE(zenmai) goto B:}
+      Z_A=1
+      label B
+      print 0,"FPS=",_FPS(),"  Chips=",_CHIPS()
+    `);
+    const v = vals({ S_SP: 10, S: 355, FUEL: 100, F_1: 0, F_B: 1, Z_A: 0, ZENMAI: 3 });
+    let byeArg = -1;
+    const api = { _BYE: (n: number) => { byeArg = n; return 0; }, _FPS: () => 30, _CHIPS: () => 7 } as never;
+    s.run(api, v);
+    expect(v.get('S')!.value).toBe(5); // 355 + 10 wrapped
+    expect(v.get('F_1')!.value).toBeCloseTo(Math.sin((5 * Math.PI) / 180) * 10, 6);
+    expect(v.get('Z_A')!.value).toBe(90); // the block ran and jumped over Z_A=1
+    expect(byeArg).toBe(3);
+    expect(s.outLines[0]).toBe('FPS=30  Chips=7');
+  });
+
+  it('skips the block when the condition is false and continues after it', () => {
+    const s = new RcScript(`if _KEY(4)>0 {fuel=fuel+(20/100*Z_P) Z_P=Z_P-5}
+if _KEY(4)=0 {Z_P=100-10*(fuel/500)}`);
+    const v = vals({ FUEL: 1000, Z_P: 50 });
+    s.run({ _KEY: () => 0 } as never, v);
+    expect(v.get('FUEL')!.value).toBe(1000);
+    expect(v.get('Z_P')!.value).toBe(80);
+  });
+});
