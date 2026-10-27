@@ -8,7 +8,9 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "probe:corpus": "node tools/corpus.mjs http://127.0.0.1:5173/ ${CORPUS:-../snaptiles-models/raw/sprishri/x} ${CORPUS2:-../snaptiles-models/raw/RCModel1}",
+    "probe:drive": "node tools/drive-probe.mjs ArrowUp:4000 ../snaptiles-models/raw/sprishri/x/ride/car1.txt ../snaptiles-models/raw/sprishri/x/ride/3wheel.txt ../snaptiles-models/raw/sprishri/x/ride/bike1.rcd ../snaptiles-models/raw/sprishri/x/ride/segway.txt ../snaptiles-models/raw/RCModel1/bike.rcd"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",
