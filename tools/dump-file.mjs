@@ -1,7 +1,7 @@
 // Dump poses for a model file: node tools/dump-file.mjs <url> <file> [typeFilter]
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
-const [url, file, filter = ''] = process.argv.slice(2);
+const [url, file, filter = '', keySpec = ''] = process.argv.slice(2);
 const buf = readFileSync(file);
 let text = new TextDecoder('utf-8', { fatal: false }).decode(buf);
 if (/�/.test(text)) text = new TextDecoder('shift_jis').decode(buf);
@@ -10,7 +10,14 @@ const page = await browser.newPage();
 await page.goto(url, { waitUntil: 'networkidle' });
 await page.fill('#source', text);
 await page.click('#run');
-await page.waitForTimeout(2500);
+await page.waitForTimeout(1500);
+if (keySpec) {
+  const [codes, ms = '1000'] = keySpec.split(':');
+  await page.focus('#view');
+  for (const c of codes.split('+')) await page.keyboard.down(c);
+  await page.waitForTimeout(Number(ms));
+  for (const c of codes.split('+')) await page.keyboard.up(c);
+}
 const rows = await page.evaluate((filter) => {
   const sim = window.__sim;
   const out = [];

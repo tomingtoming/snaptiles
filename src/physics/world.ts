@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
-import { TILE, TILE_T, assemblyBottom, attr, refreshJointFrames, type Assembly, type TileInstance, type ValEnv } from '../model/assemble';
+import { TILE, TILE_T, assemblyBottom, attr, jointSign, refreshJointFrames, type Assembly, type TileInstance, type ValEnv } from '../model/assemble';
 import { exprIsConstant } from '../rc/expr';
 import { COURSE } from '../model/course';
 
@@ -36,14 +36,18 @@ export interface PhysicsOptions {
 }
 
 /** power → torque scale for wheels: spec only says "TRQ≈1000" drives a car. */
-export const WHEEL_TORQUE_PER_POWER = 0.25; // N·m per power unit
+export const WHEEL_TORQUE_PER_POWER = 0.1; // N·m per power unit (corpus cars use power 2,000–20,000; 0.25 launched them, 0.02 crawled)
 /** spec: 6 power = 1 N */
 export const JET_NEWTON_PER_POWER = 1 / 6;
 /** flat-plate aero: N per (m/s)² of normal velocity, per unit drag coefficient of a tile */
 export const AIR_DRAG = 0.9;
 /** compliant joints (spring<1): N·m/rad at spring=1 and N·m·s/rad at damper=1 — guesses */
+/** tyre friction coefficient (rapier combines with the ground's 1.0 by averaging) */
+export const WHEEL_FRICTION = 1.4;
 export const SPRING_STIFFNESS = 4000;
 export const SPRING_DAMPING = 400;
+/** compliant joints may flex this far either way; beyond it the connection is rigid */
+export const SPRING_TRAVEL = (8 * Math.PI) / 180;
 
 // Tiles of a model never collide with each other (only with the ground / objects).
 const MODEL_GROUP = 0x0001_0002; // membership 1, filter 2
@@ -207,7 +211,8 @@ export class PhysicsWorld {
       const animated = angleAnimated && tile.spec.joint !== 'wheel';
       // spring < 1 asks for a compliant connection (suspension); default spring=1 is rigid
       const springVal = tile.node.attrs.spring !== undefined ? attr(tile.node, 'spring', env, 1) : 1;
-      const compliant = !!parentTb && !animated && tile.spec.joint !== 'wheel' && tile.spec.joint !== 'fixed' && springVal < 1;
+      const noSpring = (globalThis as unknown as { __tune?: { noSpring?: boolean } }).__tune?.noSpring ?? false;
+      const compliant = !noSpring && !!parentTb && !animated && tile.spec.joint !== 'wheel' && tile.spec.joint !== 'fixed' && springVal < 1;
       const startsGroup = !parentTb || tile.spec.joint === 'wheel' || animated || compliant;
 
       // Wheel = rim (a plate folded like a chip) + rotor (the disc). The rim is welded to the
@@ -285,9 +290,9 @@ export class PhysicsWorld {
       const mass = tile.spec.wheel ? 36.76 : tile.mass;
       if (mass > 0 || tile.spec.collides) {
         const cd = tile.spec.wheel
-          ? R.ColliderDesc.cylinder(TILE_T / 2, TILE / 2)
+          ? R.ColliderDesc.cylinder(TILE_T / 2, wheelRadius(tile.option))
           : R.ColliderDesc.cuboid(TILE / 2, TILE_T / 2, TILE / 2);
-        cd.setMass(Math.max(0.1, mass)).setFriction(tile.spec.friction).setCollisionGroups(MODEL_GROUP);
+        cd.setMass(Math.max(0.1, mass)).setFriction(tile.spec.wheel ? ((globalThis as unknown as { __tune?: { wheelFriction?: number } }).__tune?.wheelFriction ?? WHEEL_FRICTION) : tile.spec.friction).setCollisionGroups(MODEL_GROUP);
         cd.setTranslation(relPos.x, relPos.y, relPos.z).setRotation({ x: relQuat.x, y: relQuat.y, z: relQuat.z, w: relQuat.w });
         if (tile.ghost || !tile.spec.collides) cd.setSensor(true);
         this.world.createCollider(cd, body);
@@ -306,7 +311,7 @@ export class PhysicsWorld {
           const damper = tile.node.attrs.damper !== undefined ? attr(tile.node, 'damper', env, 0.5) : attr(tile.node, 'dumper', env, 0.5);
           joint.configureMotorModel(R.MotorModel.ForceBased);
           joint.configureMotorPosition(0, SPRING_STIFFNESS * Math.max(0.02, springVal), SPRING_DAMPING * Math.max(0.05, damper));
-          joint.setLimits(-Math.PI / 3, Math.PI / 3);
+          joint.setLimits(-SPRING_TRAVEL, SPRING_TRAVEL);
         }
       }
       const restAngle = angleAnimated ? attr(tile.node, 'angle', env, 0) : 0;
@@ -356,12 +361,14 @@ export class PhysicsWorld {
         if (tile.spec.joint === 'wheel') {
           const power = tile.powerless ? 0 : attr(tile.node, 'power', env, 0);
           const brake = attr(tile.node, 'brake', env, 0);
-          const parentBody = tb.rim ?? this.byId.get(tile.parent.id)!.body;
+          // reaction goes to the body the rim hangs from (not the rim itself: a steady torque
+          // against the rim joint's hard limits pumps energy into the solver and lifts the car)
+          const parentBody = this.byId.get(tile.parent.id)!.body;
           if (tb.rimJoint) {
-            const a = (attr(tile.node, 'angle', env, 0) - tb.restAngle) * DEG;
+            const a = jointSign('wheel', tile.dir) * (attr(tile.node, 'angle', env, 0) - tb.restAngle) * DEG; // rim fold
             tb.rimJoint.setLimits(a, a);
           }
-          let torque = power * WHEEL_TORQUE_PER_POWER;
+          let torque = power * ((globalThis as unknown as { __tune?: { wheelTorque?: number } }).__tune?.wheelTorque ?? WHEEL_TORQUE_PER_POWER);
           if (brake > 0) {
             const w = body.angvel();
             const pw = parentBody.angvel();
@@ -371,10 +378,11 @@ export class PhysicsWorld {
           if (torque !== 0) {
             const t = normal.clone().multiplyScalar(torque);
             body.addTorque({ x: t.x, y: t.y, z: t.z }, true);
-            if (!tile.spec.noReaction) parentBody.addTorque({ x: -t.x, y: -t.y, z: -t.z }, true);
+            const noReaction = (globalThis as unknown as { __tune?: { noReaction?: boolean } }).__tune?.noReaction ?? false;
+            if (!tile.spec.noReaction && !noReaction) parentBody.addTorque({ x: -t.x, y: -t.y, z: -t.z }, true);
           }
         } else if (tb.animated) {
-          const a = (attr(tile.node, 'angle', env, 0) - tb.restAngle) * DEG;
+          const a = jointSign(tile.spec.joint, tile.dir) * (attr(tile.node, 'angle', env, 0) - tb.restAngle) * DEG;
           joint.setLimits(a, a);
         }
       }
@@ -426,3 +434,12 @@ function toLocalDir(body: RAPIER.RigidBody, worldDir: THREE.Vector3) {
   const v = worldDir.clone().applyQuaternion(inv).normalize();
   return { x: v.x, y: v.y, z: v.z };
 }
+
+/** rotor radius per Wheel option (0/1/2). Only the ordering is documented; sizes are guesses,
+ *  chosen so the tyre reaches beyond the corners of the rim plate (half-diagonal 0.71). */
+export function wheelRadius(option: number): number {
+  const tune = (globalThis as unknown as { __tune?: { wheelRadius?: number } }).__tune?.wheelRadius;
+  const base = tune ?? WHEEL_RADIUS0;
+  return base * (option >= 2 ? 1.5 : option >= 1 ? 1.25 : 1);
+}
+export const WHEEL_RADIUS0 = 0.5;

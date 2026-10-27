@@ -22,6 +22,36 @@ export const TILE_T = 0.1;
 
 export type JointKind = 'hinge' | 'yaw' | 'roll' | 'wheel' | 'fixed';
 
+/**
+ * Sign between a fold `angle` and the right-handed rotation about hingeAxis = cross(up, dir),
+ * per attachment direction. +1 means a positive angle folds the child DOWN. Mutable so the
+ * convention can be probed against the corpus (tools/foldsign.ts).
+ */
+export const FOLD_SIGN: Record<'N' | 'S' | 'E' | 'W', number> = { N: 1, S: 1, E: 1, W: 1 };
+/**
+ * Same for Trim (roll about dir), Rudder (yaw about the parent normal) and the Wheel rim fold.
+ * Measured 2026-10-27 with tools/foldsign.ts over 16 corpus vehicles: of 64 sign combinations,
+ * fold +1 everywhere (positive folds DOWN), Trim +1, Rudder -1, wheel rim +1 puts 32/42 wheels
+ * on the ground plane (bike, segway, car1, car2, 3wheel, 6leg, tatikoma all perfect); the next
+ * best combination scores 29.
+ */
+export const JOINT_SIGN = { TRIM: 1, RUDDER: -1, WHEEL: 1 };
+
+/** sign between an `angle` attribute and the joint's right-handed rotation about its axis */
+export function jointSign(kind: JointKind, dir: 'N' | 'S' | 'E' | 'W' | null): number {
+  switch (kind) {
+    case 'hinge':
+    case 'fixed':
+      return FOLD_SIGN[dir ?? 'N'];
+    case 'roll':
+      return JOINT_SIGN.TRIM;
+    case 'yaw':
+      return JOINT_SIGN.RUDDER;
+    case 'wheel':
+      return JOINT_SIGN.WHEEL;
+  }
+}
+
 export interface TypeSpec {
   joint: JointKind;
   collides: boolean;
@@ -134,22 +164,26 @@ function childPose(spec: TypeSpec, dir: 'N' | 'S' | 'E' | 'W', angleDeg: number)
   let pos: THREE.Vector3;
   let axis: THREE.Vector3;
   let anchor: THREE.Vector3;
+  // Fold sign measured 2026-10-27 against the corpus: a positive angle folds the child UP
+  // (bike forks go down with Frame(angle=-10){Frame(angle=-135)}, car1's wheels hang below
+  // via Frame(50){Frame(-140)}). Right-hand rotation about hingeAxis = cross(up, dir) folds
+  // down, hence the negation.
   switch (spec.joint) {
     case 'hinge':
     case 'fixed':
-      q.setFromAxisAngle(hingeAxis, angleDeg * DEG);
+      q.setFromAxisAngle(hingeAxis, FOLD_SIGN[dir] * angleDeg * DEG);
       pos = half.clone().add(half.clone().applyQuaternion(q));
       axis = hingeAxis;
       anchor = half;
       break;
     case 'yaw':
-      q.setFromAxisAngle(UP, angleDeg * DEG);
+      q.setFromAxisAngle(UP, JOINT_SIGN.RUDDER * angleDeg * DEG);
       pos = half.clone().add(half.clone().applyQuaternion(q));
       axis = UP.clone();
       anchor = half;
       break;
     case 'roll':
-      q.setFromAxisAngle(d, angleDeg * DEG);
+      q.setFromAxisAngle(d, JOINT_SIGN.TRIM * angleDeg * DEG);
       pos = d.clone().multiplyScalar(TILE);
       axis = d.clone();
       anchor = half;
@@ -157,7 +191,7 @@ function childPose(spec: TypeSpec, dir: 'N' | 'S' | 'E' | 'W', angleDeg: number)
     case 'wheel':
       // the rim folds about the shared edge like a chip (Wheel(angle=90) stands the disc up);
       // the rotor then spins about the rim's normal — set by the caller
-      q.setFromAxisAngle(hingeAxis, angleDeg * DEG);
+      q.setFromAxisAngle(hingeAxis, JOINT_SIGN.WHEEL * angleDeg * DEG);
       pos = half.clone().add(half.clone().applyQuaternion(q));
       axis = hingeAxis;
       anchor = half;

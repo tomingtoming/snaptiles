@@ -179,11 +179,18 @@ export class Simulation {
     }
 
     // the original runs scripts and key steps at 30 fps; physics takes two 1/60 s steps per frame
-    for (let i = 0; i < PHYSICS_SUBSTEPS; i++) {
+    const sub = (globalThis as unknown as { __tune?: { substeps?: number } }).__tune?.substeps ?? PHYSICS_SUBSTEPS;
+    this.physics.world.timestep = this.frameDt() / sub;
+    for (let i = 0; i < sub; i++) {
       this.physics.applyControls(this.env);
       this.physics.step();
     }
     this.ticks++;
+  }
+
+  /** seconds per script frame (tunable through window.__tune.fps for experiments) */
+  frameDt(): number {
+    return 1 / ((globalThis as unknown as { __tune?: { fps?: number } }).__tune?.fps ?? FRAME_RATE);
   }
 
   /** yaw of the core's forward (-Z) axis, for the chase camera */

@@ -31,7 +31,7 @@ describe('assemble', () => {
   it('folds a chip about the shared edge', () => {
     const a = build('Core(){ W:Chip(angle=90){} }');
     const c = a.tiles[1];
-    // folded down: hangs below the west edge
+    // positive angle folds down (measured against the corpus): hangs below the west edge
     near(c.position, -TILE / 2, -TILE / 2, 0);
     near(c.anchor, -TILE / 2, 0, 0);
     const normal = new THREE.Vector3(0, 1, 0).applyQuaternion(c.quaternion);
@@ -55,8 +55,8 @@ describe('assemble', () => {
     const r = a.tiles[1];
     near(r.axis, 0, 1, 0);
     near(r.anchor, 0, 0, -TILE / 2);
-    // rotated +90° about +Y: the tile now extends toward -X from the edge
-    near(r.position, -TILE / 2, 0, -TILE / 2);
+    // Rudder sign is -1 (measured): angle=90 rotates -90° about +Y, the tile extends toward +X
+    near(r.position, TILE / 2, 0, -TILE / 2);
   });
 
   it('trim rolls about the connection axis', () => {
@@ -72,7 +72,7 @@ describe('assemble', () => {
     const a = build('Core(){ N:Chip(angle=-A*2){} }', { A: 15 });
     const c = a.tiles[1];
     const normal = new THREE.Vector3(0, 1, 0).applyQuaternion(c.quaternion);
-    // -30° fold: normal tilts toward +Z by sin(30°)... just check it is no longer straight up
+    // 30° fold either way: the normal tilts by 30°
     expect(Math.abs(normal.y - Math.cos(Math.PI / 6))).toBeLessThan(1e-6);
   });
 

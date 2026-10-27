@@ -55,7 +55,8 @@ function stripComments(src: string): string {
   while (i < src.length) {
     const c = src[i];
     const n = src[i + 1];
-    if (c === '/' && n === '/') {
+    if ((c === '/' && n === '/') || (c === '-' && n === '-')) {
+      // `//` comments; some community files also use Lua-style `--` outside the Lua block
       while (i < src.length && src[i] !== '\n') i++;
     } else if (c === '/' && n === '*') {
       i += 2;
@@ -122,8 +123,14 @@ function findBlocks(src: string): { name: string; inner: string; line: number }[
     let depth = 0;
     let i = open;
     for (; i < src.length; i++) {
-      if (src[i] === '{') depth++;
-      else if (src[i] === '}') {
+      const c = src[i];
+      // braces inside line comments (// or Lua --) do not count
+      if ((c === '/' && src[i + 1] === '/') || (c === '-' && src[i + 1] === '-')) {
+        while (i < src.length && src[i] !== '\n') i++;
+        continue;
+      }
+      if (c === '{') depth++;
+      else if (c === '}') {
         depth--;
         if (depth === 0) break;
       }
@@ -270,7 +277,8 @@ function parseBody(inner: string, baseLine: number): ChipNode[] {
   const p = new P(tokenize(inner), baseLine);
   const roots: ChipNode[] = [];
   while (p.peek()) {
-    if (p.accept(',') || p.accept(';')) continue;
+    // stray separators / an extra closing brace (seen in community files) are ignored
+    if (p.accept(',') || p.accept(';') || p.accept('}')) continue;
     roots.push(parseNode(p));
   }
   return roots;
