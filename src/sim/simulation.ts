@@ -359,7 +359,8 @@ export class Simulation {
       _GX: (n: number) => pos(n, 'x'),
       _GY: (n: number) => pos(n, 'y'),
       _GZ: (n: number) => pos(n, 'z'),
-      _TYPE: (n: number) => this.tileOf(n)?.spec.code ?? -1,
+      // a Wheel takes two numbers: the first (hub) reads type 3, the second (the tyre) 4/5 — measured on the original
+      _TYPE: (n: number) => { const t = this.tileOf(n); if (!t) return -1; return t.spec.wheel && Math.floor(n) === t.chipIndex - 1 ? 3 : t.spec.code; },
       _DIR: (n: number) => { const t = this.tileOf(n); return t?.dir ? DIR_CODE[t.dir] : 0; },
       _PARENT: (n: number) => this.tileOf(n)?.parent?.chipIndex ?? -1,
       _TOP: (n: number) => { let t = this.tileOf(n); while (t?.parent && !t.detached) t = t.parent; return t ? t.chipIndex : -1; },
