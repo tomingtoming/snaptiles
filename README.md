@@ -18,7 +18,15 @@ bun run dev
 ```
 
 Paste a model into the editor and press ▶ (or Ctrl+Enter). `R` resets the
-model. Drag to orbit, wheel to zoom.
+model in place, `U` reloads it, Ctrl+S saves the editor as a `.rcd` file, and a
+`.rcd`/`.txt` can be dropped onto the editor. Drag to orbit, wheel or pinch to
+zoom. The keycaps at the bottom are the model's keys and work by touch. Sound
+is synthesized (engine, jets, shots, impacts); 🔊 mutes it.
+
+Samples: `car` (↑↓ drive, ←→ steer), `plane` (Z/X throttle, ↓ pull up),
+`walker` (↑ walk, ←→ turn; a Lua gait), `hover` (jets with a Lua attitude
+hold; ↑↓←→ move, A/D turn), `tank` (A/D turret, Z fire). The course has a
+ramp, kerbs, a gate, a wall and crates to knock over.
 
 ## Model file
 
