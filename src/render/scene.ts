@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { TILE, TILE_T, type TileInstance, type ValEnv } from '../model/assemble';
 import { evalExpr, exprIsConstant } from '../rc/expr';
 import type { PhysicsWorld } from '../physics/world';
+import { COURSE } from '../model/course';
 
 const PALETTE: Record<string, number> = {
   core: 0xffb000,
@@ -121,6 +122,15 @@ export class SceneView {
       (grid.material as THREE.Material).opacity = 0.35;
       grid.position.y = div === 1000 ? 0.002 : 0.004;
       this.scene.add(grid);
+    }
+
+    for (const b of COURSE) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(...b.size), new THREE.MeshStandardMaterial({ color: b.color, roughness: 0.9 }));
+      m.position.set(...b.pos);
+      m.rotation.set(b.rotX ?? 0, b.rotY ?? 0, 0, 'YXZ');
+      m.castShadow = true;
+      m.receiveShadow = true;
+      this.scene.add(m);
     }
 
     this.lines = new THREE.LineSegments(this.linesGeo, new THREE.LineBasicMaterial({ vertexColors: true }));

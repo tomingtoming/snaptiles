@@ -37,7 +37,8 @@ export interface RcModel {
   /** first Core (kept for convenience); all Cores are in `bodies` */
   body: ChipNode | null;
   bodies: ChipNode[];
-  script: { lang: 'lua' | 'rc'; source: string } | null;
+  /** `line` is the file line of the block's opening brace (for error messages) */
+  script: { lang: 'lua' | 'rc'; source: string; line: number } | null;
 }
 
 export class RcParseError extends Error {
@@ -282,12 +283,12 @@ export function parseRc(source: string): RcModel {
   for (const b of blocks) {
     const name = b.name.toLowerCase();
     if (name === 'lua') {
-      model.script = { lang: 'lua', source: b.inner };
+      model.script = { lang: 'lua', source: b.inner, line: b.line };
       continue;
     }
     if (name === 'script') {
       // legacy RC script; a Lua block (if present) takes precedence
-      if (!model.script || model.script.lang !== 'lua') model.script = { lang: 'rc', source: b.inner };
+      if (!model.script || model.script.lang !== 'lua') model.script = { lang: 'rc', source: b.inner, line: b.line };
       continue;
     }
     const inner = stripComments(b.inner);

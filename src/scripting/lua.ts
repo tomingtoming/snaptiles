@@ -61,8 +61,11 @@ export class ScriptRunner {
   outLines: string[] = [];
   maxInstructionsPerCall = 500_000;
   private frameFn: 'OnFrame' | 'main' | null = null;
+  /** file line of the Lua block's opening brace: error lines are reported relative to the file */
+  lineOffset = 0;
 
-  async load(source: string, api: LuaApi, prelude = ''): Promise<void> {
+  async load(source: string, api: LuaApi, prelude = '', lineOffset = 0): Promise<void> {
+    this.lineOffset = lineOffset;
     await this.dispose();
     const lua = await this.factory.createEngine({ openStandardLibs: false, injectObjects: false, enableProxy: false });
     for (const lib of SAFE_LIBRARIES) lua.global.loadLibrary(lib);
@@ -88,7 +91,7 @@ export class ScriptRunner {
       this.frameFn = isFn('OnFrame') ? 'OnFrame' : isFn('main') ? 'main' : null;
     } catch (e) {
       this.disarmBudget();
-      this.error = formatError(e);
+      this.error = fileLine(formatError(e), this.lineOffset);
     }
   }
 
@@ -130,13 +133,13 @@ export class ScriptRunner {
       if (r !== 0) {
         const msg = g.lua.lua_tolstring(L, -1, null);
         g.lua.lua_settop(L, 0);
-        this.error = `${fnName}: ${String(msg ?? 'error')}`;
+        this.error = fileLine(`${fnName}: ${String(msg ?? 'error')}`, this.lineOffset);
         return false;
       }
       g.lua.lua_settop(L, 0);
       return true;
     } catch (e) {
-      this.error = formatError(e);
+      this.error = fileLine(formatError(e), this.lineOffset);
       return false;
     } finally {
       this.disarmBudget();
@@ -188,4 +191,9 @@ export class ScriptRunner {
 function formatError(e: unknown): string {
   if (e instanceof Error) return e.message;
   return String(e);
+}
+
+/** `[string "..."]:12:` → `line 57:` (file line), given the Lua block's opening-brace line */
+export function fileLine(message: string, lineOffset: number): string {
+  return message.replace(/\[string "[^"]*"\]:(\d+):/g, (_, n) => `line ${Number(n) + lineOffset}:`);
 }

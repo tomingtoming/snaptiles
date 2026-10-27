@@ -89,7 +89,7 @@ export class Simulation {
     const s = this.model.script;
     if (!s) return;
     if (s.lang === 'lua') {
-      await this.lua.load(s.source, this.api(), this.luaPrelude());
+      await this.lua.load(s.source, this.api(), this.luaPrelude(), s.line);
       this.scriptError = this.lua.error;
       this.callLua('OnInit');
     } else {

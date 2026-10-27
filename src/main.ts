@@ -92,7 +92,21 @@ sourceEl.addEventListener('keydown', (e) => {
   }
 });
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'KeyR' && !(e.target instanceof HTMLTextAreaElement)) sim?.reset();
+  const typing = e.target instanceof HTMLTextAreaElement;
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    // save the editor contents as a model file
+    e.preventDefault();
+    const blob = new Blob([sourceEl.value], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${SAMPLES[current]?.name ?? 'model'}.rcd`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    return;
+  }
+  if (typing) return;
+  if (e.code === 'KeyR') sim?.reset(); // R: reset in place (OnReset)
+  if (e.code === 'KeyU') void loadAndShare(sourceEl.value); // U: reload from source (OnInit)
 });
 
 // ---- camera orbit ----

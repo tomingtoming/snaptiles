@@ -2,6 +2,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import { TILE, TILE_T, assemblyBottom, attr, refreshJointFrames, type Assembly, type TileInstance, type ValEnv } from '../model/assemble';
 import { exprIsConstant } from '../rc/expr';
+import { COURSE } from '../model/course';
 
 /**
  * Tiles whose angle never changes are welded into their parent's rigid body
@@ -129,6 +130,15 @@ export class PhysicsWorld {
     this.world.numSolverIterations = 8;
     const groundDesc = R.ColliderDesc.cuboid(2000, 1, 2000).setTranslation(0, -1, 0).setFriction(1.0).setCollisionGroups(GROUND_GROUP);
     this.world.createCollider(groundDesc);
+    for (const b of COURSE) {
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(b.rotX ?? 0, b.rotY ?? 0, 0, 'YXZ'));
+      const cd = R.ColliderDesc.cuboid(b.size[0] / 2, b.size[1] / 2, b.size[2] / 2)
+        .setTranslation(...b.pos)
+        .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w })
+        .setFriction(1.0)
+        .setCollisionGroups(GROUND_GROUP);
+      this.world.createCollider(cd);
+    }
   }
 
   clear(): void {

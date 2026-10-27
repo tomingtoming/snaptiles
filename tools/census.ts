@@ -27,7 +27,7 @@ let total = 0;
 const visit = (n: ChipNode) => {
   if (n.type.toLowerCase() === 'cowl' && n.dir) {
     const opt = (n.attrs.option ?? '0').trim();
-    if (opt === '3' || opt === '4') {
+    if (['0','1','2','3','4','5'].includes(opt)) {
       total++;
       for (const c of n.children) {
         if (!c.dir) continue;
