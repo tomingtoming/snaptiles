@@ -113,7 +113,7 @@ acceleration, `_WY` = v/r). Hence the contact-force wheel above.
 
 ## Known failures
 
-- Walkers `4leg1` and `2walk` from the corpus still tip over when driven (segway, bike2, zrobo are fine).
+- Corpus walkers: `zrobo`, `4leg1` and the walker sample walk with `SERVO_HOLD` 1000; `2walk` and `4leg2` tip over. With a weak hold (3) `2walk` walks fast and `zrobo` falls instead — the grounded-foot heuristic is only a proxy for the original's constraint solver, and no single setting carries every gait.
 - `weapon/cannon.rcd` indexes an undefined Val (`math.mod(nil)`): the model itself.
 
 ## Root causes worth remembering

@@ -471,7 +471,7 @@ export class PhysicsWorld {
             const vertical = motion.dot(UP) / len; // + would lift it off the ground, − push it in
             const tangential = motion.clone().sub(UP.clone().multiplyScalar(motion.dot(UP))).length() / len;
             const hold = vertical < -0.3 ? 1 : tangential * tangential;
-            m += b.mass() * SERVO_HOLD * hold;
+            m += b.mass() * ((globalThis as unknown as { __tune?: { servoHold?: number } }).__tune?.servoHold ?? SERVO_HOLD) * hold;
           }
         }
         I += m;
