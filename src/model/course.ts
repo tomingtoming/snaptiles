@@ -29,3 +29,17 @@ export const COURSE: Block[] = [
   { pos: [-31, 1, 10], size: [4, 2, 4], color: 0xa0a8b0 },
   { pos: [-37, 1.5, 10], size: [4, 3, 4], color: 0xa0a8b0 },
 ];
+
+/** knockable crates (dynamic): a pyramid in front of the wall and a few on the field */
+export const CRATES: { pos: [number, number, number]; size: number; color: number }[] = [
+  { pos: [-2, 0.5, 34], size: 1, color: 0xd9a066 },
+  { pos: [0, 0.5, 34], size: 1, color: 0xd9a066 },
+  { pos: [2, 0.5, 34], size: 1, color: 0xd9a066 },
+  { pos: [-1, 1.5, 34], size: 1, color: 0xc98e5a },
+  { pos: [1, 1.5, 34], size: 1, color: 0xc98e5a },
+  { pos: [0, 2.5, 34], size: 1, color: 0xb97e4e },
+  { pos: [8, 0.5, -8], size: 1, color: 0xd9a066 },
+  { pos: [9.2, 0.5, -8], size: 1, color: 0xd9a066 },
+  { pos: [8.6, 1.5, -8], size: 1, color: 0xc98e5a },
+];
+

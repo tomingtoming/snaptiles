@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { TILE, TILE_T, type TileInstance, type ValEnv } from '../model/assemble';
 import { evalExpr, exprIsConstant } from '../rc/expr';
 import { wheelRadius, type PhysicsWorld } from '../physics/world';
-import { COURSE } from '../model/course';
+import { COURSE, CRATES } from '../model/course';
 
 const PALETTE: Record<string, number> = {
   core: 0xffb000,
@@ -157,6 +157,14 @@ export class SceneView {
       this.scene.add(m);
     }
 
+    for (const c of CRATES) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(c.size, c.size, c.size), new THREE.MeshStandardMaterial({ color: c.color, roughness: 0.8 }));
+      m.castShadow = true;
+      m.receiveShadow = true;
+      this.scene.add(m);
+      this.crateMeshes.push(m);
+    }
+
     this.lines = new THREE.LineSegments(this.linesGeo, new THREE.LineBasicMaterial({ vertexColors: true }));
     this.lines.frustumCulled = false;
     this.scene.add(this.lines);
@@ -240,7 +248,15 @@ export class SceneView {
     }
   }
 
+  private crateMeshes: THREE.Mesh[] = [];
   sync(world: PhysicsWorld): void {
+    world.crates.forEach((b, i) => {
+      const m = this.crateMeshes[i];
+      const t = b.translation();
+      const r = b.rotation();
+      m.position.set(t.x, t.y, t.z);
+      m.quaternion.set(r.x, r.y, r.z, r.w);
+    });
     for (const tb of world.tiles) {
       const v = this.views.get(tb.tile.id);
       if (!v) continue;

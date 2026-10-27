@@ -91,6 +91,7 @@ export class Simulation {
     for (const v of this.vals.values()) { v.value = v.default; v.touched = false; }
     this.assembly = assemble(this.model, this.env) ?? this.assembly; // fresh rest poses, nothing detached
     this.physics.build(this.assembly, this.env);
+    this.physics.resetCrates();
     this.ticks = 0;
     this.callLua('OnReset');
   }

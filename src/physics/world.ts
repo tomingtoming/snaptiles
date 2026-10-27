@@ -2,7 +2,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import { TILE, TILE_T, assemblyBottom, attr, jointSign, refreshJointFrames, type Assembly, type TileInstance, type ValEnv } from '../model/assemble';
 import { exprIsConstant } from '../rc/expr';
-import { COURSE } from '../model/course';
+import { COURSE, CRATES } from '../model/course';
 
 /**
  * Tiles whose angle never changes are welded into their parent's rigid body
@@ -66,7 +66,7 @@ export const SPRING_TRAVEL = (8 * Math.PI) / 180;
 
 // Tiles of a model never collide with each other (only with the ground / objects).
 const MODEL_GROUP = 0x0001_0002; // membership 1, filter 2
-const GROUND_GROUP = 0x0002_0001; // membership 2, filter 1
+const GROUND_GROUP = 0x0002_0007; // membership 2, collides with models, other ground-like things and shells
 
 let ready: Promise<typeof RAPIER> | null = null;
 export function initRapier(): Promise<typeof RAPIER> {
@@ -158,6 +158,24 @@ export class PhysicsWorld {
         .setCollisionGroups(GROUND_GROUP);
       this.world.createCollider(cd);
     }
+    for (const c of CRATES) {
+      const body = this.world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(...c.pos).setLinearDamping(0.1).setAngularDamping(0.2));
+      const cd = R.ColliderDesc.cuboid(c.size / 2, c.size / 2, c.size / 2).setMass(12).setFriction(0.8).setCollisionGroups(GROUND_GROUP);
+      this.world.createCollider(cd, body);
+      this.crates.push(body);
+    }
+  }
+
+  /** knockable crates (course props), reset with the model */
+  crates: RAPIER.RigidBody[] = [];
+  resetCrates(): void {
+    this.crates.forEach((b, i) => {
+      const c = CRATES[i];
+      b.setTranslation({ x: c.pos[0], y: c.pos[1], z: c.pos[2] }, true);
+      b.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+      b.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      b.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    });
   }
 
   clear(): void {
