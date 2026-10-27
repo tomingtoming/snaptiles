@@ -8,7 +8,13 @@ It reads the `.rc` model format and the `_KEY()`/`_X()`/`out()` script API of
 RigidChips, so models written for it can be pasted in and played. SnapTiles is
 a clean-room reimplementation: it was written from the public documentation
 and wikis only (see `docs/spec/`), without reading any RigidChips source code.
-It shares no code with it and is not affiliated with its author.
+It shares no code with it and is not affiliated with its author. RigidChips
+itself was made by 学生 (Yasuhiko Takeya); its last release, 1.5B26 (2006), was
+used as the reference for the physics constants recorded in `docs/measured.md`
+(measured by running it, not by reading it). No RigidChips files, community
+models or maps are included in this repository; bring your own `.rcd`.
+
+Live: https://snaptiles.toming.app (source: this repository, AGPL-3.0).
 
 ## Run
 
