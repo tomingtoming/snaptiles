@@ -62,7 +62,7 @@ export const TYRE_CONTACT_MARGIN = 0.1;
 /** load the tyre forces may transmit: μ × (model weight / number of wheels) */
 export const TYRE_LOAD_SHARE = 1;
 /** spec: 6 power = 1 N */
-export const JET_NEWTON_PER_POWER = 1 / 6;
+export const JET_NEWTON_PER_POWER = 0.145; // measured 2026-10-28: a 530 kg wheeled car pushed by a jet at power 10000 accelerates at 2.74 m/s² (1452 N); the same at 5000 (1.38 m/s²); wheel option makes no difference
 /** plate aero (per 1 m² tile): broadside drag N per (m/s)², and the lift slope N per (m/s)² per sin α.
  *  ½ρ·Cd≈0.7 and ½ρ·2π≈3.8 for air; the original's numbers are unknown. */
 export const AIR_DRAG = 0.7;

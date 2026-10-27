@@ -31,7 +31,7 @@ columns. Raw logs: `D:\snaptiles-models\quarantine\original\runs\*.csv` (not in 
 | `_AX/_AY/_AZ` | = (−`_EX`, `_EY`, −`_EZ`) | every log |
 | `_VX/_VY/_VZ` | **model-local** velocity (world drift of a slightly yawed car shows in x only in dx/dt, not in `_VX`) | turn_basic |
 | `_WX/_WY/_WZ` | model-local angular velocity; the yaw rate `_WY` has the sign of d`_EY`/dt. `_WX` = +ω_x and `_WZ` = −ω_z (three.js local frame): the corpus segway (`E = −(_AX + _WX·4 …)`) balances only with `_WX` +, the jet-balanced bike2 (`_AZ·8 − _WZ/30·6`) only with `_WZ` − | turn20, segway, bike2 |
-| Jet | thrust **power / 6 N along +normal** (the 3-wheeler's script levitates with `9.82·6·_WEIGHT()`; the plane sample at 35000 accelerates at 10 m/s² with no measurable drag up to 53 m/s) | plane_full, jet_flat_val |
+| Jet | thrust **0.145 N per power unit along +normal** (≈ power/6.9): a 530 kg wheeled car with a stand-up jet at power 10000 accelerates at a constant 2.74 m/s² over 6 s, at 5000 at 1.38 m/s², same for wheel option 0 and 2. (The 3-wheeler's script assumes power/6 to hover; the plane sample's ground run was too noisy to pin it) | rolle_* runs, plane_full |
 | attribute evaluation | a literal `power=5000` on a Jet produced no thrust; `power=Engine` with a Val default did. Attributes bound to a Val are re-evaluated every frame (so `_SET` on them is lost) | jetc_* vs jet_*_val runs |
 | servo | a commanded joint angle is applied **within one frame** (Rudder: 60° one frame after the Val changes), **without momentum**: snapping a Frame holding two Weights 45° pitches the light core 31° and the arm −14° (inertia-weighted split about the hinge), the load then swings from rest and the model settles with the core at 45° | servo_rudder, servo_hinge_load |
 | joint stiffness | rigid: a Frame(spring=0.5) holding a 4× Weight at 1.2 m does not sag; spring=0.1 sags 0.1° | sag_arm, sag_arm_spring05/01 |
@@ -106,7 +106,7 @@ acceleration, `_WY` = v/r). Hence the contact-force wheel above.
 | gravity | 9.8 | `world.ts` |
 | tyre friction | 1.4 | `WHEEL_FRICTION` |
 | plate aero at 60–90° | the original stalls and oscillates (drag far above v²·sin²); SnapTiles rolls on at 4–7 m/s | `AERO_K2/AERO_P2` |
-| sled acceleration after touchdown | SnapTiles sleds accelerate at ~0.65× the original on the ground even with friction 0; the jet's lower edge on the ground may absorb thrust. The rolling car (nothing but tyres on the ground) accelerates 13% faster in SnapTiles than in the original (3.0 vs 2.6 m/s² at 1667 N): a small rolling loss or thrust difference in the original | `aero_flat`, `rollb_0` |
+| sled acceleration after touchdown | SnapTiles sleds accelerate at ~0.65× the original on the ground even with friction 0; the jet's lower edge on the ground may absorb thrust (the rolling-car offset turned out to be the jet constant, now 0.145) | `aero_flat` |
 | Arm shell | 80 m/s, 2 kg, 4 s | `ARM_*` |
 | cowl option 5 / 1 / 2 | bulging ribbon / plate / plate | `scene.ts` |
 | `_T`, `_FUEL`, network, CCD | stubs | `simulation.ts` |
