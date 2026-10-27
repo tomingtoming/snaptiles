@@ -49,6 +49,7 @@ async function load(source: string): Promise<void> {
     const t3 = performance.now();
     (window as unknown as { __loadTimes: number[] }).__loadTimes = [t1 - t0, t2 - t1, t3 - t2].map((v) => Math.round(v)); // parse, physics+script, meshes
     scene.camYaw = 0.7;
+    scene.snap(next.corePosition());
     buildKeyCaps(next);
     if (next.scriptError) statusEl.textContent = next.scriptError;
   } catch (e) {
@@ -129,7 +130,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (typing) return;
-  if (e.code === 'KeyR') sim?.reset(); // R: reset in place (OnReset)
+  if (e.code === 'KeyR' && sim) { sim.reset(); scene.snap(sim.corePosition()); } // R: reset in place (OnReset)
   if (e.code === 'KeyU') void loadAndShare(sourceEl.value); // U: reload from source (OnInit)
 });
 

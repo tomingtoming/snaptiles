@@ -308,6 +308,16 @@ export class SceneView {
     this.camYaw += d * rate;
   }
 
+  /** jump the chase camera onto the model (after load / reset) instead of easing from afar */
+  snap(target: THREE.Vector3): void {
+    this.camTarget.copy(target);
+    const cp = this.camPitch;
+    const cy = this.camYaw;
+    const off = new THREE.Vector3(Math.cos(cp) * Math.sin(cy), Math.sin(cp), Math.cos(cp) * Math.cos(cy)).multiplyScalar(this.camDist);
+    this.camera.position.copy(target).add(off);
+    this.camera.lookAt(target);
+  }
+
   follow(target: THREE.Vector3, smooth = 0.08): void {
     this.camTarget.lerp(target, smooth);
     const cp = this.camPitch;
