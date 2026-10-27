@@ -9,6 +9,18 @@ import { ScriptRunner, type LuaApi } from '../scripting/lua';
 import { RcScript } from '../scripting/rcscript';
 import type { KeyState } from '../input/keys';
 
+/** script / key frame rate of the original tool and physics substeps per frame */
+export const FRAME_RATE = 30;
+export const PHYSICS_SUBSTEPS = 2;
+
+export interface Tune {
+  ax: number;
+  ay: number;
+  az: number;
+  w: number;
+  wLocal: boolean;
+}
+
 export interface ValState {
   name: string;
   value: number;
@@ -166,8 +178,11 @@ export class Simulation {
       v.value = Math.max(v.min, Math.min(v.max, v.value));
     }
 
-    this.physics.applyControls(this.env);
-    this.physics.step();
+    // the original runs scripts and key steps at 30 fps; physics takes two 1/60 s steps per frame
+    for (let i = 0; i < PHYSICS_SUBSTEPS; i++) {
+      this.physics.applyControls(this.env);
+      this.physics.step();
+    }
     this.ticks++;
   }
 
@@ -225,7 +240,21 @@ export class Simulation {
       return pose ? new THREE.Euler().setFromQuaternion(pose.quaternion, 'YXZ') : new THREE.Euler();
     };
     const quat = (n: number, c: 'x' | 'y' | 'z' | 'w') => this.poseOf(n)?.quaternion[c] ?? (c === 'w' ? 1 : 0);
-    const angvel = (n: number, c: 'x' | 'y' | 'z') => this.bodyOf(n)?.angvel()[c] ?? 0;
+    // Sign / frame conventions of the original are undocumented; `window.__tune` lets probes
+    // flip them at runtime (see tools/tune-probe.mjs). Defaults are the current best guess.
+    // Measured 2026-10-27 with the segway model (stands only when _AX is negated): the original
+    // reports pitch with the opposite sign of a right-handed rotation about +X, so the whole
+    // handedness is flipped (left-handed DirectX world).
+    const tune = ((globalThis as unknown as { __tune?: Tune }).__tune ??= { ax: -1, ay: 1, az: -1, w: -1, wLocal: true });
+    const angvel = (n: number, c: 'x' | 'y' | 'z') => {
+      const b = this.bodyOf(n);
+      if (!b) return 0;
+      const w = b.angvel();
+      if (!tune.wLocal) return w[c] * tune.w;
+      const pose = this.poseOf(n)!;
+      const local = new THREE.Vector3(w.x, w.y, w.z).applyQuaternion(pose.quaternion.clone().invert());
+      return local[c] * tune.w;
+    };
     const attrOf = (n: number, name: string, d = 0) => {
       const t = this.tileOf(n);
       if (!t) return 0;
@@ -257,9 +286,9 @@ export class Simulation {
       _MM: () => 0,
       _WIDTH: () => innerWidth,
       _HEIGHT: () => innerHeight,
-      _FPS: () => 60,
+      _FPS: () => FRAME_RATE,
       _BASE: () => 30,
-      _DT: () => 1 / 60,
+      _DT: () => 1 / FRAME_RATE,
       _TICKS: () => this.ticks,
       _SETTICKS: (v: number) => { this.ticks = Math.floor(v); return 0; },
       _CHIPS: () => this.assembly?.chipCount ?? 0,
@@ -283,12 +312,12 @@ export class Simulation {
       _FX: (n: number) => (this.bodyOf(n)?.linvel().x ?? 0) * (this.tileOf(n)?.mass ?? 0),
       _FY: (n: number) => (this.bodyOf(n)?.linvel().y ?? 0) * (this.tileOf(n)?.mass ?? 0),
       _FZ: (n: number) => (this.bodyOf(n)?.linvel().z ?? 0) * (this.tileOf(n)?.mass ?? 0),
-      _EX: (n: number) => -euler(n).x,
-      _EY: (n: number) => euler(n).y,
-      _EZ: (n: number) => -euler(n).z,
-      _AX: (n: number) => euler(n).x,
-      _AY: (n: number) => euler(n).y,
-      _AZ: (n: number) => euler(n).z,
+      _EX: (n: number) => -tune.ax * euler(n).x,
+      _EY: (n: number) => tune.ay * euler(n).y,
+      _EZ: (n: number) => -tune.az * euler(n).z,
+      _AX: (n: number) => tune.ax * euler(n).x,
+      _AY: (n: number) => tune.ay * euler(n).y,
+      _AZ: (n: number) => tune.az * euler(n).z,
       _XX: (n: number) => worldAxis(n, RIGHT, 'x'),
       _XY: (n: number) => worldAxis(n, RIGHT, 'y'),
       _XZ: (n: number) => worldAxis(n, RIGHT, 'z'),

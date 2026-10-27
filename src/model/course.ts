@@ -13,7 +13,7 @@ const DEG = Math.PI / 180;
 
 export const COURSE: Block[] = [
   // a long ramp north of the spawn
-  { pos: [0, 0.9, -30], size: [8, 0.4, 12], rotX: 10 * DEG, color: 0x8a949c },
+  { pos: [0, 0.9, -80], size: [8, 0.4, 12], rotX: 10 * DEG, color: 0x8a949c },
   // low kerbs to bump over
   { pos: [-12, 0.15, -12], size: [6, 0.3, 0.6], color: 0xb0b8bf },
   { pos: [-12, 0.15, -16], size: [6, 0.3, 0.6], color: 0xb0b8bf },

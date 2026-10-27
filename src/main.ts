@@ -1,7 +1,7 @@
 import { initRapier } from './physics/world';
 import { SceneView } from './render/scene';
 import { KeyState, KEY_TABLE } from './input/keys';
-import { Simulation } from './sim/simulation';
+import { FRAME_RATE, Simulation } from './sim/simulation';
 import { SAMPLES } from './samples';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -137,7 +137,7 @@ canvas.addEventListener('wheel', (e) => {
 canvas.tabIndex = 0;
 
 // ---- main loop ----
-const FIXED = 1 / 60;
+const FIXED = 1 / FRAME_RATE;
 let acc = 0;
 let last = performance.now();
 function frame(now: number): void {
