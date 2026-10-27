@@ -13,13 +13,24 @@ import type { KeyState } from '../input/keys';
 export const FRAME_RATE = 30;
 export const PHYSICS_SUBSTEPS = 2;
 
+/** sign knobs on the script API, applied to three.js 'YXZ' Euler angles / local angular velocity */
 export interface Tune {
+  ex: number;
+  ey: number;
+  ez: number;
   ax: number;
   ay: number;
   az: number;
-  w: number;
+  wx: number;
+  wy: number;
+  wz: number;
   wLocal: boolean;
 }
+/** Measured against the original 1.5B26 (2026-10-27, tools/orig-compare.ts vs the harness runs):
+ *  a chip folded 30° down on N reads _EX +0.52, on E _EZ +0.52; a Rudder(30) on S reads _EY +0.52;
+ *  _AX/_AY/_AZ = (−_EX, _EY, −_EZ); _WY of a wheel is its spin about its own normal (local frame)
+ *  and the yaw rate has the sign of d_EY/dt. _WX/_WZ signs are not yet measured. */
+export const TUNE_DEFAULTS: Tune = { ex: -1, ey: -1, ez: -1, ax: 1, ay: -1, az: 1, wx: -1, wy: -1, wz: 1, wLocal: true };
 
 export interface ValState {
   name: string;
@@ -253,15 +264,18 @@ export class Simulation {
     // Measured 2026-10-27 by driving the corpus' self-balancing models (unicycle, segway, drum,
     // bike) through tools/tune-probe.mjs + drive-probe.mjs: all four stay upright only with pitch
     // negated and angular velocity taken in the world frame with its sign flipped.
-    const tune = ((globalThis as unknown as { __tune?: Tune }).__tune ??= { ax: -1, ay: 1, az: 1, w: -1, wLocal: false });
+    const g = globalThis as unknown as { __tune?: Partial<Tune> };
+    const tune: Tune = { ...TUNE_DEFAULTS, ...(g.__tune ?? {}) };
+    g.__tune = tune;
+    const wsign = { x: tune.wx, y: tune.wy, z: tune.wz };
     const angvel = (n: number, c: 'x' | 'y' | 'z') => {
       const b = this.bodyOf(n);
       if (!b) return 0;
       const w = b.angvel();
-      if (!tune.wLocal) return w[c] * tune.w;
+      if (!tune.wLocal) return w[c] * wsign[c];
       const pose = this.poseOf(n)!;
       const local = new THREE.Vector3(w.x, w.y, w.z).applyQuaternion(pose.quaternion.clone().invert());
-      return local[c] * tune.w;
+      return local[c] * wsign[c];
     };
     const attrOf = (n: number, name: string, d = 0) => {
       const t = this.tileOf(n);
@@ -321,9 +335,9 @@ export class Simulation {
       _FX: (n: number) => (this.bodyOf(n)?.linvel().x ?? 0) * (this.tileOf(n)?.mass ?? 0),
       _FY: (n: number) => (this.bodyOf(n)?.linvel().y ?? 0) * (this.tileOf(n)?.mass ?? 0),
       _FZ: (n: number) => (this.bodyOf(n)?.linvel().z ?? 0) * (this.tileOf(n)?.mass ?? 0),
-      _EX: (n: number) => -tune.ax * euler(n).x,
-      _EY: (n: number) => tune.ay * euler(n).y,
-      _EZ: (n: number) => -tune.az * euler(n).z,
+      _EX: (n: number) => tune.ex * euler(n).x,
+      _EY: (n: number) => tune.ey * euler(n).y,
+      _EZ: (n: number) => tune.ez * euler(n).z,
       _AX: (n: number) => tune.ax * euler(n).x,
       _AY: (n: number) => tune.ay * euler(n).y,
       _AZ: (n: number) => tune.az * euler(n).z,

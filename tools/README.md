@@ -20,7 +20,8 @@ the probes take file paths.
 | `fire-probe.mjs`, `shell-probe.mjs`, `eval-probe.mjs` | arm charge / shells, arbitrary in-page expressions |
 | `touch-probe.mjs`, `pinch-probe.mjs`, `narrow-probe.mjs`, `sfx-probe.mjs`, `hash-probe.mjs` | touch keycaps, pinch zoom, mobile layout, synthesized sound, share-URL round trip |
 | `fetch-model.mjs <pageUrl> <outDir>` | downloads a getuploader file by pressing its button |
+| `orig-compare.ts <model> <out.csv> [--allwheels] [--power=] [--on=] [--off=] [--tune=json]` (bun) | replays the original-exe harness headless: forces ENGINE, dumps the rest pose at frame 30 and the per-frame core state in the original's columns |
 
 Runtime knobs read by the physics through `window.__tune` (set before loading a model):
-`ax ay az w wLocal` (API sign conventions), `fps substeps`, `wheelTorque wheelRadius wheelFriction
+`ex ey ez ax ay az wx wy wz wLocal` (API sign conventions, see `TUNE_DEFAULTS`), `fps substeps`, `noCcd`, `wheelTorque wheelRadius wheelFriction
 noReaction`, `noSpring softServo servoRate`, `aero` (`quad|newton|slope`).

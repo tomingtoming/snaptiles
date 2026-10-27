@@ -21,7 +21,7 @@ const ON = opt('on', 31);
 const OFF = opt('off', 150);
 const FRAMES = opt('frames', 330);
 const tuneArg = args.find((x) => x.startsWith('--tune='));
-if (tuneArg) (globalThis as unknown as { __tune?: unknown }).__tune = { ax: -1, ay: 1, az: 1, w: -1, wLocal: false, ...JSON.parse(tuneArg.slice(7)) }; // same knobs as window.__tune
+if (tuneArg) (globalThis as unknown as { __tune?: unknown }).__tune = JSON.parse(tuneArg.slice(7)); // same knobs as window.__tune (merged over TUNE_DEFAULTS)
 
 const buf = readFileSync(file);
 let src = new TextDecoder('utf-8', { fatal: false }).decode(buf);

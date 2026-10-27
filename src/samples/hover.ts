@@ -45,7 +45,7 @@ Lua
     local h = _H(0)
     if h < 0 then h = TARGET end
     local vy = _VY(0)
-    local pitch = math.deg(_AX(0))   -- positive = nose down
+    local pitch = -math.deg(_AX(0))  -- _AX is nose-up positive (measured); the controller wants nose-down positive
     local roll = math.deg(_AZ(0))
     local dPitch, dRoll = pitch - lastPitch, roll - lastRoll
     lastPitch, lastRoll = pitch, roll
