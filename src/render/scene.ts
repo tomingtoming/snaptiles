@@ -29,19 +29,23 @@ interface TileView {
 /**
  * Cowl shapes (option): 0 plate, 3/4 the two right triangles of a tile cut on
  * its diagonal, 5 a curved plate (drawn flat), 1/2 undocumented (drawn as plates).
- * Which triangle is 3 and which is 4 is not documented; the choice here is a guess.
+ * Which triangle is which was read off the model corpus: children of option 3
+ * cowls attach on their east side (143 vs 5), option 4 on the west (156 vs 8),
+ * with "north" meaning away from the parent. So option 3 keeps the attached edge
+ * and the east edge, option 4 the attached edge and the west edge.
  */
-function cowlGeometry(option: number, cache: Map<number, THREE.BufferGeometry>): THREE.BufferGeometry {
-  const key = option === 3 || option === 4 ? option : 0;
+function cowlGeometry(option: number, dir: TileInstance['dir'], cache: Map<string, THREE.BufferGeometry>): THREE.BufferGeometry {
+  const shape = option === 3 || option === 4 ? option : 0;
+  const key = `${shape}${shape ? dir ?? 'N' : ''}`;
   let g = cache.get(key);
   if (g) return g;
-  if (key === 0) {
+  if (shape === 0) {
     g = new THREE.BoxGeometry(TILE, TILE_T * 0.5, TILE);
   } else {
-    // right triangle keeping the attached (+Z) edge; the hypotenuse runs toward -Z
+    // built for a north-attached cowl: parent on +Z, the attached edge is +Z, far edge -Z
     const h = TILE / 2;
     const t = TILE_T * 0.25;
-    const ax = key === 3 ? -h : h;
+    const ax = shape === 3 ? h : -h; // apex corner on the far edge: NE for 3, NW for 4
     const top = [[-h, t, h], [h, t, h], [ax, t, -h]];
     const bot = top.map(([x, , z]) => [x, -t, z]);
     const pos: number[] = [];
@@ -55,6 +59,9 @@ function cowlGeometry(option: number, cache: Map<number, THREE.BufferGeometry>):
     }
     g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    // turn so the attached edge faces the parent: S parent is at -Z, E parent at -X, W parent at +X
+    const turn = { N: 0, S: Math.PI, E: -Math.PI / 2, W: Math.PI / 2 }[dir ?? 'N'];
+    if (turn) g.rotateY(turn);
     g.computeVertexNormals();
   }
   cache.set(key, g);
@@ -68,7 +75,7 @@ export class SceneView {
   private views = new Map<number, TileView>();
   private plateGeo = new THREE.BoxGeometry(TILE, TILE_T, TILE);
   private wheelGeo = new THREE.CylinderGeometry(TILE / 2, TILE / 2, TILE_T, 24);
-  private cowlGeos = new Map<number, THREE.BufferGeometry>();
+  private cowlGeos = new Map<string, THREE.BufferGeometry>();
   private group = new THREE.Group();
   private lines: THREE.LineSegments;
   private linesGeo = new THREE.BufferGeometry();
@@ -136,7 +143,7 @@ export class SceneView {
     this.group.clear();
     this.views.clear();
     for (const t of tiles) {
-      const geo = t.spec.wheel ? this.wheelGeo : t.type === 'cowl' ? cowlGeometry(t.option, this.cowlGeos) : this.plateGeo;
+      const geo = t.spec.wheel ? this.wheelGeo : t.type === 'cowl' ? cowlGeometry(t.option, t.dir, this.cowlGeos) : this.plateGeo;
       const material = new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0.1 });
       if (t.type === 'cowl') material.side = THREE.DoubleSide;
       const mesh = new THREE.Mesh(geo, material);
