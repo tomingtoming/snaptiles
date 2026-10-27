@@ -15,7 +15,7 @@ columns. Raw logs: `D:\snaptiles-models\quarantine\original\runs\*.csv` (not in 
 | chip spacing | **0.6 m** center to center (`TILE`) | rest dump of Basic.txt: Core→N chip Δz = −0.600 |
 | folded child offset | 0.3 m beyond the hinge and 0.3 m down for a 90° fold | wheel hub at x = 0.91 vs frame 0.61, y −0.30 |
 | chip thickness / ground contact | a flat chip rests with its center **0.015 m** above the ground (box contact, not a 0.3 m sphere) | core-only, core+chip, Cube rest heights |
-| spawn | the model is dropped from about 1.0 m above the ground (lowest point) | core-only spawns at ground+1.03 |
+| spawn | the core starts **1.0 m + the model's reach along z** (tile centres from the core) above the ground and the model falls from there: core only 1.03, core+one chip 1.63, chips three deep 2.83, four deep 3.43, the Basic car 2.37 (its wheels add ~0.13; option 2 wheels 2.64). Weights on the sides (x) add nothing | first-frame `_Y` of 14 runs vs their rest height |
 | mass table | Core/Chip/Rudder 25.2, Frame 12.6, Wheel 79.17 (hub+tire) → Basic = 467.87 kg | HUD `Weight=467.87` for 16 chips, SnapTiles table gives 467.88 |
 | chip numbering | a Wheel takes two numbers: first `_TYPE` 3 (hub, does not spin), second `_TYPE` 4 (spins) | rest dump |
 | wheel radius | option 0 **0.30 m**, option 1 **0.45**, option 2 **0.60**; the wheel's mass does not change with option (4 wheels + core + 2 chips = 392.27 kg for option 0, 1 and 2) | v / `_WY(wheel)` = 0.300 / 0.455 / 0.611 while rolling; wheelmass_* HUD |
@@ -23,7 +23,9 @@ columns. Raw logs: `D:\snaptiles-models\quarantine\original\runs\*.csv` (not in 
 | drive fade | the push falls linearly with wheel spin: a/a₀ = 0.877 at ω≈22 rad/s, 0.62 at ω≈69 → zero at ≈ **180 rad/s** at power 1000 and 2500. Above that the zero point grows with power: a **sliding** wheel settles at 135 rad/s (power 5000) and 376 (10000) against ~1030 N of ground force, which fits τ = 0.13·p·(1 − ω/ω0) with ω0 = p/20.6 (243, 486) | 180-frame run to 22 m/s; spin_p5000/p10000 |
 | drag | **none measurable** coasting at 22 m/s (Δv = 0.02 m/s over 1 s) | turn_basic frames 210–240 |
 | wheel spin | **powered wheels slide and spin up**: at power 5000 the powered wheels read `_WY` 90→135 rad/s within 3 s while rolling would be 10→70; at 10000 240→376; the unpowered wheels read v/r. With the fade above, a wheel inertia of ½mr² (3.6 kg·m²) and no extra drag reproduce 53→128 and 171→370 in SnapTiles (`WHEEL_SPIN_DYNAMICS`). At power 20000 the car wheelies and lands on its back with the wheels spinning past 1200 rad/s | spin_p2500…20000 (`harness_wheels.rcs`) |
-| wheel in the air | a powered wheel folded up into the air does **not** spin up (`_WY` stays 0) | wheel_up at power 2500 and 1000 |
+| wheel in the air | a powered wheel **does** spin up in the air: during the spawn drop at power 10000 `_WY` goes 34→207 rad/s in 12 frames, at 2500 8→93 (inertia ≈ 0.7 × ½mr²); the earlier wheel_up probe (folded 90° up, `_SET POWER`) read 0 and is superseded | spin_p2500/p10000 frames 1–16 |
+| motor reaction | the motor torque reacts on the chassis: the falling car pitches nose-up **before touching down** (`_EX` 0.27 at power 2500, 0.71 at 10000 by frame 16), the leading end rising; RLW is the reactionless wheel. SnapTiles applies the motor (and brake) torque to the body about the wheel axis: 0.21 / 0.55 rad | spin_p2500/p10000 |
+| landing | the spinning wheels keep ~15 frames of spin after touchdown (109→46→27 rad/s at 2500) and shove the car off at 2 m/s at power 10000; SnapTiles caps the impact load used for grip at 3× the static share so one frame cannot stop the wheel | spin runs frames 20–45 |
 | `_WY(wheel)` while rolling | = v / r exactly | all drives |
 | fold sign | positive `angle` folds **down** on all four sides (`FOLD_SIGN` all +1) | fold30: all four 30° chips sit 0.15 m lower |
 | `_EX` | +0.52 rad for a chip folded 30° down on the **N** side (−0.52 on S) | fold30 |

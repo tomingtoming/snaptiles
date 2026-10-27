@@ -83,6 +83,11 @@ export const WHEEL_SPIN_DYNAMICS = true;
 /** fade zero point per unit of power above 2500 (rad/s per power): the sliding-wheel equilibria 135 rad/s at
  *  5000 and 376 at 10000 both fit ω0 = power / 20.6 with no extra spin drag */
 export const WHEEL_SPIN_PER_POWER = 1 / 20.6;
+/** wheel inertia as a fraction of ½mr² with m the hub+tyre mass: the air spin-up at power 10000 (34→207 rad/s in
+ *  12 frames) and the sliding spin-up on the ground both fit ≈ 0.7 */
+export const WHEEL_INERTIA_SCALE = 0.7;
+/** the motor torque reacts on the chassis (Wheel); RLW is the reactionless one */
+export const WHEEL_REACTION = true;
 /** spin drag on a sliding wheel (N·m·s); 0 once the fade zero point scales with power */
 export const WHEEL_SPIN_DRAG = 0;
 /** the tyre still grips this far above the ground (the unsprung front lifts a few cm under power) */
@@ -92,12 +97,16 @@ export const TYRE_LOAD_SHARE = 1;
 /** per-wheel load from the static lever rule about the centre of mass (false: total mass / wheel count);
  *  only the fallback before the tyre has measured a contact force (TYRE_DYNAMIC_LOAD) */
 export const TYRE_STATIC_LOAD = true;
+/** spawn the model falling from the original's height (false: place it 2 cm above the ground) */
+export const SPAWN_DROP = true;
 /** use the normal force the tyre collider actually carried (contact impulses of the last step, smoothed) instead
  *  of the static lever rule: load transfer under acceleration, braking and cornering. Measured: the corpus bike
  *  reaches 14.4 m/s in 3 s at power 5000 on a rear wheel whose static share could not carry that drive, while the
  *  steered car's powered (leading) axle saturates at 1030 N per wheel on ~990 N of contact load */
 export const TYRE_DYNAMIC_LOAD = true;
 export const TYRE_LOAD_SMOOTH = 0.3;
+/** dynamic load used for grip is capped at this multiple of the wheel's static share */
+export const TYRE_LOAD_CAP = 3;
 /** spec: 6 power = 1 N */
 export const JET_NEWTON_PER_POWER = 0.145; // measured 2026-10-28: a 530 kg wheeled car pushed by a jet at power 10000 accelerates at 2.74 m/s² (1452 N); the same at 5000 (1.38 m/s²); wheel option makes no difference
 /** plate aero (per 1 m² tile): broadside drag N per (m/s)², and the lift slope N per (m/s)² per sin α.
@@ -312,7 +321,12 @@ export class PhysicsWorld {
   build(a: Assembly, env: ValEnv, spawn = new THREE.Vector3(0, 0, 0), opts: BuildOptions = {}): void {
     this.clear();
     const R = this.R;
-    const lift = opts.inPlace ? 0 : -assemblyBottom(a) + 0.02;
+    // measured on the original: the core spawns 1.0 m + the model's reach along z (tile centres) above the ground
+    // and the model falls from there (core only 1.03, one chip 1.63, three chips in a row 2.83, the Basic
+    // car 2.37); the wheels of a powered car spin up during the fall and the landing pitches it
+    const drop = (globalThis as unknown as { __tune?: { spawnDrop?: boolean } }).__tune?.spawnDrop ?? SPAWN_DROP;
+    const reach = a.tiles.reduce((m, t) => Math.max(m, Math.abs(t.position.z - a.tiles[0].position.z)), 0);
+    const lift = opts.inPlace ? 0 : drop ? 1.0 + reach - a.tiles[0].position.y : -assemblyBottom(a) + 0.02;
     const offset = spawn.clone().add(new THREE.Vector3(0, lift, 0));
     this.assembly = a;
     this.env = env;
@@ -618,13 +632,14 @@ export class PhysicsWorld {
           // than the grip): kinetic friction at the grip limit against the slip, and the wheel spins up with its
           // own inertia ½mr² until motor torque, ground reaction and a spin drag balance (measured 135/375 rad/s)
           const slip = tb.spin * r - vf;
-          if (!tb.slipping && Math.abs(Ff) <= limit) {
+          // a wheel that lands spinning (or stops spinning) far from the road speed slides first
+          if (!tb.slipping && Math.abs(Ff) <= limit && Math.abs(slip) < 0.5) {
             tb.spin = vf / r;
           } else {
             if (!tb.slipping) tb.slipping = true;
             const dir = Math.abs(slip) > 0.1 ? Math.sign(slip) : Math.sign(Ff);
             Ff = dir * limit;
-            const I = 0.5 * tile.mass * r * r;
+            const I = WHEEL_INERTIA_SCALE * 0.5 * tile.mass * r * r;
             const spinNext = tb.spin + (this.dt * (tau - Ff * r - WHEEL_SPIN_DRAG * tb.spin)) / I;
             const slipNext = spinNext * r - vf;
             if ((Math.abs(slip) > 0.1 && slip * slipNext < 0) || (Math.abs(slipNext) < 0.05 && Math.abs(tau / r) <= limit)) {
@@ -634,6 +649,12 @@ export class PhysicsWorld {
               Ff = Math.max(-limit, Math.min(limit, tau / r));
             } else tb.spin = spinNext;
           }
+        }
+        // the motor (and brake) torque acts between wheel and chassis: its reaction pitches the body (measured:
+        // a car at power 10000 pitches 0.7 rad nose-up while still falling after spawn; RLW has no reaction)
+        if (!tile.spec.noReaction && WHEEL_REACTION) {
+          const T = normal.clone().multiplyScalar(tau);
+          body.addTorque({ x: T.x, y: T.y, z: T.z }, true);
         }
         const lateralGain = (globalThis as unknown as { __tune?: { tyreLateral?: number } }).__tune?.tyreLateral ?? TYRE_LATERAL_GAIN;
         let Fl = (-lateralGain * vl * (load / 9.8)) / this.dt;
@@ -661,7 +682,22 @@ export class PhysicsWorld {
         body.addForceAtPoint({ x: F.x, y: F.y, z: F.z }, { x: at.x, y: at.y, z: at.z }, true);
       }
     }
-    if (!contact) { tb.contactPoint = null; tb.spin *= 0.9; if ((globalThis as unknown as { __tune?: { debugWheels?: boolean } }).__tune?.debugWheels) console.log('wheel', tile.chipIndex, 'no contact; d', d.toArray().map((x) => x.toFixed(2)).join(','), 'y', pose.position.y.toFixed(3)); }
+    if (!contact) {
+      tb.contactPoint = null;
+      tb.slipping = false;
+      // in the air a powered wheel spins up against the motor's fade (measured: 34→207 rad/s over the first
+      // 12 frames of the spawn drop at power 10000; a flipped car's wheels pass 1200 rad/s at 20000)
+      const airSpin = (globalThis as unknown as { __tune?: { wheelSpin?: boolean } }).__tune?.wheelSpin ?? WHEEL_SPIN_DYNAMICS;
+      if (airSpin && power !== 0) {
+        const w0 = Math.max(WHEEL_SPIN_FADE, Math.abs(power) * WHEEL_SPIN_PER_POWER);
+        const k = (globalThis as unknown as { __tune?: { wheelTorque?: number } }).__tune?.wheelTorque ?? WHEEL_TORQUE_PER_POWER;
+        const tau = power * k * (1 - (Math.sign(power) * tb.spin) / w0);
+        tb.spin += (this.dt * tau) / (WHEEL_INERTIA_SCALE * 0.5 * tile.mass * r * r);
+        if (!tile.spec.noReaction && WHEEL_REACTION) {
+          const T = normal.clone().multiplyScalar(tau);
+          body.addTorque({ x: T.x, y: T.y, z: T.z }, true);
+        }
+      } else tb.spin *= 0.9; if ((globalThis as unknown as { __tune?: { debugWheels?: boolean } }).__tune?.debugWheels) console.log('wheel', tile.chipIndex, 'no contact; d', d.toArray().map((x) => x.toFixed(2)).join(','), 'y', pose.position.y.toFixed(3)); }
     tb.spinAngle += tb.spin * this.dt;
   }
 
@@ -730,7 +766,9 @@ export class PhysicsWorld {
     wheels.forEach((w, i) => { w.load = Math.max(0, y[0] + y[1] * xs[i] + y[2] * zs[i]); sum += w.load; });
     if (sum > 0) for (const w of wheels) w.load *= W / sum;
     const dynamic = (globalThis as unknown as { __tune?: { tyreDynamicLoad?: boolean } }).__tune?.tyreDynamicLoad ?? TYRE_DYNAMIC_LOAD;
-    if (dynamic) for (const w of wheels) if (w.contactForce > 0) w.load = w.contactForce;
+    // the landing impact spikes the contact force for a frame; the grip must not eat a spinning wheel's
+    // momentum in one step (measured: the original's wheels keep spinning for ~15 frames after touchdown)
+    if (dynamic) for (const w of wheels) if (w.contactForce > 0) w.load = Math.min(w.contactForce, TYRE_LOAD_CAP * w.load);
   }
 
   /** normal force each tyre carried in the step just taken (sum of contact impulses / dt), smoothed */
