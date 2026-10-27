@@ -31,6 +31,8 @@ export interface TileBody {
   restAngle: number;
   /** last applied jet power (for the exhaust glow) */
   jetPower: number;
+  /** current servo angle (rad, joint frame) of an animated joint */
+  servoAngle: number;
 }
 
 export interface PhysicsOptions {
@@ -52,6 +54,11 @@ export const AERO_MODEL = 'slope';
 /** compliant joints (spring<1): N·m/rad at spring=1 and N·m·s/rad at damper=1 — guesses */
 /** tyre friction coefficient (rapier combines with the ground's 1.0 by averaging) */
 export const WHEEL_FRICTION = 1.4;
+/** max servo slew of an animated joint, degrees per physics step (60 Hz) — 6°/step = 360°/s */
+export const SERVO_RATE = 6;
+/** servo stiffness (N·m/rad at spring=1) when > 0; 0 = infinitely stiff (hard limits). Probe knob: window.__tune.softServo */
+export const SOFT_SERVO = 0;
+export const SERVO_BAND = (20 * Math.PI) / 180;
 export const SPRING_STIFFNESS = 4000;
 export const SPRING_DAMPING = 400;
 /** compliant joints may flex this far either way; beyond it the connection is rigid */
@@ -323,7 +330,7 @@ export class PhysicsWorld {
         }
       }
       const restAngle = angleAnimated ? attr(tile.node, 'angle', env, 0) : 0;
-      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0 };
+      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0, servoAngle: 0 };
       this.tiles.push(tb);
       this.byId.set(tile.id, tb);
     }
@@ -390,8 +397,23 @@ export class PhysicsWorld {
             if (!tile.spec.noReaction && !noReaction) parentBody.addTorque({ x: -t.x, y: -t.y, z: -t.z }, true);
           }
         } else if (tb.animated) {
-          const a = jointSign(tile.spec.joint, tile.dir) * (attr(tile.node, 'angle', env, 0) - tb.restAngle) * DEG;
-          joint.setLimits(a, a);
+          // servo: the commanded angle is reached at a bounded rate (window.__tune.servoRate
+          // deg per physics step) instead of instantly — instant jumps of a leg joint pump
+          // energy through the hard limits and launch walkers
+          const rate = ((globalThis as unknown as { __tune?: { servoRate?: number } }).__tune?.servoRate ?? SERVO_RATE) * DEG;
+          const target = jointSign(tile.spec.joint, tile.dir) * (attr(tile.node, 'angle', env, 0) - tb.restAngle) * DEG;
+          const d = target - tb.servoAngle;
+          tb.servoAngle += Math.max(-rate, Math.min(rate, d));
+          const soft = (globalThis as unknown as { __tune?: { softServo?: number } }).__tune?.softServo ?? SOFT_SERVO;
+          if (soft > 0) {
+            // finite-strength servo: a position motor (stiffness ∝ spring) with a safety band of limits
+            const spring = tile.node.attrs.spring !== undefined ? Math.max(0.05, attr(tile.node, 'spring', env, 1)) : 1;
+            joint.configureMotorModel(this.R.MotorModel.ForceBased);
+            joint.configureMotorPosition(tb.servoAngle, soft * spring, soft * 0.08);
+            joint.setLimits(tb.servoAngle - SERVO_BAND, tb.servoAngle + SERVO_BAND);
+          } else {
+            joint.setLimits(tb.servoAngle, tb.servoAngle);
+          }
         }
       }
 
