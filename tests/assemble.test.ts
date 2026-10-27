@@ -82,3 +82,40 @@ describe('assemble', () => {
     expect(a.tiles[1].chipIndex).toBe(1);
   });
 });
+
+// Conventions measured on community models (tools/foldsign.ts, 2026-10-27): these synthetic
+// bodies reproduce the mounting idioms and must keep wheels at the bottom / masts at the top.
+describe('measured conventions', () => {
+  const lowestHighest = (body: string, vals: Record<string, number> = {}) => {
+    const a = build(body, vals);
+    const ys = a.tiles.map((t) => t.position.y);
+    return { a, lo: Math.min(...ys), hi: Math.max(...ys) };
+  };
+
+  it('segway idiom: side wheels Frame(-30){Wheel(angle=120)} sit lowest, the mast folds up', () => {
+    const { a, lo, hi } = lowestHighest('Core(){ W:Frame(angle=-30){ W:Wheel(angle=120){} } E:Frame(angle=-30){ E:Wheel(angle=120){} } N:Frame(angle=-70){ N:Frame(angle=-20){ N:Frame(){} } } S:Weight(angle=-90){} }');
+    const wheels = a.tiles.filter((t) => t.spec.wheel);
+    for (const w of wheels) expect(w.position.y - lo).toBeLessThan(0.6);
+    const mastTip = a.tiles[a.tiles.length - 2]; // last N frame
+    expect(mastTip.position.y).toBeGreaterThan(1.5);
+    expect(hi).toBeGreaterThan(1.5);
+  });
+
+  it('car1 idiom: Trim(90) then Frame(90) Frame(50) Frame(-140) hangs the wheel below the core', () => {
+    const { a, lo } = lowestHighest('Core(){ N:Chip(){ N:Trim(angle=90){ E:Frame(angle=90){ E:Frame(angle=50){ E:Frame(angle=-140){ N:Wheel(){} } } } } } }');
+    const w = a.tiles.find((t) => t.spec.wheel)!;
+    expect(w.position.y).toBeLessThan(-0.2);
+    expect(w.position.y - lo).toBeLessThan(0.6);
+  });
+
+  it('bike idiom: TrimF(angle=-90){ S:Wheel } stands the rear wheel up (normal sideways)', () => {
+    const a = build('Core(){ N:Frame(angle=-15){ S:TrimF(angle=-90){ S:Wheel(){} } } }');
+    const w = a.tiles.find((t) => t.spec.wheel)!;
+    expect(Math.abs(w.axis.x)).toBeGreaterThan(0.95); // spin axis lateral
+  });
+
+  it('rudder sign: Rudder(angle=90) on N swings the tile toward +X', () => {
+    const a = build('Core(){ N:Rudder(angle=90){} }');
+    expect(a.tiles[1].position.x).toBeGreaterThan(0.4);
+  });
+});
