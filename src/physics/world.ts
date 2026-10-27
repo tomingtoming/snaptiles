@@ -364,7 +364,9 @@ export class PhysicsWorld {
         // a tyre is a frictionless cylinder (it only carries load); grip comes from driveWheel()
         const frictionScale = (globalThis as unknown as { __tune?: { frictionScale?: number } }).__tune?.frictionScale ?? 1;
         cd.setMass(Math.max(0.1, mass)).setFriction(tile.spec.wheel ? 0 : tile.spec.friction * frictionScale).setCollisionGroups(MODEL_GROUP);
-        if (tile.spec.wheel) cd.setFrictionCombineRule(R.CoefficientCombineRule.Min); // rapier averages by default: 0 vs ground 1.0 would still be 0.5
+        // rapier averages friction by default, so a chip's 0.02 against the ground's 1.0 would act as 0.5:
+        // the tile's own coefficient is the measured one, let it rule
+        cd.setFrictionCombineRule(R.CoefficientCombineRule.Min);
         cd.setTranslation(relPos.x, relPos.y, relPos.z).setRotation({ x: relQuat.x, y: relQuat.y, z: relQuat.z, w: relQuat.w });
         if (tile.ghost || !tile.spec.collides) cd.setSensor(true);
         this.world.createCollider(cd, body);
