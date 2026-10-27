@@ -47,3 +47,39 @@ describe('Simulation (rapier in node, no browser)', () => {
     await sim.lua.dispose();
   });
 });
+
+describe('brakes and lifecycle callbacks', () => {
+  it('BRAKE stops the car sample', async () => {
+    const R = await initRapier();
+    const keys = fakeKeys();
+    const sim = new Simulation(R, CAR, keys);
+    await sim.start();
+    keys.press(0);
+    for (let i = 0; i < 90; i++) sim.step();
+    keys.release(0);
+    const api = sim.api();
+    const vFast = api._VEL(0) as number;
+    expect(vFast).toBeGreaterThan(5);
+    keys.press(4); // Z = BRAKE
+    for (let i = 0; i < 60; i++) sim.step();
+    expect(api._VEL(0) as number).toBeLessThan(vFast * 0.3);
+    await sim.lua.dispose();
+  });
+
+  it('OnInit runs once at load and OnReset on reset', async () => {
+    const R = await initRapier();
+    const sim = new Simulation(R, `
+      Val { } Key { }
+      Body { Core(){ } }
+      Lua { inits = 0; resets = 0; function OnInit() inits = inits + 1 end function OnReset() resets = resets + 1 end function OnFrame() end }
+    `, fakeKeys());
+    await sim.start();
+    for (let i = 0; i < 5; i++) sim.step();
+    expect(sim.lua.getNumber('inits')).toBe(1);
+    expect(sim.lua.getNumber('resets')).toBe(0);
+    sim.reset();
+    expect(sim.lua.getNumber('resets')).toBe(1);
+    expect(sim.lua.getNumber('inits')).toBe(1);
+    await sim.lua.dispose();
+  });
+});
