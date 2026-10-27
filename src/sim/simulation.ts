@@ -269,6 +269,8 @@ export class Simulation {
     g.__tune = tune;
     const wsign = { x: tune.wx, y: tune.wy, z: tune.wz };
     const angvel = (n: number, c: 'x' | 'y' | 'z') => {
+      const wt = this.tbOf(n);
+      if (wt?.tile.spec.wheel) return c === 'y' ? wt.spin : 0; // kinematic spin, as in the original
       const b = this.bodyOf(n);
       if (!b) return 0;
       const w = b.angvel();

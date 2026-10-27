@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { TILE, TILE_T, type TileInstance, type ValEnv } from '../model/assemble';
 import { evalExpr, exprIsConstant } from '../rc/expr';
 import { wheelRadius, type PhysicsWorld } from '../physics/world';
+const SPIN_AXIS = new THREE.Vector3(0, 1, 0);
 import { COURSE, CRATES } from '../model/course';
 
 const PALETTE: Record<string, number> = {
@@ -263,10 +264,12 @@ export class SceneView {
       const pose = world.pose(tb, this.tmpPose);
       v.mesh.position.copy(pose.position);
       v.mesh.quaternion.copy(pose.quaternion);
+      if (tb.tile.spec.wheel) v.mesh.quaternion.multiply(this.spinQuat.setFromAxisAngle(SPIN_AXIS, tb.spinAngle));
       if (tb.tile.spec.jet) v.material.emissiveIntensity = Math.min(1.5, Math.abs(tb.jetPower) / 20000);
     }
   }
 
+  private spinQuat = new THREE.Quaternion();
   private shellPool: THREE.Mesh[] = [];
   private shellGeo = new THREE.SphereGeometry(0.18, 12, 8);
   private shellMat = new THREE.MeshStandardMaterial({ color: 0xffc040, emissive: 0xff7000, emissiveIntensity: 1.2 });

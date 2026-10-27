@@ -33,6 +33,11 @@ export interface TileBody {
   jetPower: number;
   /** current servo angle (rad, joint frame) of an animated joint */
   servoAngle: number;
+  /** wheels: kinematic spin about the rim normal (rad/s, + in the +power direction) and the
+   *  accumulated angle for rendering. The tyre is not a spinning body (measured: the original's
+   *  wheel does not spin up in the air and reads _WY = v/r while rolling). */
+  spin: number;
+  spinAngle: number;
 }
 
 export interface PhysicsOptions {
@@ -45,7 +50,12 @@ export const WHEEL_TORQUE_PER_POWER = 0.066; // N·m per power unit (measured: B
  *  (measured on the original 1.5B26: Basic car at power 2500, a/a0 = 0.877 at ω≈22 rad/s, 0.62 at ω≈69;
  *  no hard speed cap and no measurable air/rolling drag while coasting at 22 m/s) */
 export const WHEEL_SPIN_FADE = 180; // rad/s at which the torque would reach zero
-export const WHEEL_SPIN_INERTIA = 0.3; // kg·m² about every axis of the rotor (guess; the original's wheel-in-air spin-up is being measured)
+/** lateral grip: fraction of the sideways contact velocity removed per step (1 = dead stop) */
+export const TYRE_LATERAL_GAIN = 0.25;
+/** the tyre still grips this far above the ground (the unsprung front lifts a few cm under power) */
+export const TYRE_CONTACT_MARGIN = 0.1;
+/** load the tyre forces may transmit: μ × (model weight / number of wheels) */
+export const TYRE_LOAD_SHARE = 1;
 /** spec: 6 power = 1 N */
 export const JET_NEWTON_PER_POWER = 1 / 6;
 /** plate aero (per 1 m² tile): broadside drag N per (m/s)², and the lift slope N per (m/s)² per sin α.
@@ -111,6 +121,8 @@ export class PhysicsWorld {
   byId = new Map<number, TileBody>();
   readonly dt = 1 / 60;
   tick = 0;
+  /** mass of the assembled model (tyre load estimate) */
+  totalMass = 0;
   projectiles: Projectile[] = [];
   armCharge = new Map<number, number>(); // tile id → energy
   private assembly: Assembly | null = null;
@@ -154,7 +166,8 @@ export class PhysicsWorld {
     this.world.numSolverIterations = 8;
     const groundDesc = R.ColliderDesc.cuboid(2000, 1, 2000).setTranslation(0, -1, 0).setFriction(1.0).setCollisionGroups(GROUND_GROUP);
     this.world.createCollider(groundDesc);
-    for (const b of COURSE) {
+    const noCourse = (globalThis as unknown as { __tune?: { noCourse?: boolean } }).__tune?.noCourse ?? false; // bare ground for measurements
+    for (const b of noCourse ? [] : COURSE) {
       const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(b.rotX ?? 0, b.rotY ?? 0, 0, 'YXZ'));
       const cd = R.ColliderDesc.cuboid(b.size[0] / 2, b.size[1] / 2, b.size[2] / 2)
         .setTranslation(...b.pos)
@@ -163,7 +176,7 @@ export class PhysicsWorld {
         .setCollisionGroups(GROUND_GROUP);
       this.world.createCollider(cd);
     }
-    for (const c of CRATES) {
+    for (const c of noCourse ? [] : CRATES) {
       const body = this.world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(...c.pos).setLinearDamping(0.1).setAngularDamping(0.2));
       const cd = R.ColliderDesc.cuboid(c.size / 2, c.size / 2, c.size / 2).setMass(12).setFriction(0.8).setCollisionGroups(GROUND_GROUP);
       this.world.createCollider(cd, body);
@@ -190,7 +203,10 @@ export class PhysicsWorld {
     }
     const seen = new Set<number>();
     for (const t of this.tiles) {
-      if (t.rim) this.world.removeRigidBody(t.rim);
+      if (t.rim && !seen.has(t.rim.handle)) {
+        seen.add(t.rim.handle);
+        this.world.removeRigidBody(t.rim);
+      }
       if (seen.has(t.body.handle)) continue;
       seen.add(t.body.handle);
       this.world.removeRigidBody(t.body);
@@ -241,6 +257,7 @@ export class PhysicsWorld {
     const offset = spawn.clone().add(new THREE.Vector3(0, lift, 0));
     this.assembly = a;
     this.env = env;
+    this.totalMass = a.tiles.reduce((m, t) => m + t.mass, 0);
 
     for (const tile of a.tiles) {
       const parentTb = tile.parent && !tile.detached ? this.byId.get(tile.parent.id)! : null;
@@ -251,16 +268,14 @@ export class PhysicsWorld {
       const springVal = tile.node.attrs.spring !== undefined ? attr(tile.node, 'spring', env, 1) : 1;
       const noSpring = (globalThis as unknown as { __tune?: { noSpring?: boolean } }).__tune?.noSpring ?? false;
       const compliant = !noSpring && !!parentTb && !animated && tile.spec.joint !== 'wheel' && tile.spec.joint !== 'fixed' && springVal < 1;
-      const startsGroup = !parentTb || tile.spec.joint === 'wheel' || animated || compliant;
+      const startsGroup = !parentTb || animated || compliant;
 
       // Wheel = rim (a plate folded like a chip) + rotor (the disc). The rim is welded to the
       // parent, or gets its own fold joint when the angle is a variable.
       let rim: RAPIER.RigidBody | null = null;
       let rimJoint: RAPIER.RevoluteImpulseJoint | null = null;
-      let rotorParent = parentTb?.body ?? null;
       if (tile.spec.wheel && parentTb) {
         const rimQuat = parentTb.bodyRestQuat;
-        const rimRel = rimQuat.clone().invert().multiply(tile.quaternion);
         if (angleAnimated) {
           const p = tile.position.clone().add(offset);
           const rb = R.RigidBodyDesc.dynamic()
@@ -268,27 +283,10 @@ export class PhysicsWorld {
             .setRotation({ x: rimQuat.x, y: rimQuat.y, z: rimQuat.z, w: rimQuat.w })
             .setCcdEnabled(true);
           rim = this.world.createRigidBody(rb);
-          // the rim is a hub well inside the disc so it never touches the ground
-          const cd = R.ColliderDesc.cuboid(TILE / 4, TILE_T / 2, TILE / 4)
-            .setMass(42.41)
-            .setFriction(tile.spec.friction)
-            .setCollisionGroups(MODEL_GROUP)
-            .setRotation({ x: rimRel.x, y: rimRel.y, z: rimRel.z, w: rimRel.w });
-          this.world.createCollider(cd, rim);
           const anchorW = tile.rimAnchor.clone().add(offset);
           const jd = R.JointData.revolute(toLocal(parentTb.body, anchorW), toLocal(rim, anchorW), toLocalDir(parentTb.body, tile.rimAxis));
           rimJoint = this.world.createImpulseJoint(jd, parentTb.body, rim, true) as RAPIER.RevoluteImpulseJoint;
           rimJoint.setLimits(0, 0);
-          rotorParent = rim;
-        } else {
-          const rimPos = tile.position.clone().sub(parentTb.bodyRestPos).applyQuaternion(rimQuat.clone().invert());
-          const cd = R.ColliderDesc.cuboid(TILE / 4, TILE_T / 2, TILE / 4)
-            .setMass(42.41)
-            .setFriction(tile.spec.friction)
-            .setCollisionGroups(MODEL_GROUP)
-            .setTranslation(rimPos.x, rimPos.y, rimPos.z)
-            .setRotation({ x: rimRel.x, y: rimRel.y, z: rimRel.z, w: rimRel.w });
-          this.world.createCollider(cd, parentTb.body);
         }
       }
 
@@ -315,6 +313,11 @@ export class PhysicsWorld {
           body.setAngvel({ x: v.ang.x, y: v.ang.y, z: v.ang.z }, true);
         }
         groupRoot = tile;
+      } else if (rim) {
+        body = rim;
+        groupRoot = tile;
+        bodyRestQuat = parentTb!.bodyRestQuat.clone();
+        bodyRestPos = tile.position.clone();
       } else {
         body = parentTb!.body;
         groupRoot = parentTb!.groupRoot;
@@ -326,30 +329,30 @@ export class PhysicsWorld {
       const relPos = tile.position.clone().sub(bodyRestPos).applyQuaternion(invQ);
 
       // collider
-      const mass = tile.spec.wheel ? 36.76 : tile.mass;
+      const mass = tile.mass;
       if (mass > 0 || tile.spec.collides) {
+        // the tyre is a sphere: a frictionless cylinder lying on the ground made the chassis wander and roll
+        // (edge contacts), a ball reproduces the original's straight-line run within a few percent
+        const tyreCylinder = (globalThis as unknown as { __tune?: { tyreCylinder?: boolean } }).__tune?.tyreCylinder ?? false;
         const cd = tile.spec.wheel
-          ? R.ColliderDesc.cylinder(TILE_T / 2, wheelRadius(tile.option))
+          ? tyreCylinder ? R.ColliderDesc.cylinder(TILE_T / 2, wheelRadius(tile.option)) : R.ColliderDesc.ball(wheelRadius(tile.option))
           : R.ColliderDesc.cuboid(TILE / 2, TILE_T / 2, TILE / 2);
-        if (tile.spec.wheel) {
-          // rotor: full mass for translation but a small spin inertia — the original's cars accelerate
-          // as if the wheels had none (Basic car: m·a matches the motor torque / radius)
-          cd.setMassProperties(mass, { x: 0, y: 0, z: 0 }, { x: WHEEL_SPIN_INERTIA, y: WHEEL_SPIN_INERTIA, z: WHEEL_SPIN_INERTIA }, { x: 0, y: 0, z: 0, w: 1 });
-        } else cd.setMass(Math.max(0.1, mass));
-        cd.setFriction(tile.spec.wheel ? ((globalThis as unknown as { __tune?: { wheelFriction?: number } }).__tune?.wheelFriction ?? WHEEL_FRICTION) : tile.spec.friction).setCollisionGroups(MODEL_GROUP);
+        // a tyre is a frictionless cylinder (it only carries load); grip comes from driveWheel()
+        cd.setMass(Math.max(0.1, mass)).setFriction(tile.spec.wheel ? 0 : tile.spec.friction).setCollisionGroups(MODEL_GROUP);
+        if (tile.spec.wheel) cd.setFrictionCombineRule(R.CoefficientCombineRule.Min); // rapier averages by default: 0 vs ground 1.0 would still be 0.5
         cd.setTranslation(relPos.x, relPos.y, relPos.z).setRotation({ x: relQuat.x, y: relQuat.y, z: relQuat.z, w: relQuat.w });
         if (tile.ghost || !tile.spec.collides) cd.setSensor(true);
         this.world.createCollider(cd, body);
       }
 
       let joint: RAPIER.RevoluteImpulseJoint | null = null;
-      if (startsGroup && parentTb && rotorParent) {
+      if (startsGroup && parentTb) {
         const anchorW = tile.anchor.clone().add(offset);
         const axisW = tile.axis.clone().normalize();
         // Both bodies share the same rest orientation, so rapier's single joint axis has the
         // same coordinates in both local frames and the joint measures 0 at the rest pose.
-        const jd = R.JointData.revolute(toLocal(rotorParent, anchorW), toLocal(body, anchorW), toLocalDir(rotorParent, axisW));
-        joint = this.world.createImpulseJoint(jd, rotorParent, body, true) as RAPIER.RevoluteImpulseJoint;
+        const jd = R.JointData.revolute(toLocal(parentTb.body, anchorW), toLocal(body, anchorW), toLocalDir(parentTb.body, axisW));
+        joint = this.world.createImpulseJoint(jd, parentTb.body, body, true) as RAPIER.RevoluteImpulseJoint;
         if (animated) joint.setLimits(0, 0);
         if (compliant) {
           const damper = tile.node.attrs.damper !== undefined ? attr(tile.node, 'damper', env, 0.5) : attr(tile.node, 'dumper', env, 0.5);
@@ -359,10 +362,74 @@ export class PhysicsWorld {
         }
       }
       const restAngle = angleAnimated ? attr(tile.node, 'angle', env, 0) : 0;
-      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0, servoAngle: 0 };
+      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0, servoAngle: 0, spin: 0, spinAngle: 0 };
       this.tiles.push(tb);
       this.byId.set(tile.id, tb);
     }
+  }
+
+  /**
+   * Contact-force wheel (measured against the original): the tyre is not a spinning body. A ray
+   * from the hub, down within the wheel plane, finds the ground; the push is power × 0.066 / r
+   * (fading linearly with the kinematic spin v/r, zero at 180 rad/s), the brake damps the rolling
+   * speed, sideways slip is damped like a tyre with a friction limit. Spin is v/r while rolling and
+   * decays in the air.
+   */
+  private driveWheel(tb: TileBody, pose: Pose, normal: THREE.Vector3, env: ValEnv): void {
+    const { tile, body } = tb;
+    const DEG = Math.PI / 180;
+    const power = tile.powerless ? 0 : attr(tile.node, 'power', env, 0);
+    const brake = attr(tile.node, 'brake', env, 0);
+    if (tb.rimJoint) {
+      const a = jointSign('wheel', tile.dir) * (attr(tile.node, 'angle', env, 0) - tb.restAngle) * DEG; // rim fold
+      tb.rimJoint.setLimits(a, a);
+    }
+    const r = wheelRadius(tile.option);
+    // down, projected into the wheel plane
+    const d = new THREE.Vector3(0, -1, 0).addScaledVector(normal, normal.y);
+    let contact = false;
+    if (d.lengthSq() > 0.09) {
+      d.normalize();
+      const o = pose.position;
+      const ray = new this.R.Ray({ x: o.x, y: o.y, z: o.z }, { x: d.x, y: d.y, z: d.z });
+      const hit = this.world.castRayAndGetNormal(ray, r + TYRE_CONTACT_MARGIN, true, undefined, 0x0001_0002, undefined, body);
+      if (hit) {
+        contact = true;
+        const P = o.clone().addScaledVector(d, hit.timeOfImpact);
+        const g = new THREE.Vector3(hit.normal.x, hit.normal.y, hit.normal.z);
+        // rolling direction for +power and the lateral direction, both in the ground plane
+        const f = new THREE.Vector3().crossVectors(g, normal);
+        if (f.lengthSq() < 1e-6) return;
+        f.normalize();
+        const l = new THREE.Vector3().crossVectors(f, g).normalize();
+        const c = body.translation();
+        const lv = body.linvel();
+        const av = body.angvel();
+        const vP = new THREE.Vector3(lv.x, lv.y, lv.z).add(new THREE.Vector3(av.x, av.y, av.z).cross(P.clone().sub(new THREE.Vector3(c.x, c.y, c.z))));
+        const vf = vP.dot(f);
+        const vl = vP.dot(l);
+        tb.spin = vf / r;
+        const k = (globalThis as unknown as { __tune?: { wheelTorque?: number } }).__tune?.wheelTorque ?? WHEEL_TORQUE_PER_POWER;
+        let Ff = (power * k) / r;
+        if (power !== 0) Ff *= Math.max(0, 1 - Math.max(0, Math.sign(power) * tb.spin) / WHEEL_SPIN_FADE);
+        if (brake > 0) Ff -= (2 * brake * vf) / (r * r);
+        const wheels = this.assembly ? this.assembly.tiles.filter((t) => t.spec.wheel).length : 1;
+        const load = (this.totalMass * 9.8 * TYRE_LOAD_SHARE) / Math.max(1, wheels);
+        const mu = (globalThis as unknown as { __tune?: { wheelFriction?: number } }).__tune?.wheelFriction ?? WHEEL_FRICTION;
+        const limit = mu * load;
+        Ff = Math.max(-limit, Math.min(limit, Ff));
+        const lateralGain = (globalThis as unknown as { __tune?: { tyreLateral?: number } }).__tune?.tyreLateral ?? TYRE_LATERAL_GAIN;
+        let Fl = (-lateralGain * vl * (this.totalMass / Math.max(1, wheels))) / this.dt;
+        Fl = Math.max(-limit, Math.min(limit, Fl));
+        const F = f.clone().multiplyScalar(Ff).addScaledVector(l, Fl);
+        if ((globalThis as unknown as { __tune?: { debugWheels?: boolean } }).__tune?.debugWheels) console.log('wheel', tile.chipIndex, 'toi', hit.timeOfImpact.toFixed(3), 'n', normal.toArray().map((x) => x.toFixed(2)).join(','), 'f', f.toArray().map((x) => x.toFixed(2)).join(','), 'vf', vf.toFixed(3), 'power', power, 'Ff', Ff.toFixed(1), 'Fl', Fl.toFixed(1), 'spin', tb.spin.toFixed(2));
+        // applied at the hub, not the contact patch: no pitch/roll moment from grip (keeps the welded, unsprung
+        // chassis from rocking; yaw moments are kept because the hub is off the centreline)
+        body.addForceAtPoint({ x: F.x, y: F.y, z: F.z }, { x: o.x, y: o.y, z: o.z }, true);
+      }
+    }
+    if (!contact) { tb.spin *= 0.9; if ((globalThis as unknown as { __tune?: { debugWheels?: boolean } }).__tune?.debugWheels) console.log('wheel', tile.chipIndex, 'no contact; d', d.toArray().map((x) => x.toFixed(2)).join(','), 'y', pose.position.y.toFixed(3)); }
+    tb.spinAngle += tb.spin * this.dt;
   }
 
   /** world pose of a tile (its group body pose composed with the rest offset) */
@@ -401,33 +468,10 @@ export class PhysicsWorld {
       const pose = this.pose(tb);
       const normal = UP.clone().applyQuaternion(pose.quaternion);
 
-      if (joint && tile.parent) {
-        if (tile.spec.joint === 'wheel') {
-          const power = tile.powerless ? 0 : attr(tile.node, 'power', env, 0);
-          const brake = attr(tile.node, 'brake', env, 0);
-          // reaction goes to the body the rim hangs from (not the rim itself: a steady torque
-          // against the rim joint's hard limits pumps energy into the solver and lifts the car)
-          const parentBody = this.byId.get(tile.parent.id)!.body;
-          if (tb.rimJoint) {
-            const a = jointSign('wheel', tile.dir) * (attr(tile.node, 'angle', env, 0) - tb.restAngle) * DEG; // rim fold
-            tb.rimJoint.setLimits(a, a);
-          }
-          const w = body.angvel();
-          const pw = parentBody.angvel();
-          const rel = (w.x - pw.x) * normal.x + (w.y - pw.y) * normal.y + (w.z - pw.z) * normal.z; // spin about the rim normal
-          let torque = power * ((globalThis as unknown as { __tune?: { wheelTorque?: number } }).__tune?.wheelTorque ?? WHEEL_TORQUE_PER_POWER);
-          if (power !== 0) {
-            const along = Math.sign(power) * rel; // spin in the driven direction
-            torque *= Math.max(0, 1 - Math.max(0, along) / WHEEL_SPIN_FADE);
-          }
-          if (brake > 0) torque -= rel * brake * 2;
-          if (torque !== 0) {
-            const t = normal.clone().multiplyScalar(torque);
-            body.addTorque({ x: t.x, y: t.y, z: t.z }, true);
-            const noReaction = (globalThis as unknown as { __tune?: { noReaction?: boolean } }).__tune?.noReaction ?? false;
-            if (!tile.spec.noReaction && !noReaction) parentBody.addTorque({ x: -t.x, y: -t.y, z: -t.z }, true);
-          }
-        } else if (tb.animated) {
+      if (tile.spec.wheel && tile.parent) {
+        this.driveWheel(tb, pose, normal, env);
+      } else if (joint && tile.parent) {
+        if (tb.animated) {
           // servo: the commanded angle is reached at a bounded rate (window.__tune.servoRate
           // deg per physics step) instead of instantly — instant jumps of a leg joint pump
           // energy through the hard limits and launch walkers

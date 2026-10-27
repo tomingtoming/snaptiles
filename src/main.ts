@@ -218,10 +218,7 @@ function updateSound(s: Simulation): void {
   let spin = 0;
   let jet = 0;
   for (const tb of s.physics.tiles) {
-    if (tb.tile.spec.wheel) {
-      const w = tb.body.angvel();
-      spin = Math.max(spin, Math.hypot(w.x, w.y, w.z));
-    }
+    if (tb.tile.spec.wheel) spin = Math.max(spin, Math.abs(tb.spin));
     if (tb.tile.spec.jet) jet += Math.abs(tb.jetPower);
   }
   sfx.update(spin, jet);

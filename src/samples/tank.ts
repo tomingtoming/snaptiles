@@ -22,14 +22,14 @@ Body
   Core(color=#6b7a3a){
     N:Chip(color=#6b7a3a){
       N:Chip(color=#6b7a3a){
-        W:Chip(color=#6b7a3a){ W:Rudder(angle=HANDLE, color=#6b7a3a){ W:Frame(angle=90){ W:Wheel(power=ENGINE) } } }
-        E:Chip(color=#6b7a3a){ E:Rudder(angle=HANDLE, color=#6b7a3a){ E:Frame(angle=90){ E:Wheel(power=-ENGINE) } } }
+        W:Chip(color=#6b7a3a){ W:Rudder(angle=HANDLE, color=#6b7a3a){ W:Frame(angle=90){ W:Wheel(power=-ENGINE) } } }
+        E:Chip(color=#6b7a3a){ E:Rudder(angle=HANDLE, color=#6b7a3a){ E:Frame(angle=90){ E:Wheel(power=ENGINE) } } }
       }
     }
     S:Chip(color=#6b7a3a){
       S:Chip(color=#6b7a3a){
-        W:Chip(color=#6b7a3a){ W:Frame(angle=90){ W:Wheel(power=ENGINE) } }
-        E:Chip(color=#6b7a3a){ E:Frame(angle=90){ E:Wheel(power=-ENGINE) } }
+        W:Chip(color=#6b7a3a){ W:Frame(angle=90){ W:Wheel(power=-ENGINE) } }
+        E:Chip(color=#6b7a3a){ E:Frame(angle=90){ E:Wheel(power=ENGINE) } }
       }
     }
     W:Weight(color=#55632e){ } E:Weight(color=#55632e){ }
