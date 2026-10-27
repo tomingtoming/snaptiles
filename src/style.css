@@ -28,8 +28,8 @@ body { display: grid; grid-template-columns: 380px 1fr; }
 #view { width: 100%; height: 100%; display: block; outline: 0; touch-action: none; }
 #hud { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 #vals, #out { position: absolute; margin: 0; padding: 10px 12px; font: 13px/1.4 var(--mono); color: #1d2328; background: rgba(255, 255, 255, 0.55); border-radius: 8px; pointer-events: none; backdrop-filter: blur(4px); }
-#vals { left: 12px; top: 12px; }
-#out { right: 12px; top: 12px; max-width: 48%; }
+#vals { left: 12px; top: 12px; max-height: 45%; overflow: hidden; }
+#out { right: 12px; top: 12px; max-width: 48%; max-height: 45%; overflow: hidden; white-space: pre-wrap; }
 #vals:empty, #out:empty { display: none; }
 #keys { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; flex-wrap: wrap; max-width: calc(100% - 24px); }
 #keys .cap { display: grid; place-items: center; min-width: 44px; height: 44px; padding: 0 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.6); color: #1d2328; font: 600 15px/1 var(--mono); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25); transition: transform 60ms, background 60ms; cursor: pointer; user-select: none; touch-action: none; }
