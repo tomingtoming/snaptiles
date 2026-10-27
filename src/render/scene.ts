@@ -98,8 +98,9 @@ export class SceneView {
   camera: THREE.PerspectiveCamera;
   private views = new Map<number, TileView>();
   private plateGeo = new THREE.BoxGeometry(TILE, TILE_T, TILE);
-  private wheelGeo = new THREE.CylinderGeometry(TILE / 2, TILE / 2, TILE_T, 24);
-  private spokeGeo = new THREE.BoxGeometry(TILE * 0.8, TILE_T * 1.2, TILE * 0.12);
+  // a tyre is drawn as a short cylinder (0.12 m wide) with a pale spoke; the physics sphere has the same radius
+  private wheelGeo = new THREE.CylinderGeometry(TILE / 2, TILE / 2, TILE * 0.2, 24);
+  private spokeGeo = new THREE.BoxGeometry(TILE * 0.8, TILE * 0.22, TILE * 0.12);
   private spokeMat = new THREE.MeshStandardMaterial({ color: 0xd0d4d8, roughness: 0.6 });
   private cowlGeos = new Map<string, THREE.BufferGeometry>();
   private group = new THREE.Group();

@@ -38,11 +38,12 @@ export const CRATES: { pos: [number, number, number]; size: number; color: numbe
   { pos: [-1, 1.5, 34], size: 1, color: 0xc98e5a },
   { pos: [1, 1.5, 34], size: 1, color: 0xc98e5a },
   { pos: [0, 2.5, 34], size: 1, color: 0xb97e4e },
-  { pos: [0, 0.5, -14], size: 1, color: 0xd9a066 },
-  { pos: [0, 1.5, -14], size: 1, color: 0xc98e5a },
-  { pos: [0, 2.5, -14], size: 1, color: 0xb97e4e },
-  { pos: [8, 0.5, -8], size: 1, color: 0xd9a066 },
-  { pos: [9.2, 0.5, -8], size: 1, color: 0xd9a066 },
-  { pos: [8.6, 1.5, -8], size: 1, color: 0xc98e5a },
+  // (moved off the spawn's straight line: cars drive north at 60 km/h within seconds)
+  { pos: [6, 0.5, -30], size: 1, color: 0xd9a066 },
+  { pos: [6, 1.5, -30], size: 1, color: 0xc98e5a },
+  { pos: [6, 2.5, -30], size: 1, color: 0xb97e4e },
+  { pos: [12, 0.5, -8], size: 1, color: 0xd9a066 },
+  { pos: [13.2, 0.5, -8], size: 1, color: 0xd9a066 },
+  { pos: [12.6, 1.5, -8], size: 1, color: 0xc98e5a },
 ];
 
