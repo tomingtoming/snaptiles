@@ -1,0 +1,7 @@
+{
+  // Static site served by Cloudflare Workers Static Assets (Vite -> dist/).
+  // Deploy is a separate decision: `bun run build && bunx wrangler deploy`.
+  "name": "snaptiles",
+  "compatibility_date": "2026-10-27",
+  "assets": { "directory": "./dist" }
+}

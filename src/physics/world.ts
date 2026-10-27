@@ -29,6 +29,8 @@ export interface TileBody {
   bodyRestPos: THREE.Vector3;
   /** assembled angle (deg) of an animated joint; the joint measures 0 there */
   restAngle: number;
+  /** last applied jet power (for the exhaust glow) */
+  jetPower: number;
 }
 
 export interface PhysicsOptions {
@@ -319,7 +321,7 @@ export class PhysicsWorld {
         }
       }
       const restAngle = angleAnimated ? attr(tile.node, 'angle', env, 0) : 0;
-      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle };
+      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0 };
       this.tiles.push(tb);
       this.byId.set(tile.id, tb);
     }
@@ -395,6 +397,7 @@ export class PhysicsWorld {
 
       if (tile.spec.jet) {
         const power = tile.powerless ? 0 : attr(tile.node, 'power', env, 0);
+        tb.jetPower = power;
         if (power !== 0) {
           const f = normal.clone().multiplyScalar(power * JET_NEWTON_PER_POWER);
           body.addForceAtPoint({ x: f.x, y: f.y, z: f.z }, { x: pose.position.x, y: pose.position.y, z: pose.position.z }, true);

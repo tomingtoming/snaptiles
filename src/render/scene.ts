@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { TILE, TILE_T, type TileInstance, type ValEnv } from '../model/assemble';
 import { evalExpr, exprIsConstant } from '../rc/expr';
-import type { PhysicsWorld } from '../physics/world';
+import { wheelRadius, type PhysicsWorld } from '../physics/world';
 import { COURSE } from '../model/course';
 
 const PALETTE: Record<string, number> = {
@@ -76,6 +76,8 @@ export class SceneView {
   private views = new Map<number, TileView>();
   private plateGeo = new THREE.BoxGeometry(TILE, TILE_T, TILE);
   private wheelGeo = new THREE.CylinderGeometry(TILE / 2, TILE / 2, TILE_T, 24);
+  private spokeGeo = new THREE.BoxGeometry(TILE * 0.8, TILE_T * 1.2, TILE * 0.12);
+  private spokeMat = new THREE.MeshStandardMaterial({ color: 0xd0d4d8, roughness: 0.6 });
   private cowlGeos = new Map<string, THREE.BufferGeometry>();
   private group = new THREE.Group();
   private lines: THREE.LineSegments;
@@ -159,6 +161,18 @@ export class SceneView {
       const mesh = new THREE.Mesh(geo, material);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
+      if (t.spec.wheel) {
+        // tyre radius follows the physics; a pale spoke makes the spin visible
+        const r = wheelRadius(t.option) / (TILE / 2);
+        mesh.scale.set(r, 1, r);
+        const spoke = new THREE.Mesh(this.spokeGeo, this.spokeMat);
+        spoke.scale.set(1 / r, 1, 1 / r);
+        mesh.add(spoke);
+      }
+      if (t.spec.jet) {
+        material.emissive.setHex(0xff5a00);
+        material.emissiveIntensity = 0;
+      }
       const view: TileView = {
         tile: t,
         mesh,
@@ -211,6 +225,7 @@ export class SceneView {
       const pose = world.pose(tb, this.tmpPose);
       v.mesh.position.copy(pose.position);
       v.mesh.quaternion.copy(pose.quaternion);
+      if (tb.tile.spec.jet) v.material.emissiveIntensity = Math.min(1.5, Math.abs(tb.jetPower) / 20000);
     }
   }
 
