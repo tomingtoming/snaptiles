@@ -19,6 +19,9 @@ export interface TileBody {
   relQuat: THREE.Quaternion;
   joint: RAPIER.RevoluteImpulseJoint | null;
   animated: boolean;
+  /** wheels with a variable angle: the rim body and its fold joint (otherwise the rim is welded) */
+  rim: RAPIER.RigidBody | null;
+  rimJoint: RAPIER.RevoluteImpulseJoint | null;
   /** rest orientation of `body` (model frame). Every body in a joint chain shares its
    *  parent's orientation so rapier's single joint axis means the same thing in both. */
   bodyRestQuat: THREE.Quaternion;
@@ -69,9 +72,13 @@ export class PhysicsWorld {
   }
 
   clear(): void {
-    for (const t of this.tiles) if (t.joint) this.world.removeImpulseJoint(t.joint, true);
+    for (const t of this.tiles) {
+      if (t.joint) this.world.removeImpulseJoint(t.joint, true);
+      if (t.rimJoint) this.world.removeImpulseJoint(t.rimJoint, true);
+    }
     const seen = new Set<number>();
     for (const t of this.tiles) {
+      if (t.rim) this.world.removeRigidBody(t.rim);
       if (seen.has(t.body.handle)) continue;
       seen.add(t.body.handle);
       this.world.removeRigidBody(t.body);
@@ -90,8 +97,48 @@ export class PhysicsWorld {
     for (const tile of a.tiles) {
       const parentTb = tile.parent ? this.byId.get(tile.parent.id)! : null;
       const angleExpr = tile.node.attrs.angle ?? '';
-      const animated = !!tile.parent && !exprIsConstant(angleExpr) && tile.spec.joint !== 'wheel' && tile.spec.joint !== 'fixed';
+      const angleAnimated = !!tile.parent && !exprIsConstant(angleExpr) && tile.spec.joint !== 'fixed';
+      const animated = angleAnimated && tile.spec.joint !== 'wheel';
       const startsGroup = !parentTb || tile.spec.joint === 'wheel' || animated;
+
+      // Wheel = rim (a plate folded like a chip) + rotor (the disc). The rim is welded to the
+      // parent, or gets its own fold joint when the angle is a variable.
+      let rim: RAPIER.RigidBody | null = null;
+      let rimJoint: RAPIER.RevoluteImpulseJoint | null = null;
+      let rotorParent = parentTb?.body ?? null;
+      if (tile.spec.wheel && parentTb) {
+        const rimQuat = parentTb.bodyRestQuat;
+        const rimRel = rimQuat.clone().invert().multiply(tile.quaternion);
+        if (angleAnimated) {
+          const p = tile.position.clone().add(offset);
+          const rb = R.RigidBodyDesc.dynamic()
+            .setTranslation(p.x, p.y, p.z)
+            .setRotation({ x: rimQuat.x, y: rimQuat.y, z: rimQuat.z, w: rimQuat.w })
+            .setCcdEnabled(true);
+          rim = this.world.createRigidBody(rb);
+          // the rim is a hub well inside the disc so it never touches the ground
+          const cd = R.ColliderDesc.cuboid(TILE / 4, TILE_T / 2, TILE / 4)
+            .setMass(42.41)
+            .setFriction(tile.spec.friction)
+            .setCollisionGroups(MODEL_GROUP)
+            .setRotation({ x: rimRel.x, y: rimRel.y, z: rimRel.z, w: rimRel.w });
+          this.world.createCollider(cd, rim);
+          const anchorW = tile.rimAnchor.clone().add(offset);
+          const jd = R.JointData.revolute(toLocal(parentTb.body, anchorW), toLocal(rim, anchorW), toLocalDir(parentTb.body, tile.rimAxis));
+          rimJoint = this.world.createImpulseJoint(jd, parentTb.body, rim, true) as RAPIER.RevoluteImpulseJoint;
+          rimJoint.setLimits(0, 0);
+          rotorParent = rim;
+        } else {
+          const rimPos = tile.position.clone().sub(parentTb.bodyRestPos).applyQuaternion(rimQuat.clone().invert());
+          const cd = R.ColliderDesc.cuboid(TILE / 4, TILE_T / 2, TILE / 4)
+            .setMass(42.41)
+            .setFriction(tile.spec.friction)
+            .setCollisionGroups(MODEL_GROUP)
+            .setTranslation(rimPos.x, rimPos.y, rimPos.z)
+            .setRotation({ x: rimRel.x, y: rimRel.y, z: rimRel.z, w: rimRel.w });
+          this.world.createCollider(cd, parentTb.body);
+        }
+      }
 
       let body: RAPIER.RigidBody;
       let groupRoot: TileInstance;
@@ -121,7 +168,7 @@ export class PhysicsWorld {
       const relPos = tile.position.clone().sub(bodyRestPos).applyQuaternion(invQ);
 
       // collider
-      const mass = tile.mass;
+      const mass = tile.spec.wheel ? 36.76 : tile.mass;
       if (mass > 0 || tile.spec.collides) {
         const cd = tile.spec.wheel
           ? R.ColliderDesc.cylinder(TILE_T / 2, TILE / 2)
@@ -133,17 +180,17 @@ export class PhysicsWorld {
       }
 
       let joint: RAPIER.RevoluteImpulseJoint | null = null;
-      if (startsGroup && parentTb) {
+      if (startsGroup && parentTb && rotorParent) {
         const anchorW = tile.anchor.clone().add(offset);
         const axisW = tile.axis.clone().normalize();
         // Both bodies share the same rest orientation, so rapier's single joint axis has the
         // same coordinates in both local frames and the joint measures 0 at the rest pose.
-        const jd = R.JointData.revolute(toLocal(parentTb.body, anchorW), toLocal(body, anchorW), toLocalDir(parentTb.body, axisW));
-        joint = this.world.createImpulseJoint(jd, parentTb.body, body, true) as RAPIER.RevoluteImpulseJoint;
+        const jd = R.JointData.revolute(toLocal(rotorParent, anchorW), toLocal(body, anchorW), toLocalDir(rotorParent, axisW));
+        joint = this.world.createImpulseJoint(jd, rotorParent, body, true) as RAPIER.RevoluteImpulseJoint;
         if (animated) joint.setLimits(0, 0);
       }
-      const restAngle = animated ? attr(tile.node, 'angle', env, 0) : 0;
-      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, bodyRestQuat, bodyRestPos, restAngle };
+      const restAngle = angleAnimated ? attr(tile.node, 'angle', env, 0) : 0;
+      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle };
       this.tiles.push(tb);
       this.byId.set(tile.id, tb);
     }
@@ -189,7 +236,11 @@ export class PhysicsWorld {
         if (tile.spec.joint === 'wheel') {
           const power = attr(tile.node, 'power', env, 0);
           const brake = attr(tile.node, 'brake', env, 0);
-          const parentBody = this.byId.get(tile.parent.id)!.body;
+          const parentBody = tb.rim ?? this.byId.get(tile.parent.id)!.body;
+          if (tb.rimJoint) {
+            const a = (attr(tile.node, 'angle', env, 0) - tb.restAngle) * DEG;
+            tb.rimJoint.setLimits(a, a);
+          }
           let torque = power * WHEEL_TORQUE_PER_POWER;
           if (brake > 0) {
             const w = body.angvel();

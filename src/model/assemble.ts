@@ -79,6 +79,9 @@ export interface TileInstance {
   /** joint anchor and axis in model frame at rest */
   anchor: THREE.Vector3;
   axis: THREE.Vector3;
+  /** wheels: the rim's hinge (fold) axis and anchor; `axis`/`anchor` are then the rotor spin */
+  rimAxis: THREE.Vector3;
+  rimAnchor: THREE.Vector3;
   dirAxis: THREE.Vector3;
   color: number | null;
   /** raw color / effect expressions (re-evaluated every frame when not constant) */
@@ -146,9 +149,12 @@ function childPose(spec: TypeSpec, dir: 'N' | 'S' | 'E' | 'W', angleDeg: number)
       anchor = half;
       break;
     case 'wheel':
-      pos = d.clone().multiplyScalar(TILE);
-      axis = UP.clone(); // spins about its own normal
-      anchor = pos.clone();
+      // the rim folds about the shared edge like a chip (Wheel(angle=90) stands the disc up);
+      // the rotor then spins about the rim's normal — set by the caller
+      q.setFromAxisAngle(hingeAxis, angleDeg * DEG);
+      pos = half.clone().add(half.clone().applyQuaternion(q));
+      axis = hingeAxis;
+      anchor = half;
       break;
   }
   return { q, pos, axis, anchor };
@@ -177,6 +183,8 @@ export function assemble(model: RcModel, env: ValEnv): Assembly | null {
       quaternion: new THREE.Quaternion(),
       anchor: new THREE.Vector3(),
       axis: new THREE.Vector3(0, 0, 1),
+      rimAxis: new THREE.Vector3(0, 0, 1),
+      rimAnchor: new THREE.Vector3(),
       dirAxis: new THREE.Vector3(0, 0, -1),
       color: parseColor(node.attrs.color, env),
       colorExpr: node.attrs.color ?? null,
@@ -195,12 +203,18 @@ export function assemble(model: RcModel, env: ValEnv): Assembly | null {
     chipIndex++;
 
     if (parent && node.dir) {
-      const angle = spec.joint === 'wheel' ? 0 : attr(node, 'angle', env, 0);
+      const angle = attr(node, 'angle', env, 0);
       const { q, pos, axis, anchor } = childPose(spec, node.dir, angle);
       inst.quaternion.copy(parent.quaternion).multiply(q);
       inst.position.copy(parent.position).add(pos.clone().applyQuaternion(parent.quaternion));
       inst.anchor.copy(parent.position).add(anchor.clone().applyQuaternion(parent.quaternion));
       inst.axis.copy(axis).applyQuaternion(parent.quaternion).normalize();
+      if (spec.wheel) {
+        inst.rimAxis.copy(inst.axis);
+        inst.rimAnchor.copy(inst.anchor);
+        inst.axis.copy(UP).applyQuaternion(inst.quaternion).normalize();
+        inst.anchor.copy(inst.position);
+      }
       inst.dirAxis.copy(DIR_VEC[node.dir]).applyQuaternion(parent.quaternion);
       parent.children.push(inst);
     } else if (parent) {
