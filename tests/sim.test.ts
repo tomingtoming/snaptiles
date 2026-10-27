@@ -83,3 +83,39 @@ describe('brakes and lifecycle callbacks', () => {
     await sim.lua.dispose();
   });
 });
+
+import { WALKER } from '../src/samples/walker';
+import { TANK } from '../src/samples/tank';
+
+describe('walker and tank samples', () => {
+  it('the walker crawls north on ↑ and stays upright', async () => {
+    const R = await initRapier();
+    const keys = fakeKeys();
+    const sim = new Simulation(R, WALKER, keys);
+    await sim.start();
+    for (let i = 0; i < 30; i++) sim.step();
+    const z0 = sim.corePosition().z;
+    keys.press(0);
+    for (let i = 0; i < 180; i++) sim.step(); // 6 s
+    expect(sim.corePosition().z).toBeLessThan(z0 - 0.8);
+    const q = sim.physics.pose(sim.physics.tiles[0]).quaternion;
+    expect(1 - 2 * (q.x * q.x + q.z * q.z)).toBeGreaterThan(0.9); // up vector still up
+    await sim.lua.dispose();
+  });
+
+  it('the tank turns its turret with D and fires with Z', async () => {
+    const R = await initRapier();
+    const keys = fakeKeys();
+    const sim = new Simulation(R, TANK, keys);
+    await sim.start();
+    for (let i = 0; i < 160; i++) sim.step();
+    keys.press(9); // D
+    for (let i = 0; i < 30; i++) sim.step();
+    keys.release(9);
+    expect(sim.vals.get('TURRET')!.value).toBeGreaterThan(60);
+    keys.press(4); // Z
+    sim.step();
+    expect(sim.physics.projectiles.length).toBe(1);
+    await sim.lua.dispose();
+  });
+});
