@@ -1,11 +1,12 @@
-// Legacy `Script{}` language (docs/spec/lua-api.md §4): one statement per line,
-// executed top to bottom once per frame.
+// Legacy `Script{}` language (docs/spec/lua-api.md §4), executed top to bottom once per frame.
 //
 //   var = expr
 //   if cond { ... }          (no nesting; leaving the block leaves all)
-//   label name / goto name
+//   label name / goto name   (a trailing colon is tolerated: `goto A:`)
 //   print row, item, ...
 //
+// Statements are separated by newlines OR just by starting a new statement — community
+// files write `if F_B=1 {Z_A=90 DUMMY=_BYE(zenmai) goto B:}` on one line.
 // Expressions: numbers, variables (Val or frame-local), _FUNC(args), + - * / %,
 // comparisons (= == != <> < > <= >=) → 1/0, & | and or, unary minus, parentheses.
 
@@ -14,7 +15,7 @@ import type { ValState } from '../sim/simulation';
 
 type Stmt =
   | { k: 'set'; name: string; expr: Expr }
-  | { k: 'if'; cond: Expr; end: number } // jump to `end` (index after block) when false
+  | { k: 'if'; cond: Expr; end: number } // jump to `end` (index after the block) when false
   | { k: 'endif' }
   | { k: 'goto'; label: string }
   | { k: 'label'; name: string }
@@ -29,7 +30,10 @@ type Expr =
   | { k: 'un'; op: string; a: Expr }
   | { k: 'bin'; op: string; a: Expr; b: Expr };
 
+type Tok = { t: 'num' | 'id' | 'op' | 'str'; v: string };
+
 const MAX_STEPS = 20000;
+const KEYWORDS = new Set(['if', 'goto', 'label', 'print']);
 
 export class RcScript {
   private stmts: Stmt[] = [];
@@ -42,44 +46,80 @@ export class RcScript {
 
   private compile(source: string): void {
     const text = source.replace(/\r\n?/g, '\n').replace(/\/\/[^\n]*/g, '');
-    // Split braces onto their own logical statements.
-    const lines = text.replace(/\{/g, ' { \n').replace(/\}/g, '\n } \n').split('\n');
+    const toks = lex(text);
     const ifStack: number[] = [];
-    for (const raw of lines) {
-      const line = raw.trim();
-      if (!line) continue;
-      if (line === '}') {
+    let i = 0;
+    const isStart = (j: number): boolean => {
+      const t = toks[j];
+      if (!t) return true;
+      if (t.t === 'op' && t.v === '}') return true;
+      if (t.t === 'id' && KEYWORDS.has(t.v.toLowerCase())) return true;
+      // `IDENT =` begins an assignment (but not `IDENT ==` and not inside parentheses)
+      return t.t === 'id' && toks[j + 1]?.t === 'op' && toks[j + 1].v === '=';
+    };
+    /** collect tokens until the next statement start (at paren depth 0) or a brace */
+    const until = (stop: (t: Tok) => boolean): Tok[] => {
+      const out: Tok[] = [];
+      let depth = 0;
+      while (i < toks.length) {
+        const t = toks[i];
+        if (depth === 0 && (stop(t) || isStart(i))) break;
+        if (t.t === 'op' && t.v === '(') depth++;
+        if (t.t === 'op' && t.v === ')') depth--;
+        out.push(t);
+        i++;
+      }
+      return out;
+    };
+    while (i < toks.length) {
+      const t = toks[i];
+      if (t.t === 'op' && t.v === '}') {
         const idx = ifStack.pop();
         if (idx === undefined) throw new Error('unmatched }');
         (this.stmts[idx] as { end: number }).end = this.stmts.length + 1;
         this.stmts.push({ k: 'endif' });
+        i++;
         continue;
       }
-      let m: RegExpExecArray | null;
-      if ((m = /^if\b(.*)\{$/i.exec(line))) {
+      if (t.t === 'op' && t.v === '{') { i++; continue; } // stray
+      const word = t.t === 'id' ? t.v.toLowerCase() : '';
+      if (word === 'if') {
+        i++;
+        const cond: Tok[] = [];
+        while (i < toks.length && !(toks[i].t === 'op' && toks[i].v === '{')) cond.push(toks[i++]);
+        i++; // '{'
         ifStack.push(this.stmts.length);
-        this.stmts.push({ k: 'if', cond: parseExpr(m[1]), end: -1 });
+        this.stmts.push({ k: 'if', cond: parseTokens(cond), end: -1 });
         continue;
       }
-      if ((m = /^label\s+([A-Za-z_]\w*)$/i.exec(line))) {
-        this.labels.set(m[1].toUpperCase(), this.stmts.length);
-        this.stmts.push({ k: 'label', name: m[1].toUpperCase() });
+      if (word === 'label' || word === 'goto') {
+        i++;
+        const name = toks[i]?.t === 'id' ? toks[i++].v.toUpperCase() : '';
+        if (toks[i]?.t === 'op' && toks[i].v === ':') i++;
+        if (!name) throw new Error(`${word} without a name`);
+        if (word === 'label') {
+          this.labels.set(name, this.stmts.length);
+          this.stmts.push({ k: 'label', name });
+        } else this.stmts.push({ k: 'goto', label: name });
         continue;
       }
-      if ((m = /^goto\s+([A-Za-z_]\w*)$/i.exec(line))) {
-        this.stmts.push({ k: 'goto', label: m[1].toUpperCase() });
+      if (word === 'print') {
+        i++;
+        const args = splitTop(until(() => false));
+        this.stmts.push({ k: 'print', row: parseTokens(args[0] ?? []), items: args.slice(1).map(parseTokens) });
         continue;
       }
-      if ((m = /^print\s+(.*)$/i.exec(line))) {
-        const parts = splitTop(m[1]);
-        this.stmts.push({ k: 'print', row: parseExpr(parts[0] ?? '0'), items: parts.slice(1).map(parseExpr) });
+      if (t.t === 'id' && toks[i + 1]?.t === 'op' && toks[i + 1].v === '=') {
+        const name = t.v.toUpperCase();
+        i += 2;
+        const expr = until(() => false);
+        this.stmts.push({ k: 'set', name, expr: parseTokens(expr) });
         continue;
       }
-      if ((m = /^([A-Za-z_]\w*)\s*=(?!=)\s*(.*)$/.exec(line))) {
-        this.stmts.push({ k: 'set', name: m[1].toUpperCase(), expr: parseExpr(m[2]) });
-        continue;
-      }
-      this.stmts.push({ k: 'expr', expr: parseExpr(line) });
+      // anything else: a bare expression statement
+      const expr = until(() => false);
+      if (expr.length === 0) { i++; continue; }
+      this.stmts.push({ k: 'expr', expr: parseTokens(expr) });
     }
     if (ifStack.length) throw new Error('unclosed if block');
   }
@@ -114,7 +154,7 @@ export class RcScript {
         }
         case 'print': {
           const row = Math.max(0, Math.min(24, Math.floor(num(ev(s.row)))));
-          const text = s.items.map((i) => { const v = ev(i); return typeof v === 'number' ? (Number.isInteger(v) ? String(v) : v.toFixed(2)) : v; }).join(' ');
+          const text = s.items.map((i) => { const v = ev(i); return typeof v === 'number' ? (Number.isInteger(v) ? String(v) : v.toFixed(2)) : v; }).join('');
           while (this.outLines.length <= row) this.outLines.push('');
           this.outLines[row] = text;
           pc++;
@@ -130,27 +170,22 @@ function num(v: number | string): number {
   return typeof v === 'number' ? v : Number(v) || 0;
 }
 
-function splitTop(s: string): string[] {
-  const out: string[] = [];
+/** split a token list on top-level commas */
+function splitTop(toks: Tok[]): Tok[][] {
+  const out: Tok[][] = [];
   let depth = 0;
-  let cur = '';
-  let inStr = false;
-  for (const c of s) {
-    if (c === '"') inStr = !inStr;
-    if (!inStr) {
-      if (c === '(') depth++;
-      if (c === ')') depth--;
-      if (c === ',' && depth === 0) { out.push(cur.trim()); cur = ''; continue; }
-    }
-    cur += c;
+  let cur: Tok[] = [];
+  for (const t of toks) {
+    if (t.t === 'op' && t.v === '(') depth++;
+    if (t.t === 'op' && t.v === ')') depth--;
+    if (t.t === 'op' && t.v === ',' && depth === 0) { out.push(cur); cur = []; continue; }
+    cur.push(t);
   }
-  if (cur.trim()) out.push(cur.trim());
+  if (cur.length) out.push(cur);
   return out;
 }
 
-// ---- expression parser ----
-type Tok = { t: 'num' | 'id' | 'op' | 'str'; v: string };
-
+// ---- lexer ----
 function lex(s: string): Tok[] {
   const toks: Tok[] = [];
   let i = 0;
@@ -193,8 +228,8 @@ function lex(s: string): Tok[] {
   return toks;
 }
 
-function parseExpr(src: string): Expr {
-  const toks = lex(src);
+// ---- expression parser (over tokens) ----
+function parseTokens(toks: Tok[]): Expr {
   let i = 0;
   const peek = () => toks[i];
   const take = () => toks[i++];
@@ -210,7 +245,7 @@ function parseExpr(src: string): Expr {
       if (isOp('(')) {
         take();
         const args: Expr[] = [];
-        while (!isOp(')')) {
+        while (peek() && !isOp(')')) {
           args.push(or());
           if (isOp(',')) take(); else break;
         }
@@ -258,6 +293,10 @@ function parseExpr(src: string): Expr {
     return a;
   };
   return or();
+}
+
+export function parseExpr(src: string): Expr {
+  return parseTokens(lex(src));
 }
 
 const MATH: Record<string, (...a: number[]) => number> = {

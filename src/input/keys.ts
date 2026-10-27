@@ -7,11 +7,13 @@ export interface KeyDef {
   glyph: string; // how the keycap is drawn
 }
 
+// Arrow order measured on the corpus (bike: 0=engine 1=brake 2/3=steer; tonbo: 0/1=pitch
+// 2/3=roll; 3wheel; zrobo "Up/Down: Walk/Stop  </>: Turn"): 0 ↑, 1 ↓, 2 ←, 3 →.
 export const KEY_TABLE: KeyDef[] = [
-  { code: 'ArrowLeft', glyph: '←' },
   { code: 'ArrowUp', glyph: '↑' },
-  { code: 'ArrowRight', glyph: '→' },
   { code: 'ArrowDown', glyph: '↓' },
+  { code: 'ArrowLeft', glyph: '←' },
+  { code: 'ArrowRight', glyph: '→' },
   { code: 'KeyZ', glyph: 'Z' },
   { code: 'KeyX', glyph: 'X' },
   { code: 'KeyC', glyph: 'C' },

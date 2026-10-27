@@ -10,10 +10,10 @@ Key
 {
   4:THROTTLE(step=600)
   5:THROTTLE(step=-600)
-  1:ELEV(step=-2)
-  3:ELEV(step=2)
-  0:AIL(step=-2)
-  2:AIL(step=2)
+  0:ELEV(step=-2)
+  1:ELEV(step=2)
+  2:AIL(step=-2)
+  3:AIL(step=2)
   7:RUD(step=-2)
   9:RUD(step=2)
 }

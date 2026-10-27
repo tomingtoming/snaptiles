@@ -24,7 +24,7 @@ model. Drag to orbit, wheel to zoom.
 
 ```
 Val  { STEER(default=0, min=-30, max=30, step=3) }
-Key  { 0:STEER(step=-3)  2:STEER(step=3) }
+Key  { 2:STEER(step=-3)  3:STEER(step=3) }
 Body { Core(){ N:Rudder(angle=STEER){ N:Chip(angle=90){ N:Wheel(power=500){ } } } } }
 Lua  { function OnFrame() out(0, "x", _X(0)) end }
 ```
@@ -32,7 +32,7 @@ Lua  { function OnFrame() out(0, "x", _X(0)) end }
 - `Val` declares variables (`default/min/max/step`; `step` is the per-frame
   return toward `default` when nothing touches the variable).
 - `Key` adds `step` to a variable every frame a key is held. Key numbers:
-  `0 ← 1 ↑ 2 → 3 ↓ 4 Z 5 X 6 C 7 A 8 S 9 D 10 V 11 B 12 F 13 G 14 Q 15 W 16 E`.
+  `0 ↑ 1 ↓ 2 ← 3 → 4 Z 5 X 6 C 7 A 8 S 9 D 10 V 11 B 12 F 13 G 14 Q 15 W 16 E`.
 - `Body` is a tree of tiles. Each child is attached to a side of its parent
   (`N S E W`). `Chip`/`Frame`/`Weight`/`Jet`/`Arm` fold about the shared edge
   (`angle`), `Rudder` turns about the parent's normal, `Trim` rolls about the

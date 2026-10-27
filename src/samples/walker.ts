@@ -10,10 +10,10 @@ Val
 }
 Key
 {
-  1:GO(step=0.2)
-  3:GO(step=-0.2)
-  0:TURN(step=-0.2)
-  2:TURN(step=0.2)
+  0:GO(step=0.2)
+  1:GO(step=-0.2)
+  2:TURN(step=-0.2)
+  3:TURN(step=0.2)
 }
 Body
 {

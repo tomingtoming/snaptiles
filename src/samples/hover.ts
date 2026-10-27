@@ -14,10 +14,10 @@ Val
 }
 Key
 {
-  1:FWD(step=0.2)
-  3:FWD(step=-0.2)
-  0:SIDE(step=-0.2)
-  2:SIDE(step=0.2)
+  0:FWD(step=0.2)
+  1:FWD(step=-0.2)
+  2:SIDE(step=-0.2)
+  3:SIDE(step=0.2)
   7:TURN(step=-0.2)
   9:TURN(step=0.2)
 }

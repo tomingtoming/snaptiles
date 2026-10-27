@@ -7,10 +7,10 @@ Val
 }
 Key
 {
-  1:ENGINE(step=150)
-  3:ENGINE(step=-150)
-  0:HANDLE(step=-3)
-  2:HANDLE(step=3)
+  0:ENGINE(step=150)
+  1:ENGINE(step=-150)
+  2:HANDLE(step=-3)
+  3:HANDLE(step=3)
   4:BRAKE(step=100)
 }
 Body

@@ -31,7 +31,7 @@ describe('legacy Script', () => {
     s.run(api, v);
     expect(v.get('TRQ')!.value).toBeCloseTo(1050, 5);
     expect(v.get('X')!.value).toBe(3);
-    expect(s.outLines[0]).toBe('trq 1050');
+    expect(s.outLines[0]).toBe('trq1050'); // items are concatenated, as in the original
     s.run(api, v);
     expect(v.get('TRQ')!.value).toBeCloseTo(2152.5, 5);
   });
