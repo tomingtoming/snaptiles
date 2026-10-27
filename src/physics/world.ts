@@ -40,6 +40,9 @@ export const WHEEL_TORQUE_PER_POWER = 0.25; // N·m per power unit
 export const JET_NEWTON_PER_POWER = 1 / 6;
 /** flat-plate aero: N per (m/s)² of normal velocity, per unit drag coefficient of a tile */
 export const AIR_DRAG = 0.9;
+/** compliant joints (spring<1): N·m/rad at spring=1 and N·m·s/rad at damper=1 — guesses */
+export const SPRING_STIFFNESS = 4000;
+export const SPRING_DAMPING = 400;
 
 // Tiles of a model never collide with each other (only with the ground / objects).
 const MODEL_GROUP = 0x0001_0002; // membership 1, filter 2
@@ -192,7 +195,10 @@ export class PhysicsWorld {
       const angleExpr = tile.node.attrs.angle ?? '';
       const angleAnimated = !!parentTb && !exprIsConstant(angleExpr) && tile.spec.joint !== 'fixed';
       const animated = angleAnimated && tile.spec.joint !== 'wheel';
-      const startsGroup = !parentTb || tile.spec.joint === 'wheel' || animated;
+      // spring < 1 asks for a compliant connection (suspension); default spring=1 is rigid
+      const springVal = tile.node.attrs.spring !== undefined ? attr(tile.node, 'spring', env, 1) : 1;
+      const compliant = !!parentTb && !animated && tile.spec.joint !== 'wheel' && tile.spec.joint !== 'fixed' && springVal < 1;
+      const startsGroup = !parentTb || tile.spec.joint === 'wheel' || animated || compliant;
 
       // Wheel = rim (a plate folded like a chip) + rotor (the disc). The rim is welded to the
       // parent, or gets its own fold joint when the angle is a variable.
@@ -286,6 +292,12 @@ export class PhysicsWorld {
         const jd = R.JointData.revolute(toLocal(rotorParent, anchorW), toLocal(body, anchorW), toLocalDir(rotorParent, axisW));
         joint = this.world.createImpulseJoint(jd, rotorParent, body, true) as RAPIER.RevoluteImpulseJoint;
         if (animated) joint.setLimits(0, 0);
+        if (compliant) {
+          const damper = tile.node.attrs.damper !== undefined ? attr(tile.node, 'damper', env, 0.5) : attr(tile.node, 'dumper', env, 0.5);
+          joint.configureMotorModel(R.MotorModel.ForceBased);
+          joint.configureMotorPosition(0, SPRING_STIFFNESS * Math.max(0.02, springVal), SPRING_DAMPING * Math.max(0.05, damper));
+          joint.setLimits(-Math.PI / 3, Math.PI / 3);
+        }
       }
       const restAngle = angleAnimated ? attr(tile.node, 'angle', env, 0) : 0;
       const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle };
