@@ -141,6 +141,7 @@ function frame(now: number): void {
     scene.sync(sim.physics);
     scene.updateDynamic(sim.env);
     scene.setLines3d(sim.lines3d);
+    scene.syncProjectiles(sim.physics.projectiles);
     drawHud(sim.lines2d);
     if (!dragging && performance.now() - lastDrag > 3000) scene.chaseYaw(sim.coreHeading());
     scene.follow(sim.corePosition());

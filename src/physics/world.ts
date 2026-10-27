@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
-import { TILE, TILE_T, assemblyBottom, attr, type Assembly, type TileInstance, type ValEnv } from '../model/assemble';
+import { TILE, TILE_T, assemblyBottom, attr, refreshJointFrames, type Assembly, type TileInstance, type ValEnv } from '../model/assemble';
 import { exprIsConstant } from '../rc/expr';
 
 /**
@@ -56,12 +56,67 @@ export interface Pose {
   quaternion: THREE.Quaternion;
 }
 
+export interface BuildOptions {
+  /** rest poses are already world poses (rebuild after a detach): do not lift onto the ground */
+  inPlace?: boolean;
+  /** per tile id, velocities to restore on the bodies that start a group */
+  velocities?: Map<number, { lin: THREE.Vector3; ang: THREE.Vector3 }>;
+}
+
+export interface Projectile {
+  body: RAPIER.RigidBody;
+  born: number; // tick
+  energy: number;
+}
+
+/** Arm: charge per step (spec says 2500 per 30 fps frame), muzzle speed and shell mass are guesses */
+export const ARM_CHARGE_PER_STEP = 2500 / 2;
+export const ARM_MUZZLE_SPEED = 80;
+export const ARM_SHELL_MASS = 2;
+export const ARM_SHELL_LIFE = 4 * 60;
+export const ARM_ARMED_AFTER_TICK = 150 * 2;
+const SHELL_GROUP = 0x0004_0002; // membership 4, collides with ground only
+
 export class PhysicsWorld {
   world: RAPIER.World;
   tiles: TileBody[] = [];
   byId = new Map<number, TileBody>();
   readonly dt = 1 / 60;
   tick = 0;
+  projectiles: Projectile[] = [];
+  armCharge = new Map<number, number>(); // tile id → energy
+  private assembly: Assembly | null = null;
+  private env: ValEnv = () => undefined;
+
+  /**
+   * _BYE / _SPLIT: cut a tile (and its subtree) loose. Every tile's current world pose
+   * becomes its new rest pose and the world is rebuilt in place with velocities kept.
+   */
+  detach(tile: TileInstance, powerless: boolean): void {
+    if (!this.assembly || !tile.parent || tile.detached) return;
+    const velocities = new Map<number, { lin: THREE.Vector3; ang: THREE.Vector3 }>();
+    for (const tb of this.tiles) {
+      const pose = this.pose(tb);
+      tb.tile.position.copy(pose.position);
+      tb.tile.quaternion.copy(pose.quaternion);
+      const l = tb.body.linvel();
+      const w = tb.body.angvel();
+      velocities.set(tb.tile.id, { lin: new THREE.Vector3(l.x, l.y, l.z), ang: new THREE.Vector3(w.x, w.y, w.z) });
+    }
+    // joint anchors/axes live in the model frame: recompute them from the new poses
+    for (const tb of this.tiles) refreshJointFrames(tb.tile);
+    tile.detached = true;
+    if (powerless) {
+      const mark = (t: TileInstance) => { t.powerless = true; t.children.forEach(mark); };
+      mark(tile);
+    }
+    const charges = new Map(this.armCharge);
+    const shells = this.projectiles;
+    this.projectiles = [];
+    this.build(this.assembly, this.env, new THREE.Vector3(), { inPlace: true, velocities });
+    this.armCharge = charges;
+    this.projectiles = shells;
+  }
 
   constructor(private R: typeof RAPIER, opts: PhysicsOptions = {}) {
     this.world = new R.World({ x: 0, y: opts.gravity ?? -9.8, z: 0 });
@@ -86,18 +141,54 @@ export class PhysicsWorld {
     this.tiles = [];
     this.byId.clear();
     this.tick = 0;
+    for (const p of this.projectiles) this.world.removeRigidBody(p.body);
+    this.projectiles = [];
+    this.armCharge.clear();
   }
 
-  build(a: Assembly, env: ValEnv, spawn = new THREE.Vector3(0, 0, 0)): void {
+  /** Arm: charge every step; fire a shell along the tile normal when power reaches option. */
+  private updateArm(tb: TileBody, pose: Pose, normal: THREE.Vector3, env: ValEnv): void {
+    const tile = tb.tile;
+    const option = Math.max(0, tile.option);
+    const charge = Math.min(option || Infinity, (this.armCharge.get(tile.id) ?? 0) + ARM_CHARGE_PER_STEP);
+    this.armCharge.set(tile.id, charge);
+    const power = tile.powerless ? 0 : attr(tile.node, 'power', env, 0);
+    if (option <= 0 || power < option || charge < option || this.tick < ARM_ARMED_AFTER_TICK) return;
+    this.armCharge.set(tile.id, 0);
+    const R = this.R;
+    const v = this.velocity(tb, pose);
+    const muzzle = pose.position.clone().add(normal.clone().multiplyScalar(0.6));
+    const vel = v.clone().add(normal.clone().multiplyScalar(ARM_MUZZLE_SPEED));
+    const body = this.world.createRigidBody(
+      R.RigidBodyDesc.dynamic().setTranslation(muzzle.x, muzzle.y, muzzle.z).setLinvel(vel.x, vel.y, vel.z).setCcdEnabled(true),
+    );
+    this.world.createCollider(R.ColliderDesc.ball(0.15).setMass(ARM_SHELL_MASS).setCollisionGroups(SHELL_GROUP), body);
+    this.projectiles.push({ body, born: this.tick, energy: option });
+    const recoil = normal.clone().multiplyScalar(-ARM_SHELL_MASS * ARM_MUZZLE_SPEED);
+    tb.body.applyImpulseAtPoint({ x: recoil.x, y: recoil.y, z: recoil.z }, { x: pose.position.x, y: pose.position.y, z: pose.position.z }, true);
+  }
+
+  private cullProjectiles(): void {
+    this.projectiles = this.projectiles.filter((p) => {
+      const t = p.body.translation();
+      const dead = this.tick - p.born > ARM_SHELL_LIFE || t.y < 0.16;
+      if (dead) this.world.removeRigidBody(p.body);
+      return !dead;
+    });
+  }
+
+  build(a: Assembly, env: ValEnv, spawn = new THREE.Vector3(0, 0, 0), opts: BuildOptions = {}): void {
     this.clear();
     const R = this.R;
-    const lift = -assemblyBottom(a) + 0.02;
+    const lift = opts.inPlace ? 0 : -assemblyBottom(a) + 0.02;
     const offset = spawn.clone().add(new THREE.Vector3(0, lift, 0));
+    this.assembly = a;
+    this.env = env;
 
     for (const tile of a.tiles) {
-      const parentTb = tile.parent ? this.byId.get(tile.parent.id)! : null;
+      const parentTb = tile.parent && !tile.detached ? this.byId.get(tile.parent.id)! : null;
       const angleExpr = tile.node.attrs.angle ?? '';
-      const angleAnimated = !!tile.parent && !exprIsConstant(angleExpr) && tile.spec.joint !== 'fixed';
+      const angleAnimated = !!parentTb && !exprIsConstant(angleExpr) && tile.spec.joint !== 'fixed';
       const animated = angleAnimated && tile.spec.joint !== 'wheel';
       const startsGroup = !parentTb || tile.spec.joint === 'wheel' || animated;
 
@@ -156,6 +247,11 @@ export class PhysicsWorld {
           .setAngularDamping(tile.spec.wheel ? 0.2 : 0.05)
           .setCcdEnabled(true);
         body = this.world.createRigidBody(rb);
+        const v = opts.velocities?.get(tile.id);
+        if (v) {
+          body.setLinvel({ x: v.lin.x, y: v.lin.y, z: v.lin.z }, true);
+          body.setAngvel({ x: v.ang.x, y: v.ang.y, z: v.ang.z }, true);
+        }
         groupRoot = tile;
       } else {
         body = parentTb!.body;
@@ -234,7 +330,7 @@ export class PhysicsWorld {
 
       if (joint && tile.parent) {
         if (tile.spec.joint === 'wheel') {
-          const power = attr(tile.node, 'power', env, 0);
+          const power = tile.powerless ? 0 : attr(tile.node, 'power', env, 0);
           const brake = attr(tile.node, 'brake', env, 0);
           const parentBody = tb.rim ?? this.byId.get(tile.parent.id)!.body;
           if (tb.rimJoint) {
@@ -259,8 +355,10 @@ export class PhysicsWorld {
         }
       }
 
+      if (tile.type === 'arm') this.updateArm(tb, pose, normal, env);
+
       if (tile.spec.jet) {
-        const power = attr(tile.node, 'power', env, 0);
+        const power = tile.powerless ? 0 : attr(tile.node, 'power', env, 0);
         if (power !== 0) {
           const f = normal.clone().multiplyScalar(power * JET_NEWTON_PER_POWER);
           body.addForceAtPoint({ x: f.x, y: f.y, z: f.z }, { x: pose.position.x, y: pose.position.y, z: pose.position.z }, true);
@@ -286,6 +384,7 @@ export class PhysicsWorld {
   step(): void {
     this.world.step();
     this.tick++;
+    if (this.projectiles.length) this.cullProjectiles();
   }
 }
 

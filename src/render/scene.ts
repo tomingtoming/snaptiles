@@ -204,6 +204,25 @@ export class SceneView {
     }
   }
 
+  private shellPool: THREE.Mesh[] = [];
+  private shellGeo = new THREE.SphereGeometry(0.18, 12, 8);
+  private shellMat = new THREE.MeshStandardMaterial({ color: 0xffc040, emissive: 0xff7000, emissiveIntensity: 1.2 });
+  syncProjectiles(list: { body: { translation(): { x: number; y: number; z: number } } }[]): void {
+    while (this.shellPool.length < list.length) {
+      const m = new THREE.Mesh(this.shellGeo, this.shellMat);
+      this.scene.add(m);
+      this.shellPool.push(m);
+    }
+    this.shellPool.forEach((m, i) => {
+      const p = list[i];
+      m.visible = !!p;
+      if (p) {
+        const t = p.body.translation();
+        m.position.set(t.x, t.y, t.z);
+      }
+    });
+  }
+
   /** segments from _MOVE3D/_LINE3D: x1 y1 z1 x2 y2 z2 r g b */
   setLines3d(buf: number[]): void {
     const n = buf.length / 9;

@@ -83,6 +83,8 @@ export interface TileInstance {
   rimAxis: THREE.Vector3;
   rimAnchor: THREE.Vector3;
   dirAxis: THREE.Vector3;
+  /** the same joint frames expressed in the parent's rest frame (to refresh after motion) */
+  local: { anchor: THREE.Vector3; axis: THREE.Vector3; rimAnchor: THREE.Vector3; rimAxis: THREE.Vector3; dirAxis: THREE.Vector3 } | null;
   color: number | null;
   /** raw color / effect expressions (re-evaluated every frame when not constant) */
   colorExpr: string | null;
@@ -91,6 +93,10 @@ export interface TileInstance {
   mass: number;
   option: number;
   children: TileInstance[];
+  /** cut loose from its parent by _BYE/_SPLIT (becomes the root of its own system) */
+  detached: boolean;
+  /** _BYE: the cut system's power is forced to 0 */
+  powerless: boolean;
 }
 
 export interface Assembly {
@@ -193,6 +199,9 @@ export function assemble(model: RcModel, env: ValEnv): Assembly | null {
       mass: spec.mass * (typeKey === 'weight' ? Math.max(1, Math.min(8, option || 1)) : 1),
       option,
       children: [],
+      detached: false,
+      powerless: false,
+      local: null,
     };
     byChip.set(chipIndex, inst);
     if (spec.wheel) {
@@ -216,6 +225,16 @@ export function assemble(model: RcModel, env: ValEnv): Assembly | null {
         inst.anchor.copy(inst.position);
       }
       inst.dirAxis.copy(DIR_VEC[node.dir]).applyQuaternion(parent.quaternion);
+      const inv = parent.quaternion.clone().invert();
+      const toLocal = (v: THREE.Vector3) => v.clone().sub(parent.position).applyQuaternion(inv);
+      const toLocalDir = (v: THREE.Vector3) => v.clone().applyQuaternion(inv);
+      inst.local = {
+        anchor: toLocal(inst.anchor),
+        axis: toLocalDir(inst.axis),
+        rimAnchor: toLocal(inst.rimAnchor),
+        rimAxis: toLocalDir(inst.rimAxis),
+        dirAxis: toLocalDir(inst.dirAxis),
+      };
       parent.children.push(inst);
     } else if (parent) {
       inst.quaternion.copy(parent.quaternion);
@@ -227,8 +246,19 @@ export function assemble(model: RcModel, env: ValEnv): Assembly | null {
     return inst;
   };
 
-  const roots = [visit(model.body, null)];
+  const roots = (model.bodies.length ? model.bodies : [model.body]).map((b) => visit(b, null));
   return { tiles, roots, byChip, chipCount: chipIndex };
+}
+
+/** Recompute a tile's world-frame joint anchors/axes from its parent's current pose. */
+export function refreshJointFrames(t: TileInstance): void {
+  if (!t.parent || !t.local) return;
+  const p = t.parent;
+  t.anchor.copy(t.local.anchor).applyQuaternion(p.quaternion).add(p.position);
+  t.axis.copy(t.local.axis).applyQuaternion(p.quaternion);
+  t.rimAnchor.copy(t.local.rimAnchor).applyQuaternion(p.quaternion).add(p.position);
+  t.rimAxis.copy(t.local.rimAxis).applyQuaternion(p.quaternion);
+  t.dirAxis.copy(t.local.dirAxis).applyQuaternion(p.quaternion);
 }
 
 /** Lowest point of the assembly (model frame), used to drop it onto the ground. */

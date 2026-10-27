@@ -34,7 +34,9 @@ export interface ChipNode {
 export interface RcModel {
   vals: ValDecl[];
   keys: KeyBinding[];
+  /** first Core (kept for convenience); all Cores are in `bodies` */
   body: ChipNode | null;
+  bodies: ChipNode[];
   script: { lang: 'lua' | 'rc'; source: string } | null;
 }
 
@@ -262,15 +264,20 @@ function parseNode(p: P): ChipNode {
   return node;
 }
 
-function parseBody(inner: string, baseLine: number): ChipNode | null {
+/** A Body may hold several Cores (each its own vehicle / "bit"). */
+function parseBody(inner: string, baseLine: number): ChipNode[] {
   const p = new P(tokenize(inner), baseLine);
-  if (!p.peek()) return null;
-  return parseNode(p);
+  const roots: ChipNode[] = [];
+  while (p.peek()) {
+    if (p.accept(',') || p.accept(';')) continue;
+    roots.push(parseNode(p));
+  }
+  return roots;
 }
 
 export function parseRc(source: string): RcModel {
   const text = source.replace(/\r\n?/g, '\n');
-  const model: RcModel = { vals: [], keys: [], body: null, script: null };
+  const model: RcModel = { vals: [], keys: [], body: null, bodies: [], script: null };
   const blocks = findBlocks(text);
   for (const b of blocks) {
     const name = b.name.toLowerCase();
@@ -286,7 +293,11 @@ export function parseRc(source: string): RcModel {
     const inner = stripComments(b.inner);
     if (name === 'val' || name === 'var') model.vals.push(...parseVal(inner, b.line));
     else if (name === 'key') model.keys.push(...parseKey(inner, b.line));
-    else if (name === 'body') model.body = parseBody(inner, b.line);
+    else if (name === 'body') {
+      const roots = parseBody(inner, b.line);
+      model.bodies.push(...roots);
+      model.body = model.bodies[0] ?? null;
+    }
   }
   return model;
 }

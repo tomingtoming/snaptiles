@@ -77,6 +77,7 @@ export class Simulation {
   reset(): void {
     if (!this.assembly) return;
     for (const v of this.vals.values()) { v.value = v.default; v.touched = false; }
+    this.assembly = assemble(this.model, this.env) ?? this.assembly; // fresh rest poses, nothing detached
     this.physics.build(this.assembly, this.env);
     this.ticks = 0;
     this.callLua('OnReset');
@@ -266,7 +267,7 @@ export class Simulation {
       _M: (n: number) => this.tileOf(n)?.mass ?? 0,
       _FUEL: () => 1_000_000,
       _FUELMAX: () => 1_000_000,
-      _E: () => 0,
+      _E: (n: number) => { const t = this.tileOf(n); return t ? this.physics.armCharge.get(t.id) ?? 0 : 0; },
       _T: (n: number) => (this.tileOf(n) ? 10000 : -1),
       _X: (n: number) => pos(n, 'x'),
       _Y: (n: number) => pos(n, 'y'),
@@ -307,7 +308,9 @@ export class Simulation {
       _TYPE: (n: number) => this.tileOf(n)?.spec.code ?? -1,
       _DIR: (n: number) => { const t = this.tileOf(n); return t?.dir ? DIR_CODE[t.dir] : 0; },
       _PARENT: (n: number) => this.tileOf(n)?.parent?.chipIndex ?? -1,
-      _TOP: () => 0,
+      _TOP: (n: number) => { let t = this.tileOf(n); while (t?.parent && !t.detached) t = t.parent; return t ? t.chipIndex : -1; },
+      _BYE: (n: number) => { const t = this.tileOf(n); if (t) this.physics.detach(t, true); return 0; },
+      _SPLIT: (n: number) => { const t = this.tileOf(n); if (t) this.physics.detach(t, false); return 0; },
       _ANGLE: (n: number) => attrOf(n, 'angle'),
       _POWER: (n: number) => attrOf(n, 'power'),
       _SPRING: (n: number) => attrOf(n, 'spring', 1),
@@ -318,8 +321,6 @@ export class Simulation {
       _EFFECT: () => 0,
       _USER1: (n: number) => attrOf(n, 'user1'),
       _USER2: (n: number) => attrOf(n, 'user2'),
-      _BYE: () => 0,
-      _SPLIT: () => 0,
       _FACE: () => 0,
       _ZOOM: () => 17.19,
       _PLAYERS: () => 1,
