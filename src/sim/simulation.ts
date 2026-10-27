@@ -30,6 +30,12 @@ export class Simulation {
   out: string[] = [];
   scriptError: string | null = null;
   ticks = 0;
+  /** segments drawn by the script this frame: x1 y1 z1 x2 y2 z2 r g b / x1 y1 x2 y2 r g b */
+  lines3d: number[] = [];
+  lines2d: number[] = [];
+  private penColor: [number, number, number] = [1, 1, 1];
+  private pen3 = new THREE.Vector3();
+  private pen2 = [0, 0];
   private keysPrev = new Set<number>();
   private keysNow = new Set<number>();
   private chipNames = new Map<string, number>();
@@ -133,6 +139,9 @@ export class Simulation {
       v.touched = true;
     }
 
+    this.lines3d = [];
+    this.lines2d = [];
+    this.penColor = [1, 1, 1];
     if (this.model.script?.lang === 'lua' && !this.scriptError) {
       this.pushValsToLua();
       const ok = this.lua.frame();
@@ -194,6 +203,7 @@ export class Simulation {
 
   /** Script API shared by Lua and legacy Script. */
   api(): LuaApi {
+    const self = this;
     const key = (n: number) => (this.keysNow.has(n) ? 1 : 0);
     const keydown = (n: number) => (this.keysNow.has(n) && !this.keysPrev.has(n) ? 1 : 0);
     const keyup = (n: number) => (!this.keysNow.has(n) && this.keysPrev.has(n) ? 1 : 0);
@@ -318,6 +328,62 @@ export class Simulation {
       _TODEG: (r: number) => (r * 180) / Math.PI,
       _TORAD: (d: number) => (d * Math.PI) / 180,
       _RND: () => Math.random(),
+      // relative euler angles of chip a as seen from chip b
+      _RX: (a: number, b: number) => relEuler(a, b).x,
+      _RY: (a: number, b: number) => relEuler(a, b).y,
+      _RZ: (a: number, b: number) => relEuler(a, b).z,
+      // drawing
+      _SETCOLOR: (rgb: number) => {
+        const c = Math.max(0, Math.floor(rgb)) & 0xffffff;
+        this.penColor = [((c >> 16) & 255) / 255, ((c >> 8) & 255) / 255, (c & 255) / 255];
+        return 0;
+      },
+      _MOVE3D: (x: number, y: number, z: number) => { this.pen3.set(x, y, z); return 0; },
+      _LINE3D: (x: number, y: number, z: number) => {
+        this.lines3d.push(this.pen3.x, this.pen3.y, this.pen3.z, x, y, z, ...this.penColor);
+        this.pen3.set(x, y, z);
+        return 0;
+      },
+      _MOVE2D: (x: number, y: number) => { this.pen2 = [x, y]; return 0; },
+      _LINE2D: (x: number, y: number) => {
+        this.lines2d.push(this.pen2[0], this.pen2[1], x, y, ...this.penColor);
+        this.pen2 = [x, y];
+        return 0;
+      },
+      // not simulated: network players, CCD camera, objects
+      _PLAYERID: () => 0,
+      _PLAYERCHIPS: () => this.assembly?.chipCount ?? 0,
+      _PLAYERARMS: () => 0,
+      _PLAYERCOLOR: () => 0xffffff,
+      _PLAYERCRUSHES: () => 0,
+      _PLAYERRESETS: () => 0,
+      _PLAYERINITS: () => 0,
+      _PLAYERYFORCES: () => 0,
+      _PLAYERX: () => 0,
+      _PLAYERY: () => 0,
+      _PLAYERZ: () => 0,
+      _PLAYERNAME: () => '',
+      _CCD: () => 0,
+      _RED: () => 0,
+      _GREEN: () => 0,
+      _BLUE: () => 0,
+      _MOBJ: () => 0,
+      _IOBJ: () => 0,
+      _OX: () => 0,
+      _OY: () => -1000000,
+      _OZ: () => 0,
+      _I: () => 0,
+      _LX: () => 0,
+      _LY: () => 0,
+      _LZ: () => 0,
+      _HAT: () => 0,
     };
+    function relEuler(this: void, a: number, b: number): THREE.Euler {
+      const pa = self.poseOf(a);
+      const pb = self.poseOf(b);
+      if (!pa || !pb) return new THREE.Euler();
+      const rel = pb.quaternion.clone().invert().multiply(pa.quaternion);
+      return new THREE.Euler().setFromQuaternion(rel, 'YXZ');
+    }
   }
 }

@@ -194,7 +194,10 @@ class P {
 
 function num(s: string | undefined, d: number): number {
   if (s === undefined) return d;
-  const v = Number(s.replace(/\s+/g, ''));
+  const t = s.replace(/\s+/g, '');
+  const hex = /^#([0-9a-fA-F]{1,8})$/.exec(t); // colors live in Val too: COLOR_1(default=#27AD96)
+  if (hex) return parseInt(hex[1], 16);
+  const v = Number(t);
   return Number.isFinite(v) ? v : d;
 }
 

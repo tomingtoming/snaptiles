@@ -81,6 +81,9 @@ export interface TileInstance {
   axis: THREE.Vector3;
   dirAxis: THREE.Vector3;
   color: number | null;
+  /** raw color / effect expressions (re-evaluated every frame when not constant) */
+  colorExpr: string | null;
+  effectExpr: string | null;
   ghost: boolean;
   mass: number;
   option: number;
@@ -176,6 +179,8 @@ export function assemble(model: RcModel, env: ValEnv): Assembly | null {
       axis: new THREE.Vector3(0, 0, 1),
       dirAxis: new THREE.Vector3(0, 0, -1),
       color: parseColor(node.attrs.color, env),
+      colorExpr: node.attrs.color ?? null,
+      effectExpr: node.attrs.effect ?? null,
       ghost: !!spec.ghostable && option === 1,
       mass: spec.mass * (typeKey === 'weight' ? Math.max(1, Math.min(8, option || 1)) : 1),
       option,

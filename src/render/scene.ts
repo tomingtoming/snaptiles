@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { TILE, TILE_T, type TileInstance } from '../model/assemble';
+import { TILE, TILE_T, type TileInstance, type ValEnv } from '../model/assemble';
+import { evalExpr, exprIsConstant } from '../rc/expr';
 import type { PhysicsWorld } from '../physics/world';
 
 const PALETTE: Record<string, number> = {
@@ -17,19 +18,66 @@ const PALETTE: Record<string, number> = {
   arm: 0xd04040,
 };
 
+interface TileView {
+  tile: TileInstance;
+  mesh: THREE.Mesh;
+  material: THREE.MeshStandardMaterial;
+  dynamicColor: boolean;
+  dynamicAlpha: boolean;
+}
+
+/**
+ * Cowl shapes (option): 0 plate, 3/4 the two right triangles of a tile cut on
+ * its diagonal, 5 a curved plate (drawn flat), 1/2 undocumented (drawn as plates).
+ * Which triangle is 3 and which is 4 is not documented; the choice here is a guess.
+ */
+function cowlGeometry(option: number, cache: Map<number, THREE.BufferGeometry>): THREE.BufferGeometry {
+  const key = option === 3 || option === 4 ? option : 0;
+  let g = cache.get(key);
+  if (g) return g;
+  if (key === 0) {
+    g = new THREE.BoxGeometry(TILE, TILE_T * 0.5, TILE);
+  } else {
+    // right triangle keeping the attached (+Z) edge; the hypotenuse runs toward -Z
+    const h = TILE / 2;
+    const t = TILE_T * 0.25;
+    const ax = key === 3 ? -h : h;
+    const top = [[-h, t, h], [h, t, h], [ax, t, -h]];
+    const bot = top.map(([x, , z]) => [x, -t, z]);
+    const pos: number[] = [];
+    const push = (...v: number[][]) => v.forEach((p) => pos.push(...p));
+    push(top[0], top[1], top[2]);
+    push(bot[2], bot[1], bot[0]);
+    for (let i = 0; i < 3; i++) {
+      const j = (i + 1) % 3;
+      push(top[i], bot[i], top[j]);
+      push(top[j], bot[i], bot[j]);
+    }
+    g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.computeVertexNormals();
+  }
+  cache.set(key, g);
+  return g;
+}
+
 export class SceneView {
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
   camera: THREE.PerspectiveCamera;
-  meshes = new Map<number, THREE.Object3D>();
+  private views = new Map<number, TileView>();
   private plateGeo = new THREE.BoxGeometry(TILE, TILE_T, TILE);
   private wheelGeo = new THREE.CylinderGeometry(TILE / 2, TILE / 2, TILE_T, 24);
-  private materials = new Map<number, THREE.MeshStandardMaterial>();
+  private cowlGeos = new Map<number, THREE.BufferGeometry>();
   private group = new THREE.Group();
+  private lines: THREE.LineSegments;
+  private linesGeo = new THREE.BufferGeometry();
   camYaw = 0.6;
   camPitch = 0.35;
   camDist = 12;
   private camTarget = new THREE.Vector3();
+  private sun: THREE.DirectionalLight;
+  private tmpPose = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
 
   constructor(public canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -40,8 +88,7 @@ export class SceneView {
     this.scene.fog = new THREE.Fog(0xdfe7ee, 60, 220);
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 500);
 
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.9);
-    this.scene.add(hemi);
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.9));
     const sun = new THREE.DirectionalLight(0xffffff, 1.6);
     sun.position.set(20, 40, 10);
     sun.castShadow = true;
@@ -61,21 +108,20 @@ export class SceneView {
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     this.scene.add(ground);
-    const grid = new THREE.GridHelper(1000, 1000, 0x8f9a86, 0xa9b4a0);
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.35;
-    grid.position.y = 0.002;
-    this.scene.add(grid);
-    const grid10 = new THREE.GridHelper(1000, 100, 0x6f7a66, 0x6f7a66);
-    (grid10.material as THREE.Material).transparent = true;
-    (grid10.material as THREE.Material).opacity = 0.35;
-    grid10.position.y = 0.004;
-    this.scene.add(grid10);
+    for (const [div, color] of [[1000, 0x8f9a86], [100, 0x6f7a66]] as const) {
+      const grid = new THREE.GridHelper(1000, div, color, color);
+      (grid.material as THREE.Material).transparent = true;
+      (grid.material as THREE.Material).opacity = 0.35;
+      grid.position.y = div === 1000 ? 0.002 : 0.004;
+      this.scene.add(grid);
+    }
 
+    this.lines = new THREE.LineSegments(this.linesGeo, new THREE.LineBasicMaterial({ vertexColors: true }));
+    this.lines.frustumCulled = false;
+    this.scene.add(this.lines);
     this.scene.add(this.group);
     this.resize();
   }
-  private sun: THREE.DirectionalLight;
 
   resize(): void {
     const w = this.canvas.clientWidth || 1;
@@ -85,46 +131,85 @@ export class SceneView {
     this.camera.updateProjectionMatrix();
   }
 
-  private material(color: number): THREE.MeshStandardMaterial {
-    let m = this.materials.get(color);
-    if (!m) {
-      m = new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.1 });
-      this.materials.set(color, m);
-    }
-    return m;
-  }
-
-  rebuild(tiles: TileInstance[]): void {
+  rebuild(tiles: TileInstance[], env: ValEnv): void {
+    for (const v of this.views.values()) v.material.dispose();
     this.group.clear();
-    this.meshes.clear();
+    this.views.clear();
     for (const t of tiles) {
-      const color = t.color ?? PALETTE[t.type] ?? 0xcccccc;
-      const mesh = new THREE.Mesh(t.spec.wheel ? this.wheelGeo : this.plateGeo, this.material(color));
+      const geo = t.spec.wheel ? this.wheelGeo : t.type === 'cowl' ? cowlGeometry(t.option, this.cowlGeos) : this.plateGeo;
+      const material = new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0.1 });
+      if (t.type === 'cowl') material.side = THREE.DoubleSide;
+      const mesh = new THREE.Mesh(geo, material);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      const obj: THREE.Object3D = mesh;
-      if (t.spec.wheel) {
-        // cylinder axis (Y) is already the tile normal, which is the spin axis
-      } else if (t.ghost || !t.spec.collides) {
-        const mat = this.material(color).clone();
-        mat.transparent = true;
-        mat.opacity = 0.45;
-        mesh.material = mat;
+      const view: TileView = {
+        tile: t,
+        mesh,
+        material,
+        dynamicColor: !!t.colorExpr && !exprIsConstant(t.colorExpr),
+        dynamicAlpha: !!t.effectExpr && !exprIsConstant(t.effectExpr),
+      };
+      this.applyColor(view, env);
+      this.applyAlpha(view, env);
+      if (t.ghost) {
+        material.transparent = true;
+        material.opacity = 0.35;
       }
-      this.group.add(obj);
-      this.meshes.set(t.id, obj);
+      this.group.add(mesh);
+      this.views.set(t.id, view);
     }
   }
 
-  private tmpPose = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
+  private applyColor(v: TileView, env: ValEnv): void {
+    const t = v.tile;
+    let c = t.colorExpr ? evalExpr(t.colorExpr, env) : NaN;
+    if (!Number.isFinite(c) || !t.colorExpr) c = PALETTE[t.type] ?? 0xcccccc;
+    v.material.color.setHex(Math.max(0, Math.min(0xffffff, Math.floor(c))));
+  }
+
+  /** effect=#PQRS on a Cowl: P is transparency (0 opaque … F invisible) */
+  private applyAlpha(v: TileView, env: ValEnv): void {
+    const t = v.tile;
+    if (t.type !== 'cowl' || !t.effectExpr) return;
+    const e = Math.floor(evalExpr(t.effectExpr, env));
+    if (!Number.isFinite(e) || e < 0x1000) return; // fewer than 4 hex digits: P is 0
+    const p = (e >> 12) & 0xf;
+    const opacity = 1 - p / 15;
+    v.material.transparent = opacity < 1;
+    v.material.opacity = opacity;
+  }
+
+  /** re-evaluate colors / transparency that depend on Val variables */
+  updateDynamic(env: ValEnv): void {
+    for (const v of this.views.values()) {
+      if (v.dynamicColor) this.applyColor(v, env);
+      if (v.dynamicAlpha) this.applyAlpha(v, env);
+    }
+  }
+
   sync(world: PhysicsWorld): void {
     for (const tb of world.tiles) {
-      const obj = this.meshes.get(tb.tile.id);
-      if (!obj) continue;
+      const v = this.views.get(tb.tile.id);
+      if (!v) continue;
       const pose = world.pose(tb, this.tmpPose);
-      obj.position.copy(pose.position);
-      obj.quaternion.copy(pose.quaternion);
+      v.mesh.position.copy(pose.position);
+      v.mesh.quaternion.copy(pose.quaternion);
     }
+  }
+
+  /** segments from _MOVE3D/_LINE3D: x1 y1 z1 x2 y2 z2 r g b */
+  setLines3d(buf: number[]): void {
+    const n = buf.length / 9;
+    const pos = new Float32Array(n * 6);
+    const col = new Float32Array(n * 6);
+    for (let i = 0; i < n; i++) {
+      const o = i * 9;
+      pos.set([buf[o], buf[o + 1], buf[o + 2], buf[o + 3], buf[o + 4], buf[o + 5]], i * 6);
+      col.set([buf[o + 6], buf[o + 7], buf[o + 8], buf[o + 6], buf[o + 7], buf[o + 8]], i * 6);
+    }
+    this.linesGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this.linesGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    this.lines.visible = n > 0;
   }
 
   /** chase: ease the orbit yaw toward the model's heading (set by main when not dragging) */
@@ -138,11 +223,7 @@ export class SceneView {
     this.camTarget.lerp(target, smooth);
     const cp = this.camPitch;
     const cy = this.camYaw;
-    const off = new THREE.Vector3(
-      Math.cos(cp) * Math.sin(cy),
-      Math.sin(cp),
-      Math.cos(cp) * Math.cos(cy),
-    ).multiplyScalar(this.camDist);
+    const off = new THREE.Vector3(Math.cos(cp) * Math.sin(cy), Math.sin(cp), Math.cos(cp) * Math.cos(cy)).multiplyScalar(this.camDist);
     const eye = this.camTarget.clone().add(off);
     eye.y = Math.max(eye.y, 0.4);
     this.camera.position.lerp(eye, 0.15);

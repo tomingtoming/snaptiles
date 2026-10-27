@@ -20,6 +20,20 @@ table.getn = function(t) return #t end
 table.setn = function() end
 unpack = table.unpack
 loadstring = load
+-- Lua 5.0 accepted %d with any number; 5.4 insists on an integer representation
+do
+  local fmt = string.format
+  string.format = function(f, ...)
+    local ok, r = pcall(fmt, f, ...)
+    if ok then return r end
+    local n = select('#', ...)
+    local args = { ... }
+    for i = 1, n do
+      if type(args[i]) == 'number' then args[i] = math.floor(args[i] + 0.5) end
+    end
+    return fmt(f, table.unpack(args, 1, n))
+  end
+end
 dofile = nil; loadfile = nil; require = nil; collectgarbage = nil
 `;
 

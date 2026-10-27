@@ -21,6 +21,13 @@ export function evalExpr(src: string, env: Env): number {
     }
     if (c === '-') { i++; return -primary(); }
     if (c === '+') { i++; return primary(); }
+    if (c === '#') {
+      let j = i + 1;
+      while (j < s.length && /[0-9a-fA-F]/.test(s[j])) j++;
+      const v = parseInt(s.slice(i + 1, j) || '0', 16);
+      i = j;
+      return v;
+    }
     if (c === '"' || c === "'") {
       const q = c;
       let j = i + 1;
@@ -70,5 +77,6 @@ export function evalExpr(src: string, env: Env): number {
 }
 
 export function exprIsConstant(src: string): boolean {
-  return !/[A-Za-z_]/.test(src);
+  // a #RRGGBB literal contains letters but is still a constant
+  return !/[A-Za-z_]/.test(src.replace(/#[0-9a-fA-F]+/g, ''));
 }

@@ -31,7 +31,7 @@ async function load(source: string): Promise<void> {
     await next.start();
     sim = next;
     (window as unknown as { __sim: Simulation }).__sim = next; // probe hook for tools/
-    scene.rebuild(next.assembly!.tiles);
+    scene.rebuild(next.assembly!.tiles, next.env);
     scene.camYaw = 0.7;
     buildKeyCaps(next);
     if (next.scriptError) statusEl.textContent = next.scriptError;
@@ -129,6 +129,9 @@ function frame(now: number): void {
     }
     if (n === 4) acc = 0;
     scene.sync(sim.physics);
+    scene.updateDynamic(sim.env);
+    scene.setLines3d(sim.lines3d);
+    drawHud(sim.lines2d);
     if (!dragging && performance.now() - lastDrag > 3000) scene.chaseYaw(sim.coreHeading());
     scene.follow(sim.corePosition());
     updateOverlay(sim);
@@ -142,6 +145,28 @@ function updateOverlay(s: Simulation): void {
   outEl.textContent = s.out.join('\n').replace(/\n+$/, '');
   for (const c of keyCaps) c.el.dataset.down = String(keys.isDown(c.n));
   if (s.scriptError && statusEl.textContent !== s.scriptError) statusEl.textContent = s.scriptError;
+}
+// _MOVE2D/_LINE2D overlay: x spans -1..1 across the width, y is 1 at the top and -1 at the bottom
+const hud = $<HTMLCanvasElement>('hud');
+const hudCtx = hud.getContext('2d')!;
+function drawHud(buf: number[]): void {
+  const w = hud.clientWidth;
+  const h = hud.clientHeight;
+  if (hud.width !== w || hud.height !== h) {
+    hud.width = w;
+    hud.height = h;
+  }
+  hudCtx.clearRect(0, 0, w, h);
+  if (buf.length === 0) return;
+  hudCtx.lineWidth = 1.5;
+  for (let i = 0; i < buf.length; i += 7) {
+    const [x1, y1, x2, y2, r, g, b] = buf.slice(i, i + 7);
+    hudCtx.strokeStyle = `rgb(${r * 255},${g * 255},${b * 255})`;
+    hudCtx.beginPath();
+    hudCtx.moveTo(((x1 + 1) / 2) * w, ((1 - y1) / 2) * h);
+    hudCtx.lineTo(((x2 + 1) / 2) * w, ((1 - y2) / 2) * h);
+    hudCtx.stroke();
+  }
 }
 function fmt(v: number): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(2);
