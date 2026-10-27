@@ -44,6 +44,8 @@ export const JET_NEWTON_PER_POWER = 1 / 6;
 /** plate aero (per 1 m² tile): broadside drag N per (m/s)², and the lift slope N per (m/s)² per sin α.
  *  ½ρ·Cd≈0.7 and ½ρ·2π≈3.8 for air; the original's numbers are unknown. */
 export const AIR_DRAG = 0.7;
+/** isotropic drag per tile: N per (m/s)² per unit coefficient (a guess; 20 chips ≈ 1.8 kN at 30 m/s) */
+export const ISO_DRAG = 0; // 0 = off: it kept tonbo and the plane sample from taking off; kept as an experiment knob
 export const LIFT_SLOPE = 3.8;
 /** which plate aero law to use: 'quad' | 'newton' | 'slope' (probe with window.__tune.aero) */
 export const AERO_MODEL = 'slope';
@@ -399,14 +401,26 @@ export class PhysicsWorld {
         const power = tile.powerless ? 0 : attr(tile.node, 'power', env, 0);
         tb.jetPower = power;
         if (power !== 0) {
-          const f = normal.clone().multiplyScalar(power * JET_NEWTON_PER_POWER);
+          // option 1/2 = balloon (wikiwiki: 1 hydrogen, 2 air): buoyancy straight up, whatever the tilt;
+          // the airship model mounts them at angle -90/0/90 and lifts with 10,000-50,000
+          const balloon = tile.option === 1 || tile.option === 2;
+          const f = balloon
+            ? new THREE.Vector3(0, power * JET_NEWTON_PER_POWER, 0)
+            : normal.clone().multiplyScalar(power * JET_NEWTON_PER_POWER);
           body.addForceAtPoint({ x: f.x, y: f.y, z: f.z }, { x: pose.position.x, y: pose.position.y, z: pose.position.z }, true);
         }
       }
 
       if (tile.spec.drag > 0) {
-        // quadratic drag along the tile normal only (plates slip edge-on) → also the lift model
         const v = this.velocity(tb, pose);
+        // isotropic air resistance per tile (the reference table lists a per-type coefficient:
+        // Chip 1, Weight 1, Arm 0.7, Wheel 0.05, Frame/Jet 0) — caps top speeds
+        const vl = v.length();
+        if (vl > 0.5) {
+          const iso = -ISO_DRAG * tile.spec.drag * vl;
+          body.addForceAtPoint({ x: v.x * iso, y: v.y * iso, z: v.z * iso }, { x: pose.position.x, y: pose.position.y, z: pose.position.z }, true);
+        }
+        // plate normal force (lift at angle of attack, broadside drag)
         const vn = v.dot(normal);
         // Thin plate: normal force rises with the angle of attack (lift slope LIFT_SLOPE per
         // sin α) and saturates at the broadside drag (AIR_DRAG per v²). Edge-on plates feel nothing.
