@@ -40,7 +40,12 @@ export interface PhysicsOptions {
 }
 
 /** power → torque scale for wheels: spec only says "TRQ≈1000" drives a car. */
-export const WHEEL_TORQUE_PER_POWER = 0.1; // N·m per power unit (corpus cars use power 2,000–20,000; 0.25 launched them, 0.02 crawled)
+export const WHEEL_TORQUE_PER_POWER = 0.066; // N·m per power unit (measured: Basic car, 4 wheels, a0 = 4.89 m/s² at power 2500)
+/** motor torque falls linearly with the wheel's spin: T = k·power·(1 − ω/WHEEL_SPIN_FADE)
+ *  (measured on the original 1.5B26: Basic car at power 2500, a/a0 = 0.877 at ω≈22 rad/s, 0.62 at ω≈69;
+ *  no hard speed cap and no measurable air/rolling drag while coasting at 22 m/s) */
+export const WHEEL_SPIN_FADE = 180; // rad/s at which the torque would reach zero
+export const WHEEL_SPIN_INERTIA = 0.3; // kg·m² about every axis of the rotor (guess; the original's wheel-in-air spin-up is being measured)
 /** spec: 6 power = 1 N */
 export const JET_NEWTON_PER_POWER = 1 / 6;
 /** plate aero (per 1 m² tile): broadside drag N per (m/s)², and the lift slope N per (m/s)² per sin α.
@@ -299,9 +304,10 @@ export class PhysicsWorld {
         const rb = R.RigidBodyDesc.dynamic()
           .setTranslation(p.x, p.y, p.z)
           .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w })
-          .setLinearDamping(0.02)
-          .setAngularDamping(tile.spec.wheel ? 0.2 : 0.05)
-          .setCcdEnabled(true);
+          // the original shows no measurable drag coasting at 22 m/s; damping only steals speed
+          .setLinearDamping(0)
+          .setAngularDamping(tile.spec.wheel ? 0 : 0.05)
+          .setCcdEnabled(!(globalThis as unknown as { __tune?: { noCcd?: boolean } }).__tune?.noCcd);
         body = this.world.createRigidBody(rb);
         const v = opts.velocities?.get(tile.id);
         if (v) {
@@ -325,7 +331,12 @@ export class PhysicsWorld {
         const cd = tile.spec.wheel
           ? R.ColliderDesc.cylinder(TILE_T / 2, wheelRadius(tile.option))
           : R.ColliderDesc.cuboid(TILE / 2, TILE_T / 2, TILE / 2);
-        cd.setMass(Math.max(0.1, mass)).setFriction(tile.spec.wheel ? ((globalThis as unknown as { __tune?: { wheelFriction?: number } }).__tune?.wheelFriction ?? WHEEL_FRICTION) : tile.spec.friction).setCollisionGroups(MODEL_GROUP);
+        if (tile.spec.wheel) {
+          // rotor: full mass for translation but a small spin inertia — the original's cars accelerate
+          // as if the wheels had none (Basic car: m·a matches the motor torque / radius)
+          cd.setMassProperties(mass, { x: 0, y: 0, z: 0 }, { x: WHEEL_SPIN_INERTIA, y: WHEEL_SPIN_INERTIA, z: WHEEL_SPIN_INERTIA }, { x: 0, y: 0, z: 0, w: 1 });
+        } else cd.setMass(Math.max(0.1, mass));
+        cd.setFriction(tile.spec.wheel ? ((globalThis as unknown as { __tune?: { wheelFriction?: number } }).__tune?.wheelFriction ?? WHEEL_FRICTION) : tile.spec.friction).setCollisionGroups(MODEL_GROUP);
         cd.setTranslation(relPos.x, relPos.y, relPos.z).setRotation({ x: relQuat.x, y: relQuat.y, z: relQuat.z, w: relQuat.w });
         if (tile.ghost || !tile.spec.collides) cd.setSensor(true);
         this.world.createCollider(cd, body);
@@ -401,13 +412,15 @@ export class PhysicsWorld {
             const a = jointSign('wheel', tile.dir) * (attr(tile.node, 'angle', env, 0) - tb.restAngle) * DEG; // rim fold
             tb.rimJoint.setLimits(a, a);
           }
+          const w = body.angvel();
+          const pw = parentBody.angvel();
+          const rel = (w.x - pw.x) * normal.x + (w.y - pw.y) * normal.y + (w.z - pw.z) * normal.z; // spin about the rim normal
           let torque = power * ((globalThis as unknown as { __tune?: { wheelTorque?: number } }).__tune?.wheelTorque ?? WHEEL_TORQUE_PER_POWER);
-          if (brake > 0) {
-            const w = body.angvel();
-            const pw = parentBody.angvel();
-            const rel = (w.x - pw.x) * normal.x + (w.y - pw.y) * normal.y + (w.z - pw.z) * normal.z;
-            torque -= rel * brake * 2;
+          if (power !== 0) {
+            const along = Math.sign(power) * rel; // spin in the driven direction
+            torque *= Math.max(0, 1 - Math.max(0, along) / WHEEL_SPIN_FADE);
           }
+          if (brake > 0) torque -= rel * brake * 2;
           if (torque !== 0) {
             const t = normal.clone().multiplyScalar(torque);
             body.addTorque({ x: t.x, y: t.y, z: t.z }, true);

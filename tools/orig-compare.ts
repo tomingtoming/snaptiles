@@ -1,5 +1,5 @@
 // Replay the original-exe measurement harness in SnapTiles (headless):
-//   bun tools/orig-compare.ts <model.txt> <out.csv> [--allwheels] [--power=2500] [--on=31] [--off=150] [--frames=330]
+//   bun tools/orig-compare.ts <model.txt> <out.csv> [--allwheels] [--power=2500] [--on=31] [--off=150] [--frames=330] [--tune='{"wheelFriction":1}']
 // Every frame in [on, off] the Val ENGINE is forced to `power` (the harness scenario in the original sets
 // POWER on every wheel; pass --allwheels to give the Basic car's front wheels power=±Engine too).
 // Prints the same columns as the original's log.txt: frame,x,y,z,vx,vy,vz,ex,ey,ez,chips,wheel,wheelpow,wheelwy,wheely
@@ -20,6 +20,8 @@ const POWER = opt('power', 2500);
 const ON = opt('on', 31);
 const OFF = opt('off', 150);
 const FRAMES = opt('frames', 330);
+const tuneArg = args.find((x) => x.startsWith('--tune='));
+if (tuneArg) (globalThis as unknown as { __tune?: unknown }).__tune = { ax: -1, ay: 1, az: 1, w: -1, wLocal: false, ...JSON.parse(tuneArg.slice(7)) }; // same knobs as window.__tune
 
 const buf = readFileSync(file);
 let src = new TextDecoder('utf-8', { fatal: false }).decode(buf);
