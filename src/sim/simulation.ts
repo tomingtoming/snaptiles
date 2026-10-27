@@ -29,8 +29,8 @@ export interface Tune {
 /** Measured against the original 1.5B26 (2026-10-27, tools/orig-compare.ts vs the harness runs):
  *  a chip folded 30° down on N reads _EX +0.52, on E _EZ +0.52; a Rudder(30) on S reads _EY +0.52;
  *  _AX/_AY/_AZ = (−_EX, _EY, −_EZ); _WY of a wheel is its spin about its own normal (local frame)
- *  and the yaw rate has the sign of d_EY/dt. _WZ −1 keeps the jet-balanced corpus bike upright; _WX is unverified. */
-export const TUNE_DEFAULTS: Tune = { ex: -1, ey: -1, ez: -1, ax: 1, ay: -1, az: 1, wx: -1, wy: -1, wz: -1, wLocal: true };
+ *  and the yaw rate has the sign of d_EY/dt. _WZ −1 keeps the jet-balanced corpus bike upright, _WX +1 lets the corpus segway (E = −(_AX + _WX·4 …)) balance. */
+export const TUNE_DEFAULTS: Tune = { ex: -1, ey: -1, ez: -1, ax: 1, ay: -1, az: 1, wx: 1, wy: -1, wz: -1, wLocal: true };
 
 export interface ValState {
   name: string;

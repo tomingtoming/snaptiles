@@ -50,6 +50,8 @@ export const WHEEL_TORQUE_PER_POWER = 0.13; // N·m per power unit (measured: Ba
  *  (measured on the original 1.5B26: Basic car at power 2500, a/a0 = 0.877 at ω≈22 rad/s, 0.62 at ω≈69;
  *  no hard speed cap and no measurable air/rolling drag while coasting at 22 m/s) */
 export const WHEEL_SPIN_FADE = 180; // rad/s at which the torque would reach zero
+/** rapier velocity-solver iterations per step (joint chains sag less with more) */
+export const SOLVER_ITERATIONS = 16; // 8 let the 3-wheeler's joint chain sag 0.4 m under its own weight; 32 settles it at the original's height
 /** lateral grip: fraction of the sideways contact velocity removed per step (1 = dead stop) */
 export const TYRE_LATERAL_GAIN = 0.25;
 /** the tyre still grips this far above the ground (the unsprung front lifts a few cm under power) */
@@ -163,7 +165,9 @@ export class PhysicsWorld {
   constructor(private R: typeof RAPIER, opts: PhysicsOptions = {}) {
     this.world = new R.World({ x: 0, y: opts.gravity ?? -9.8, z: 0 });
     this.world.timestep = this.dt;
-    this.world.numSolverIterations = 8;
+    const tune = (globalThis as unknown as { __tune?: { solverIterations?: number; pgsIterations?: number } }).__tune;
+    this.world.numSolverIterations = tune?.solverIterations ?? SOLVER_ITERATIONS;
+    if (tune?.pgsIterations) this.world.integrationParameters.numInternalPgsIterations = tune.pgsIterations;
     const groundDesc = R.ColliderDesc.cuboid(2000, 1, 2000).setTranslation(0, -1, 0).setFriction(1.0).setCollisionGroups(GROUND_GROUP);
     this.world.createCollider(groundDesc);
     const noCourse = (globalThis as unknown as { __tune?: { noCourse?: boolean } }).__tune?.noCourse ?? false; // bare ground for measurements
@@ -515,6 +519,7 @@ export class PhysicsWorld {
             ? new THREE.Vector3(0, power * JET_NEWTON_PER_POWER, 0)
             : normal.clone().multiplyScalar(power * JET_NEWTON_PER_POWER);
           body.addForceAtPoint({ x: f.x, y: f.y, z: f.z }, { x: pose.position.x, y: pose.position.y, z: pose.position.z }, true);
+          if ((globalThis as unknown as { __tune?: { debugJets?: boolean } }).__tune?.debugJets) console.log('jet', tile.chipIndex, 'power', power.toFixed(0), 'normal', normal.toArray().map((x) => x.toFixed(2)).join(','), 'F', f.toArray().map((x) => x.toFixed(0)).join(','), 'y', pose.position.y.toFixed(2));
         }
       }
 

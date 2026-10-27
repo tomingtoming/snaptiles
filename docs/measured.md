@@ -30,7 +30,10 @@ columns. Raw logs: `D:\snaptiles-models\quarantine\original\runs\*.csv` (not in 
 | `_EY` | +0.52 for a Rudder(30) on the S side, whose tile swings toward **W**; the nose turning toward W gives a falling `_EY` | trimrudder30, turn20 |
 | `_AX/_AY/_AZ` | = (−`_EX`, `_EY`, −`_EZ`) | every log |
 | `_VX/_VY/_VZ` | **model-local** velocity (world drift of a slightly yawed car shows in x only in dx/dt, not in `_VX`) | turn_basic |
-| `_WX/_WY/_WZ` | model-local angular velocity; the yaw rate `_WY` has the sign of d`_EY`/dt. `_WX`/`_WZ` signs not yet measured | turn20 |
+| `_WX/_WY/_WZ` | model-local angular velocity; the yaw rate `_WY` has the sign of d`_EY`/dt. `_WX` = +ω_x and `_WZ` = −ω_z (three.js local frame): the corpus segway (`E = −(_AX + _WX·4 …)`) balances only with `_WX` +, the jet-balanced bike2 (`_AZ·8 − _WZ/30·6`) only with `_WZ` − | turn20, segway, bike2 |
+| Jet | thrust **power / 6 N along +normal** (the 3-wheeler's script levitates with `9.82·6·_WEIGHT()`; the plane sample at 35000 accelerates at 10 m/s² with no measurable drag up to 53 m/s) | plane_full, jet_flat_val |
+| attribute evaluation | a literal `power=5000` on a Jet produced no thrust; `power=Engine` with a Val default did. Attributes bound to a Val are re-evaluated every frame (so `_SET` on them is lost) | jetc_* vs jet_*_val runs |
+| settling | the 3-wheeler rests with its core 0.65 m above ground; SnapTiles needed 16 rapier solver iterations (8 let the chain of six servo joints sag 0.4 m and the belly plate touched the ground) | wheel3 rest dump, lowest-corner.ts |
 | axes | W is **+x**, N is −z, y up in the original (SnapTiles keeps W = −x, i.e. a mirrored x; the Euler readouts above are matched numerically, not by mirroring) | rest dumps |
 | Trim / Rudder signs | consistent with `JOINT_SIGN` (+1 / −1) | trimrudder30 positions |
 | arrow keys | 0 ↑ 1 ↓ 2 ← 3 → (then Z X C A S D V B F G Q W E) | bike (0 engine, 1 brake), tonbo, zrobo |
@@ -45,7 +48,7 @@ columns. Raw logs: `D:\snaptiles-models\quarantine\original\runs\*.csv` (not in 
 
 `TILE` 0.6, `TILE_T` 0.03, `WHEEL_RADIUS0` 0.3 with ×1.5 / ×2, `WHEEL_TORQUE_PER_POWER` 0.13,
 `WHEEL_SPIN_FADE` 180, no linear/angular damping, contact-force tyres, `TUNE_DEFAULTS`
-(ex −1, ey −1, ez −1, ax +1, ay −1, az +1, wy −1, local frame).
+(ex −1, ey −1, ez −1, ax +1, ay −1, az +1, wx +1, wy −1, wz −1, local frame), `SOLVER_ITERATIONS` 16.
 
 ## Wheel model (implemented 2026-10-27 night, `driveWheel()` in `world.ts`)
 
@@ -64,9 +67,9 @@ the ground force; forces on a folding rim go to the chassis the rim hangs from) 
 | 149 | 27.13 | 26.61 | 57.9 | 58.9 |
 | 199 (coasting) | 27.22 | 26.84 | 103.4 | 103.6 |
 
-Community models after the rewrite: bike, bike2 (jet-balanced), segway (self-balancing with `_AX`
-as measured) and car1 ride; corpus 94/95 load. The jet-levitated 3-wheeler sits on a plate corner
-and does not move — jets are being measured next.
+Community models after the rewrite (bare ground, ↑ held 4 s): bike 62 km/h, bike2 (jet-balanced)
+80 km/h, segway balances at 49 km/h, car1 93 km/h, the 3-wheeler 34 km/h; corpus 94/95 load.
+The walker sample's crawl gait slips with the stiffer solver (test threshold relaxed to 0.2 m).
 
 With the Rudder fixed at 20° and power 1000 both cars drive a circle of radius ≈ 5 m toward the E
 side, one lap in ≈ 150 frames, `_EY` falling. A frictionless *cylinder* tyre instead of the sphere
@@ -91,7 +94,7 @@ acceleration, `_WY` = v/r). Hence the contact-force wheel above.
 | spring<1 joints | motor 4000·spring, ±8° travel | `SPRING_*` |
 | Arm shell | 80 m/s, 2 kg, 4 s | `ARM_*` |
 | cowl option 5 / 1 / 2 | bulging ribbon / plate / plate | `scene.ts` |
-| `_WX`, `_WZ` signs, `_T`, `_FUEL`, network, CCD | unverified / stubs | `simulation.ts` |
+| `_T`, `_FUEL`, network, CCD | stubs | `simulation.ts` |
 
 ## Known failures
 

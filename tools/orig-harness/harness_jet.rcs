@@ -1,0 +1,61 @@
+-- SnapTiles measurement harness v3: every Wheel/RLW gets POWER +-2500 (by side) during frames 31..150,
+-- rest geometry of all chips at frame 30 -> geom.txt, per-frame core state -> log.txt (written once at frame 330)
+n=0
+buf=""
+wrote=-9
+lasterr="none"
+function OnInit()
+	n=0
+	buf="frame,x,y,z,vx,vy,vz,ex,ey,ez,chips,wheel,wheelpow,wheelwy,wheely\n"
+end
+
+function geom()
+	local g="chip,type,dir,parent,x,y,z,ex,ey,ez\n"
+	for c=0,_CHIPS()-1 do
+		g=g..c..",".._TYPE(c)..",".._GET(c,"DIR")..",".._GET(c,"PARENT")..","..
+			_X(c)..",".._Y(c)..",".._Z(c)..",".._EX(c)..",".._EY(c)..",".._EZ(c).."\n"
+	end
+	local h=_FOPEN("geom.txt","w")
+	if h>=0 then _FPUTS(h,g) _FCLOSE(h) end
+end
+
+function step()
+	local pw=0
+	local wy=0
+	local wheel=-1
+	for c=0,_CHIPS()-1 do
+		if _TYPE(c)==7 then
+			local p=0
+			if n>30 and n<=150 then
+				p=2500
+			end
+			_SET(c,"POWER",p)
+			if wheel<0 then wheel=c end
+		end
+	end
+	local wref=0
+	if wheel>=0 then pw=_GET(wheel,"POWER") wy=_WY(wheel) wref=wheel end
+	if n==30 then geom() end
+	if n<=330 then
+		buf=buf..n..","..
+			_X(0)..",".._Y(0)..",".._Z(0)..","..
+			_VX(0)..",".._VY(0)..",".._VZ(0)..","..
+			_EX(0)..",".._EY(0)..",".._EZ(0)..","..
+			_CHIPS()..","..wheel..","..pw..","..wy..",".._Y(wref).."\n"
+	end
+	if n==330 then
+		local h=_FOPEN("log.txt","w")
+		if h>=0 then _FPUTS(h,buf) _FCLOSE(h) wrote=h else wrote=-1 end
+	end
+end
+
+function OnFrame()
+	n=n+1
+	local ok,err=pcall(step)
+	if not ok then lasterr=tostring(err) end
+	out(0,"frame ",n," wrote ",wrote)
+	out(1,"err ",lasterr)
+end
+
+function OnReset()
+end

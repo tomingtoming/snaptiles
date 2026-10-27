@@ -20,6 +20,7 @@ const POWER = opt('power', 2500);
 const ON = opt('on', 31);
 const OFF = opt('off', 150);
 const FRAMES = opt('frames', 330);
+const GEOM_AT = opt('geomAt', 30);
 const tuneArg = args.find((x) => x.startsWith('--tune='));
 if (tuneArg) (globalThis as unknown as { __tune?: unknown }).__tune = JSON.parse(tuneArg.slice(7)); // same knobs as window.__tune (merged over TUNE_DEFAULTS)
 
@@ -56,7 +57,7 @@ for (let n = 1; n <= FRAMES; n++) {
   engine.default = p;
   engine.value = p;
   sim.step();
-  if (n === 30) {
+  if (n === GEOM_AT) {
     const g = geomDump();
     writeFileSync(outFile.replace(/\.csv$/, '') + '.geom.csv', g);
     console.log(g);
