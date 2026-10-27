@@ -41,6 +41,14 @@ Lua  { function OnFrame() out(0, "x", _X(0)) end }
 - `Lua` (or the legacy one-statement-per-line `Script`) runs every frame:
   `OnInit`, `OnReset`, `OnFrame` (or `main`). Val variables are globals.
 
+Conventions that the public docs do not state were measured against community
+models (see `tools/foldsign.ts`, `tools/tune-probe.mjs`, `tools/drive-probe.mjs`):
+a positive fold `angle` folds the child down, `Rudder` turns the opposite way
+of a right-hand rotation about the parent normal, `_AX` reports pitch with the
+opposite sign of a right-hand rotation about +X, and `_WX/_WY/_WZ` are world
+frame angular velocity with the sign flipped. Scripts run at 30 fps with two
+physics substeps per frame. Wheel `power` maps to torque at 0.1 N·m per unit.
+
 Details and what is still unverified against the original: `docs/spec/`.
 
 ## Tests

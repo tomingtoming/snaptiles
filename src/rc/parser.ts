@@ -106,6 +106,14 @@ function tokenize(src: string): Tok[] {
       i = j + 1;
       continue;
     }
+    if (c === '#') {
+      // #RRGGBB colour literal: keep it as one token so no space is inserted after '#'
+      let j = i + 1;
+      while (j < src.length && /[0-9a-fA-F]/.test(src[j])) j++;
+      toks.push({ t: 'num', v: src.slice(i, j), line });
+      i = j;
+      continue;
+    }
     toks.push({ t: 'sym', v: c, line });
     i++;
   }

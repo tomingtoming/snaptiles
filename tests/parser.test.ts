@@ -56,7 +56,8 @@ describe('parseRc', () => {
     expect(frame).toMatchObject({ type: 'Frame', dir: 'N' });
     expect(frame.children[0].attrs.angle).toBe('HANDLE');
     expect(frame.children[1].attrs.angle).toBe('- HANDLE');
-    expect(frame.children[0].children[0].attrs.color).toBe('# ff0000');
+    expect(frame.children[0].children[0].attrs.color).toBe('#ff0000');
+    expect(evalExpr(frame.children[0].children[0].attrs.color, () => undefined)).toBe(0xff0000);
     expect(m.script?.lang).toBe('lua');
     expect(m.script?.source).toContain('print("go")');
     expect(m.script?.source).toContain('{ a = 1 }');
