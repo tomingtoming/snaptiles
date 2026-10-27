@@ -246,8 +246,9 @@ function parseNode(p: P): ChipNode {
   const line = p.line();
   let dir: ChipNode['dir'] = null;
   let name = p.ident();
-  if (DIRS.has(name) && p.accept(':')) {
-    dir = name as ChipNode['dir'];
+  if (DIRS.has(name.toUpperCase()) && p.peek()?.v === ':') {
+    p.accept(':');
+    dir = name.toUpperCase() as ChipNode['dir'];
     name = p.ident();
   }
   const attrs = p.peek()?.v === '(' ? p.args() : {};

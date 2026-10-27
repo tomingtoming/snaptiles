@@ -15,6 +15,17 @@ export type LuaApi = Record<string, (...args: number[]) => number | string | und
 const COMPAT = `
 math.mod = math.fmod
 math.pow = function(a, b) return a ^ b end
+math.atan2 = function(y, x) return math.atan(y, x) end
+math.log10 = function(x) return math.log(x, 10) end
+math.ldexp = function(m, e) return m * 2 ^ e end
+math.frexp = function(x)
+  if x == 0 then return 0, 0 end
+  local e = math.floor(math.log(math.abs(x), 2)) + 1
+  return x / 2 ^ e, e
+end
+math.cosh = function(x) return (math.exp(x) + math.exp(-x)) / 2 end
+math.sinh = function(x) return (math.exp(x) - math.exp(-x)) / 2 end
+math.tanh = function(x) local a, b = math.exp(x), math.exp(-x) return (a - b) / (a + b) end
 string.gfind = string.gmatch
 table.getn = function(t) return #t end
 table.setn = function() end
@@ -65,7 +76,8 @@ export class ScriptRunner {
       await lua.doString(COMPAT);
       if (prelude) await lua.doString(prelude);
       this.armBudget();
-      await lua.doString(source);
+      // full-width spaces (U+3000) appear as indentation in Shift-JIS era scripts
+      await lua.doString(source.replace(/　/g, ' '));
       this.disarmBudget();
       const g = lua.global;
       const isFn = (name: string) => {
