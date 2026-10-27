@@ -25,6 +25,14 @@ for (const f of files) {
     return { x: p.position.x, y: p.position.y, z: p.position.z, upY: +upY.toFixed(2), kmh: +(v.length() * 3.6).toFixed(1), err: s.scriptError ?? '' };
   });
   for (const c of codes.split('+')) await page.keyboard.up(c);
+  if (process.env.TAIL) {
+    await page.waitForTimeout(Number(process.env.TAIL));
+    const r2 = await page.evaluate(() => {
+      const s = window.__sim; const tb = s.physics.tiles[0]; const p = s.physics.pose(tb); const q = p.quaternion;
+      return { upY: +(1 - 2 * (q.x * q.x + q.z * q.z)).toFixed(2), y: p.position.y, kmh: +(s.physics.velocity(tb, p).length() * 3.6).toFixed(1) };
+    });
+    r.upY = r2.upY; r.y = r2.y; r.kmh = r2.kmh;
+  }
   const dist = Math.hypot(r.x - before[0], r.z - before[2]).toFixed(1);
   console.log(`${r.upY < 0.5 ? 'FLIP' : 'ok  '} ${f.split(/[\/]/).slice(-2).join('/')} dist=${dist} kmh=${r.kmh} upY=${r.upY} y=${r.y.toFixed(2)} ${r.err.slice(0, 60)}`);
 }
