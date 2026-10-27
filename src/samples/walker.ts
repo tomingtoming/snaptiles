@@ -45,8 +45,8 @@ Lua
     local speed = GO + math.abs(TURN) * 0.6
     if math.abs(speed) < 0.05 then return end
     phase = (phase + 0.015 * speed) % 1
-    local l = 1 - TURN * 0.8   -- turning: shorten the stride on the inside
-    local r = 1 + TURN * 0.8
+    local l = 1 + TURN * 0.8   -- turning right (TURN>0): the right legs take shorter strides
+    local r = 1 - TURN * 0.8
     local h, k
     h, k = leg((phase + 0.00) % 1) FL_H, FL_K = h * l, k
     h, k = leg((phase + 0.50) % 1) FR_H, FR_K = h * r, k
