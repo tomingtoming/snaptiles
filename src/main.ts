@@ -100,6 +100,14 @@ sourceEl.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     e.preventDefault();
     void loadAndShare(sourceEl.value);
+    return;
+  }
+  if (e.key === 'Tab') {
+    // keep Tab in the editor (model files are tab-indented)
+    e.preventDefault();
+    const { selectionStart: a, selectionEnd: b, value } = sourceEl;
+    sourceEl.value = value.slice(0, a) + '	' + value.slice(b);
+    sourceEl.selectionStart = sourceEl.selectionEnd = a + 1;
   }
 });
 window.addEventListener('keydown', (e) => {
