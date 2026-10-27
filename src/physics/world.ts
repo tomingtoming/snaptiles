@@ -45,6 +45,8 @@ export interface TileBody {
   /** the tyre collider (wheels) and the smoothed normal force it measured in the last steps */
   collider: import('@dimforge/rapier3d-compat').Collider | null;
   contactForce: number;
+  /** wheels: the tyre is sliding against the ground (drive or brake beyond the grip), spin then integrates */
+  slipping: boolean;
   /** revolute axis in the parent body's local frame (for measuring the current joint angle) */
   jointAxisLocal: THREE.Vector3 | null;
   jointAnchorLocal: THREE.Vector3 | null;
@@ -75,6 +77,14 @@ export const TYRE_FRICTION_CIRCLE = true;
 export const TYRE_LATERAL_MU = 1.2;
 /** which force wins inside the ellipse when both saturate (see driveWheel) */
 export const TYRE_LATERAL_FIRST = false;
+/** wheels slide and spin up when the motor exceeds the grip (measured: powered wheels at 135-155 rad/s at power
+ *  5000 while rolling would be 25-100, 315-390 at 10000); false: kinematic spin v/r with a capped force */
+export const WHEEL_SPIN_DYNAMICS = true;
+/** fade zero point per unit of power above 2500 (rad/s per power): the sliding-wheel equilibria 135 rad/s at
+ *  5000 and 376 at 10000 both fit ω0 = power / 20.6 with no extra spin drag */
+export const WHEEL_SPIN_PER_POWER = 1 / 20.6;
+/** spin drag on a sliding wheel (N·m·s); 0 once the fade zero point scales with power */
+export const WHEEL_SPIN_DRAG = 0;
 /** the tyre still grips this far above the ground (the unsprung front lifts a few cm under power) */
 export const TYRE_CONTACT_MARGIN = 0.1;
 /** load the tyre forces may transmit: μ × (model weight / number of wheels) */
@@ -424,7 +434,7 @@ export class PhysicsWorld {
         }
       }
       const restAngle = angleAnimated ? attr(tile.node, 'angle', env, 0) : 0;
-      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0, servoAngle: 0, spin: 0, spinAngle: 0, contactPoint: null, load: 0, collider: null, contactForce: 0, jointAxisLocal, jointAnchorLocal };
+      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0, servoAngle: 0, spin: 0, spinAngle: 0, contactPoint: null, load: 0, collider: null, contactForce: 0, slipping: false, jointAxisLocal, jointAnchorLocal };
       tb.collider = tyreColliders.get(tile.id) ?? null;
       this.tiles.push(tb);
       this.byId.set(tile.id, tb);
@@ -580,24 +590,51 @@ export class PhysicsWorld {
         const vP = new THREE.Vector3(lv.x, lv.y, lv.z).add(new THREE.Vector3(av.x, av.y, av.z).cross(P.clone().sub(new THREE.Vector3(c.x, c.y, c.z))));
         const vf = vP.dot(f);
         const vl = vP.dot(l);
-        tb.spin = vf / r;
         const k = (globalThis as unknown as { __tune?: { wheelTorque?: number } }).__tune?.wheelTorque ?? WHEEL_TORQUE_PER_POWER;
         const wheels = this.assembly ? this.assembly.tiles.filter((t) => t.spec.wheel).length : 1;
         tb.contactPoint = P;
         const load = (((globalThis as unknown as { __tune?: { tyreStaticLoad?: boolean } }).__tune?.tyreStaticLoad ?? TYRE_STATIC_LOAD) && tb.load > 0 ? tb.load : (this.totalMass * 9.8) / Math.max(1, wheels)) * TYRE_LOAD_SHARE;
-        let Ff = (power * k) / r;
-        if (power !== 0) Ff *= Math.max(0, 1 - Math.max(0, Math.sign(power) * tb.spin) / WHEEL_SPIN_FADE);
+        // motor torque: k·power·(1 − spin/ω0). Measured: at power 1000 and 2500 the push fades linearly to zero at
+        // 180 rad/s; a sliding wheel at power 5000/10000 settles near 135/375 rad/s against ~1030 N of ground
+        // force, which only fits if the fade's zero point grows with power above ~3700 (ω0 = power/20.6)
+        const w0 = Math.max(WHEEL_SPIN_FADE, Math.abs(power) * WHEEL_SPIN_PER_POWER);
+        let tau = power !== 0 ? power * k * (1 - (Math.sign(power) * tb.spin) / w0) : 0;
         if (brake > 0) {
           // measured: a 530 kg car with brake=10 on four wheels sheds 2.2 m/s² (0.22 g), brake=50 7.7 m/s²
           // (0.78 g) at any speed — Coulomb, ≈0.022 g per brake unit, saturating near 0.8 g
           const frac = Math.min(BRAKE_G_PER_UNIT * brake, BRAKE_G_MAX);
           const ramp = Math.min(1, Math.abs(vf) / 0.5); // no chatter at rest
-          Ff -= Math.sign(vf) * frac * load * ramp;
+          tau -= Math.sign(vf) * frac * load * ramp * r;
         }
-
         const mu = (globalThis as unknown as { __tune?: { wheelFriction?: number } }).__tune?.wheelFriction ?? WHEEL_FRICTION;
         const limit = mu * load;
-        Ff = Math.max(-limit, Math.min(limit, Ff));
+        const wheelSpin = (globalThis as unknown as { __tune?: { wheelSpin?: boolean } }).__tune?.wheelSpin ?? WHEEL_SPIN_DYNAMICS;
+        let Ff = tau / r;
+        if (!wheelSpin) {
+          tb.spin = vf / r;
+          Ff = Math.max(-limit, Math.min(limit, Ff));
+        } else {
+          // rolling: the ground force is the motor's, the spin follows the road. Sliding (the motor asks for more
+          // than the grip): kinetic friction at the grip limit against the slip, and the wheel spins up with its
+          // own inertia ½mr² until motor torque, ground reaction and a spin drag balance (measured 135/375 rad/s)
+          const slip = tb.spin * r - vf;
+          if (!tb.slipping && Math.abs(Ff) <= limit) {
+            tb.spin = vf / r;
+          } else {
+            if (!tb.slipping) tb.slipping = true;
+            const dir = Math.abs(slip) > 0.1 ? Math.sign(slip) : Math.sign(Ff);
+            Ff = dir * limit;
+            const I = 0.5 * tile.mass * r * r;
+            const spinNext = tb.spin + (this.dt * (tau - Ff * r - WHEEL_SPIN_DRAG * tb.spin)) / I;
+            const slipNext = spinNext * r - vf;
+            if ((Math.abs(slip) > 0.1 && slip * slipNext < 0) || (Math.abs(slipNext) < 0.05 && Math.abs(tau / r) <= limit)) {
+              // the slip closed: back to rolling
+              tb.slipping = false;
+              tb.spin = vf / r;
+              Ff = Math.max(-limit, Math.min(limit, tau / r));
+            } else tb.spin = spinNext;
+          }
+        }
         const lateralGain = (globalThis as unknown as { __tune?: { tyreLateral?: number } }).__tune?.tyreLateral ?? TYRE_LATERAL_GAIN;
         let Fl = (-lateralGain * vl * (load / 9.8)) / this.dt;
         // friction circle, drive first (measured on the original, steered car at steer 10/20 deg: the lateral

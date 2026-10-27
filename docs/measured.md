@@ -20,8 +20,9 @@ columns. Raw logs: `D:\snaptiles-models\quarantine\original\runs\*.csv` (not in 
 | chip numbering | a Wheel takes two numbers: first `_TYPE` 3 (hub, does not spin), second `_TYPE` 4 (spins) | rest dump |
 | wheel radius | option 0 **0.30 m**, option 1 **0.45**, option 2 **0.60**; the wheel's mass does not change with option (4 wheels + core + 2 chips = 392.27 kg for option 0, 1 and 2) | v / `_WY(wheel)` = 0.300 / 0.455 / 0.611 while rolling; wheelmass_* HUD |
 | wheel drive | force ∝ power, independent of radius: torque-equivalent **0.13 N·m per power unit** (Basic with all four wheels at power 2500: a₀ = 8.5 m/s²; linear in power from 500 to 2500) | power sweep 500…2500 (two front wheels), basic_nopower (four) |
-| drive fade | the push falls linearly with wheel spin: a/a₀ = 0.877 at ω≈22 rad/s, 0.62 at ω≈69 → zero at ≈ **180 rad/s** | 180-frame run to 22 m/s |
+| drive fade | the push falls linearly with wheel spin: a/a₀ = 0.877 at ω≈22 rad/s, 0.62 at ω≈69 → zero at ≈ **180 rad/s** at power 1000 and 2500. Above that the zero point grows with power: a **sliding** wheel settles at 135 rad/s (power 5000) and 376 (10000) against ~1030 N of ground force, which fits τ = 0.13·p·(1 − ω/ω0) with ω0 = p/20.6 (243, 486) | 180-frame run to 22 m/s; spin_p5000/p10000 |
 | drag | **none measurable** coasting at 22 m/s (Δv = 0.02 m/s over 1 s) | turn_basic frames 210–240 |
+| wheel spin | **powered wheels slide and spin up**: at power 5000 the powered wheels read `_WY` 90→135 rad/s within 3 s while rolling would be 10→70; at 10000 240→376; the unpowered wheels read v/r. With the fade above, a wheel inertia of ½mr² (3.6 kg·m²) and no extra drag reproduce 53→128 and 171→370 in SnapTiles (`WHEEL_SPIN_DYNAMICS`). At power 20000 the car wheelies and lands on its back with the wheels spinning past 1200 rad/s | spin_p2500…20000 (`harness_wheels.rcs`) |
 | wheel in the air | a powered wheel folded up into the air does **not** spin up (`_WY` stays 0) | wheel_up at power 2500 and 1000 |
 | `_WY(wheel)` while rolling | = v / r exactly | all drives |
 | fold sign | positive `angle` folds **down** on all four sides (`FOLD_SIGN` all +1) | fold30: all four 30° chips sit 0.15 m lower |
@@ -63,8 +64,11 @@ columns. Raw logs: `D:\snaptiles-models\quarantine\original\runs\*.csv` (not in 
 ## Wheel model (implemented 2026-10-27 night, `driveWheel()` in `world.ts`)
 
 The tyre is a frictionless sphere that only carries load. Each step a ray from the hub, down within
-the wheel plane, finds the ground; the push is power × 0.13 / r along the rolling direction (fading
-to zero at a kinematic spin v/r of 180 rad/s), the brake damps the rolling speed, sideways slip is
+the wheel plane, finds the ground; the motor torque is power × 0.13 × (1 − spin/ω0) with ω0 = max(180,
+power/20.6) rad/s. While the ground can take the motor's force the wheel rolls (spin = v/r); when the
+motor asks for more than the grip the tyre slides at the grip limit and the spin integrates with the
+wheel's own inertia until motor torque and ground reaction balance (`WHEEL_SPIN_DYNAMICS`, measured
+spin equilibria 135/376 rad/s at power 5000/10000). The brake is a Coulomb torque, sideways slip is
 damped (`TYRE_LATERAL_GAIN`) — all applied at the contact patch (a segway needs the pitch moment of
 the ground force; forces on a folding rim go to the chassis the rim hangs from). The drive/brake force
 is limited to 1.1 × the wheel's load and the lateral force to 1.2 × load, sharing a friction ellipse
@@ -116,6 +120,7 @@ acceleration, `_WY` = v/r). Hence the contact-force wheel above.
 | gravity | 9.8 | `world.ts` |
 | plate aero at 60–90° | the original stalls and oscillates (drag far above v²·sin²); SnapTiles rolls on at 4–7 m/s | `AERO_K2/AERO_P2` |
 | Arm shell | 80 m/s, 2 kg, 4 s | `ARM_*` |
+| fade of a **rolling** wheel above power 3700 | the ω0 = power/20.6 zero point is fitted on sliding wheels; a rolling wheel at high power is assumed to follow the same torque law (the original's power-5000 car still accelerated at 4.1 m/s² at 29.6 m/s, consistent with it). Corpus car1 now reaches 230 km/h | `WHEEL_SPIN_PER_POWER` |
 | friction-ellipse priority at high drive | the original keeps 0.4–0.9 g of lateral acceleration while its powered axle is saturated at 25–35 m/s; drive-first gives 0.2–0.7 (right trend, low early). At power 10000 the original is also 12% slower in a straight line than at 5000 (wheelspin?), SnapTiles is not | `TYRE_LATERAL_FIRST` |
 | cowl option 5 / 1 / 2 | bulging ribbon / plate / plate | `scene.ts` |
 | `_T`, `_FUEL`, network, CCD | stubs | `simulation.ts` |
