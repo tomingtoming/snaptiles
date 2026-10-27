@@ -35,6 +35,8 @@ columns. Raw logs: `D:\snaptiles-models\quarantine\original\runs\*.csv` (not in 
 | attribute evaluation | a literal `power=5000` on a Jet produced no thrust; `power=Engine` with a Val default did. Attributes bound to a Val are re-evaluated every frame (so `_SET` on them is lost) | jetc_* vs jet_*_val runs |
 | servo | a commanded joint angle is applied **within one frame** (Rudder: 60° one frame after the Val changes), **without momentum**: snapping a Frame holding two Weights 45° pitches the light core 31° and the arm −14° (inertia-weighted split about the hinge), the load then swings from rest and the model settles with the core at 45° | servo_rudder, servo_hinge_load |
 | joint stiffness | rigid: a Frame(spring=0.5) holding a 4× Weight at 1.2 m does not sag; spring=0.1 sags 0.1° | sag_arm, sag_arm_spring05/01 |
+| plate aero | normal force ≈ **3 N/(m/s)² · v² · sin^1.3(α)** per chip: flat plates feel nothing to 40 m/s (a 3-plate sled keeps accelerating at 6.5 m/s²), a 2-chip plate at 30° costs ≈1.2 N/(m/s)² per chip, at 60° ≈3.9, a flat sled lifts off at 40 m/s with 9° of pitch, a plate at 45° stalls a 1000 N sled at 10 m/s. The 90° sled stalled at 6 m/s (≈30 per chip) — far steeper than the law, but that run was dragging the ground | aero_* and sled_* runs |
+| sliding friction | a chip model pushed by 1000 N accelerates at 6.6 m/s² (8.9 without friction): μ ≈ 0.23 for Chip; Frame/Weight keep the documented ordering | aero_flat, aero_tilt45 |
 | settling | the 3-wheeler rests with its core 0.65 m above ground; SnapTiles needed 16 rapier solver iterations (8 let the chain of six servo joints sag 0.4 m and the belly plate touched the ground) | wheel3 rest dump, lowest-corner.ts |
 | axes | W is **+x**, N is −z, y up in the original (SnapTiles keeps W = −x, i.e. a mirrored x; the Euler readouts above are matched numerically, not by mirroring) | rest dumps |
 | Trim / Rudder signs | consistent with `JOINT_SIGN` (+1 / −1) | trimrudder30 positions |
@@ -103,7 +105,8 @@ acceleration, `_WY` = v/r). Hence the contact-force wheel above.
 |---|---|---|
 | gravity | 9.8 | `world.ts` |
 | tyre friction | 1.4 | `WHEEL_FRICTION` |
-| plate aero | lift slope 3.8 per sin α, broadside cap 0.7 (per tile, not per area) | `world.ts` — measure with Data/plane.txt next |
+| plate aero near 90° | the law above under-predicts the broadside sled (6 m/s measured, 8.8 in SnapTiles); the original's readme says drag rises steeply toward 90° | `AERO_K/AERO_P` |
+| sled acceleration after touchdown | SnapTiles sleds accelerate at ~0.65× the original on the ground even with friction 0; the jet's lower edge on the ground may absorb thrust | `aero_flat` comparison |
 | Arm shell | 80 m/s, 2 kg, 4 s | `ARM_*` |
 | cowl option 5 / 1 / 2 | bulging ribbon / plate / plate | `scene.ts` |
 | `_T`, `_FUEL`, network, CCD | stubs | `simulation.ts` |
@@ -111,7 +114,6 @@ acceleration, `_WY` = v/r). Hence the contact-force wheel above.
 ## Known failures
 
 - Walkers `4leg1` and `2walk` from the corpus still tip over when driven (segway, bike2, zrobo are fine).
-- The plane sample no longer takes off with the 0.6 m tile (test skipped; aero unmeasured).
 - `weapon/cannon.rcd` indexes an undefined Val (`math.mod(nil)`): the model itself.
 
 ## Root causes worth remembering

@@ -72,20 +72,22 @@ export interface TypeSpec {
   friction: number;
 }
 
+// friction: measured 2026-10-28 on the original — a Core+Jet+2 Chip sled pushed by 1000 N accelerates at
+// 6.6 m/s² instead of 8.9, i.e. μ ≈ 0.23 for chips; Frame and Weight keep the documented ordering (Chip < Frame < Weight)
 export const TYPES: Record<string, TypeSpec> = {
-  core: { joint: 'fixed', collides: true, mass: 25.2, code: 0, drag: 1, friction: 0.6 },
-  chip: { joint: 'hinge', collides: true, mass: 25.2, code: 1, drag: 1, friction: 0.6 },
-  frame: { joint: 'hinge', collides: true, mass: 12.6, code: 33, ghostable: true, drag: 0, friction: 0.8 },
-  rudder: { joint: 'yaw', collides: true, mass: 25.2, code: 2, drag: 1, friction: 0.6 },
-  rudderf: { joint: 'yaw', collides: true, mass: 12.6, code: 34, ghostable: true, drag: 0, friction: 0.8 },
-  trim: { joint: 'roll', collides: true, mass: 25.2, code: 6, drag: 1, friction: 0.6 },
-  trimf: { joint: 'roll', collides: true, mass: 12.6, code: 35, ghostable: true, drag: 0, friction: 0.8 },
+  core: { joint: 'fixed', collides: true, mass: 25.2, code: 0, drag: 1, friction: 0.23 },
+  chip: { joint: 'hinge', collides: true, mass: 25.2, code: 1, drag: 1, friction: 0.23 },
+  frame: { joint: 'hinge', collides: true, mass: 12.6, code: 33, ghostable: true, drag: 0, friction: 0.3 },
+  rudder: { joint: 'yaw', collides: true, mass: 25.2, code: 2, drag: 1, friction: 0.23 },
+  rudderf: { joint: 'yaw', collides: true, mass: 12.6, code: 34, ghostable: true, drag: 0, friction: 0.3 },
+  trim: { joint: 'roll', collides: true, mass: 25.2, code: 6, drag: 1, friction: 0.23 },
+  trimf: { joint: 'roll', collides: true, mass: 12.6, code: 35, ghostable: true, drag: 0, friction: 0.3 },
   wheel: { joint: 'wheel', collides: true, mass: 42.41 + 36.76, code: 4, wheel: true, drag: 0.05, friction: 1.4 },
   rlw: { joint: 'wheel', collides: true, mass: 42.41 + 36.76, code: 5, wheel: true, noReaction: true, drag: 0.05, friction: 1.4 },
-  jet: { joint: 'hinge', collides: true, mass: 36.76, code: 7, jet: true, drag: 0, friction: 0.6 },
-  weight: { joint: 'hinge', collides: true, mass: 100.8, code: 8, drag: 1, friction: 1.0 },
+  jet: { joint: 'hinge', collides: true, mass: 36.76, code: 7, jet: true, drag: 0, friction: 0.23 },
+  weight: { joint: 'hinge', collides: true, mass: 100.8, code: 8, drag: 1, friction: 0.4 },
   cowl: { joint: 'fixed', collides: false, mass: 0, code: 9, merge: true, drag: 0, friction: 0 },
-  arm: { joint: 'hinge', collides: true, mass: 50.4, code: 10, drag: 0.7, friction: 0.6 },
+  arm: { joint: 'hinge', collides: true, mass: 50.4, code: 10, drag: 0.7, friction: 0.23 },
 };
 
 export const DIR_VEC: Record<'N' | 'S' | 'E' | 'W', THREE.Vector3> = {

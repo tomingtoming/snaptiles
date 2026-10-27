@@ -126,7 +126,7 @@ import { PLANE } from '../src/samples/plane';
 describe('plane sample', () => {
   // Skipped 2026-10-27: with the measured 0.6 m tile the sample no longer rotates; the aero model is a
   // guess (per-tile lift slope) and is next to be measured against the original (Data/plane.txt).
-  it.skip('takes off when ↓ (pull up) is held at full throttle', async () => {
+  it('takes off when ↓ (pull up) is held at full throttle', async () => {
     const R = await initRapier();
     const keys = fakeKeys();
     const sim = new Simulation(R, PLANE, keys);

@@ -70,7 +70,10 @@ export const AIR_DRAG = 0.7;
 export const ISO_DRAG = 0; // 0 = off: it kept tonbo and the plane sample from taking off; kept as an experiment knob
 export const LIFT_SLOPE = 3.8;
 /** which plate aero law to use: 'quad' | 'newton' | 'slope' (probe with window.__tune.aero) */
-export const AERO_MODEL = 'slope';
+export const AERO_MODEL = 'pow';
+/** plate normal force = AERO_K · v² · sin^AERO_P(α) per chip (measured, see docs/measured.md) */
+export const AERO_K = 3.0;
+export const AERO_P = 1.3;
 /** compliant joints (spring<1): N·m/rad at spring=1 and N·m·s/rad at damper=1 — guesses */
 /** tyre friction coefficient (rapier combines with the ground's 1.0 by averaging) */
 export const WHEEL_FRICTION = 1.4;
@@ -354,7 +357,8 @@ export class PhysicsWorld {
           ? tyreCylinder ? R.ColliderDesc.cylinder(TILE_T / 2, wheelRadius(tile.option)) : R.ColliderDesc.ball(wheelRadius(tile.option))
           : R.ColliderDesc.cuboid(TILE / 2, TILE_T / 2, TILE / 2);
         // a tyre is a frictionless cylinder (it only carries load); grip comes from driveWheel()
-        cd.setMass(Math.max(0.1, mass)).setFriction(tile.spec.wheel ? 0 : tile.spec.friction).setCollisionGroups(MODEL_GROUP);
+        const frictionScale = (globalThis as unknown as { __tune?: { frictionScale?: number } }).__tune?.frictionScale ?? 1;
+        cd.setMass(Math.max(0.1, mass)).setFriction(tile.spec.wheel ? 0 : tile.spec.friction * frictionScale).setCollisionGroups(MODEL_GROUP);
         if (tile.spec.wheel) cd.setFrictionCombineRule(R.CoefficientCombineRule.Min); // rapier averages by default: 0 vs ground 1.0 would still be 0.5
         cd.setTranslation(relPos.x, relPos.y, relPos.z).setRotation({ x: relQuat.x, y: relQuat.y, z: relQuat.z, w: relQuat.w });
         if (tile.ghost || !tile.spec.collides) cd.setSensor(true);
@@ -699,7 +703,14 @@ export class PhysicsWorld {
         let mag: number;
         if (aero === 'quad') mag = 0.9 * vn * vn; // original guess: v_n·|v_n|
         else if (aero === 'newton') mag = 0.9 * speed * Math.abs(vn);
-        else mag = Math.min(LIFT_SLOPE * speed * Math.abs(vn), AIR_DRAG * speed * speed);
+        else if (aero === 'slope') mag = Math.min(LIFT_SLOPE * speed * Math.abs(vn), AIR_DRAG * speed * speed);
+        else {
+          // measured 2026-10-28 on the original (ballasted sled, 2-chip plate, 3333 N): the plate's normal
+          // force grows like v²·sin^1.3(α) — ≈1.2 N/(m/s)² per chip at 30°, 3.9 at 60°, small at 15°, and
+          // flat plates feel nothing up to 40 m/s; a 3-plate sled lifts off at 40 m/s with 9° of pitch
+          const sinA = speed > 1e-6 ? Math.abs(vn) / speed : 0;
+          mag = AERO_K * speed * speed * Math.pow(sinA, AERO_P);
+        }
         const f = -Math.sign(vn) * tile.spec.drag * mag;
         if (Math.abs(f) > 1e-4) {
           body.addForceAtPoint(
