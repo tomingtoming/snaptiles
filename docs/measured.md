@@ -18,7 +18,7 @@ columns. Raw logs: `D:\snaptiles-models\quarantine\original\runs\*.csv` (not in 
 | spawn | the model is dropped from about 1.0 m above the ground (lowest point) | core-only spawns at ground+1.03 |
 | mass table | Core/Chip/Rudder 25.2, Frame 12.6, Wheel 79.17 (hub+tire) → Basic = 467.87 kg | HUD `Weight=467.87` for 16 chips, SnapTiles table gives 467.88 |
 | chip numbering | a Wheel takes two numbers: first `_TYPE` 3 (hub, does not spin), second `_TYPE` 4 (spins) | rest dump |
-| wheel radius | option 0 **0.30 m**, option 1 **0.45**, option 2 **0.60** | v / `_WY(wheel)` = 0.300 / 0.455 / 0.611 while rolling |
+| wheel radius | option 0 **0.30 m**, option 1 **0.45**, option 2 **0.60**; the wheel's mass does not change with option (4 wheels + core + 2 chips = 392.27 kg for option 0, 1 and 2) | v / `_WY(wheel)` = 0.300 / 0.455 / 0.611 while rolling; wheelmass_* HUD |
 | wheel drive | force ∝ power, independent of radius: torque-equivalent **0.13 N·m per power unit** (Basic with all four wheels at power 2500: a₀ = 8.5 m/s²; linear in power from 500 to 2500) | power sweep 500…2500 (two front wheels), basic_nopower (four) |
 | drive fade | the push falls linearly with wheel spin: a/a₀ = 0.877 at ω≈22 rad/s, 0.62 at ω≈69 → zero at ≈ **180 rad/s** | 180-frame run to 22 m/s |
 | drag | **none measurable** coasting at 22 m/s (Δv = 0.02 m/s over 1 s) | turn_basic frames 210–240 |
@@ -35,7 +35,7 @@ columns. Raw logs: `D:\snaptiles-models\quarantine\original\runs\*.csv` (not in 
 | attribute evaluation | a literal `power=5000` on a Jet produced no thrust; `power=Engine` with a Val default did. Attributes bound to a Val are re-evaluated every frame (so `_SET` on them is lost) | jetc_* vs jet_*_val runs |
 | servo | a commanded joint angle is applied **within one frame** (Rudder: 60° one frame after the Val changes), **without momentum**: snapping a Frame holding two Weights 45° pitches the light core 31° and the arm −14° (inertia-weighted split about the hinge), the load then swings from rest and the model settles with the core at 45° | servo_rudder, servo_hinge_load |
 | joint stiffness | rigid: a Frame(spring=0.5) holding a 4× Weight at 1.2 m does not sag; spring=0.1 sags 0.1° | sag_arm, sag_arm_spring05/01 |
-| plate aero | normal force ≈ **3 N/(m/s)² · v² · sin^1.3(α)** per chip: flat plates feel nothing to 40 m/s (a 3-plate sled keeps accelerating at 6.5 m/s²), a 2-chip plate at 30° costs ≈1.2 N/(m/s)² per chip, at 60° ≈3.9, a flat sled lifts off at 40 m/s with 9° of pitch, a plate at 45° stalls a 1000 N sled at 10 m/s. The 90° sled stalled at 6 m/s (≈30 per chip) — far steeper than the law, but that run was dragging the ground | aero_* and sled_* runs |
+| plate aero | drag per chip / v² from a jet-pushed **rolling** car (no sliding contact): **0.22 at 15°, 1.2 at 30°, 2.85 at 45°, ≈4 at 50°**, constant over 5–19 m/s (∝ v²). At 60–90° the original's car stalls near 1–3 m/s and oscillates (coefficient jumps 7 → 27 → 400 between 5 and 6 m/s: not a v² law, the readme's "steep rise toward 90°"). Normal force per chip ≈ v²·(6.7·sin^1.5 α + 9.3·sin^8 α) reproduces 0–45° within the mass offset; flat plates feel nothing to 40 m/s; a flat 3-plate sled lifts off at ≈40 m/s with 9–18° of pitch | rollb_* (0/15/30/45/50/60/75/90), sled_*, aero_* |
 | sliding friction | a chip model pushed by 1000 N accelerates at 6.6 m/s² (8.9 without friction): μ ≈ 0.23 for Chip; Frame/Weight keep the documented ordering | aero_flat, aero_tilt45 |
 | settling | the 3-wheeler rests with its core 0.65 m above ground; SnapTiles needed 16 rapier solver iterations (8 let the chain of six servo joints sag 0.4 m and the belly plate touched the ground) | wheel3 rest dump, lowest-corner.ts |
 | axes | W is **+x**, N is −z, y up in the original (SnapTiles keeps W = −x, i.e. a mirrored x; the Euler readouts above are matched numerically, not by mirroring) | rest dumps |
@@ -105,8 +105,8 @@ acceleration, `_WY` = v/r). Hence the contact-force wheel above.
 |---|---|---|
 | gravity | 9.8 | `world.ts` |
 | tyre friction | 1.4 | `WHEEL_FRICTION` |
-| plate aero near 90° | the law above under-predicts the broadside sled (6 m/s measured, 8.8 in SnapTiles); the original's readme says drag rises steeply toward 90° | `AERO_K/AERO_P` |
-| sled acceleration after touchdown | SnapTiles sleds accelerate at ~0.65× the original on the ground even with friction 0; the jet's lower edge on the ground may absorb thrust | `aero_flat` comparison |
+| plate aero at 60–90° | the original stalls and oscillates (drag far above v²·sin²); SnapTiles rolls on at 4–7 m/s | `AERO_K2/AERO_P2` |
+| sled acceleration after touchdown | SnapTiles sleds accelerate at ~0.65× the original on the ground even with friction 0; the jet's lower edge on the ground may absorb thrust. The rolling car (nothing but tyres on the ground) accelerates 13% faster in SnapTiles than in the original (3.0 vs 2.6 m/s² at 1667 N): a small rolling loss or thrust difference in the original | `aero_flat`, `rollb_0` |
 | Arm shell | 80 m/s, 2 kg, 4 s | `ARM_*` |
 | cowl option 5 / 1 / 2 | bulging ribbon / plate / plate | `scene.ts` |
 | `_T`, `_FUEL`, network, CCD | stubs | `simulation.ts` |

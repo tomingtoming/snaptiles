@@ -71,9 +71,14 @@ export const ISO_DRAG = 0; // 0 = off: it kept tonbo and the plane sample from t
 export const LIFT_SLOPE = 3.8;
 /** which plate aero law to use: 'quad' | 'newton' | 'slope' (probe with window.__tune.aero) */
 export const AERO_MODEL = 'pow';
-/** plate normal force = AERO_K · v² · sin^AERO_P(α) per chip (measured, see docs/measured.md) */
-export const AERO_K = 3.0;
-export const AERO_P = 1.3;
+/** plate normal force per chip = v² · (AERO_K·sin^AERO_P α + AERO_K2·sin^AERO_P2 α), α = angle to the airflow.
+ *  Measured on the original with a jet-pushed rolling car (drag per chip / v²: 0.22 at 15°, 1.2 at 30°,
+ *  2.85 at 45°, ≈4 at 50°; at 60–90° the car stalls near 1–3 m/s). The second term is the steep rise
+ *  toward broadside that the original's readme mentions. */
+export const AERO_K = 6.7;
+export const AERO_P = 1.5;
+export const AERO_K2 = 9.3;
+export const AERO_P2 = 8;
 /** compliant joints (spring<1): N·m/rad at spring=1 and N·m·s/rad at damper=1 — guesses */
 /** tyre friction coefficient (rapier combines with the ground's 1.0 by averaging) */
 export const WHEEL_FRICTION = 1.4;
@@ -709,7 +714,7 @@ export class PhysicsWorld {
           // force grows like v²·sin^1.3(α) — ≈1.2 N/(m/s)² per chip at 30°, 3.9 at 60°, small at 15°, and
           // flat plates feel nothing up to 40 m/s; a 3-plate sled lifts off at 40 m/s with 9° of pitch
           const sinA = speed > 1e-6 ? Math.abs(vn) / speed : 0;
-          mag = AERO_K * speed * speed * Math.pow(sinA, AERO_P);
+          mag = speed * speed * (AERO_K * Math.pow(sinA, AERO_P) + AERO_K2 * Math.pow(sinA, AERO_P2));
         }
         const f = -Math.sign(vn) * tile.spec.drag * mag;
         if (Math.abs(f) > 1e-4) {
