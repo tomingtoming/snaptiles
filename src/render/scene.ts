@@ -36,12 +36,34 @@ interface TileView {
  * and the east edge, option 4 the attached edge and the west edge.
  */
 function cowlGeometry(option: number, dir: TileInstance['dir'], cache: Map<string, THREE.BufferGeometry>): THREE.BufferGeometry {
-  const shape = option === 3 || option === 4 ? option : 0;
+  const shape = option === 3 || option === 4 || option === 5 ? option : 0;
   const key = `${shape}${shape ? dir ?? 'N' : ''}`;
   let g = cache.get(key);
   if (g) return g;
   if (shape === 0) {
     g = new THREE.BoxGeometry(TILE, TILE_T * 0.5, TILE);
+  } else if (shape === 5) {
+    // "curved" cowl (shape undocumented): a ribbon spanning the tile that bulges up 0.18
+    const h = TILE / 2;
+    const n = 10;
+    const pos: number[] = [];
+    const idx: number[] = [];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      const z = h - TILE * t;
+      const y = 0.18 * Math.sin(Math.PI * t);
+      pos.push(-h, y, z, h, y, z);
+    }
+    for (let i = 0; i < n; i++) {
+      const a = i * 2;
+      idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+    }
+    g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx);
+    const turn = { N: 0, S: Math.PI, E: -Math.PI / 2, W: Math.PI / 2 }[dir ?? 'N'];
+    if (turn) g.rotateY(turn);
+    g.computeVertexNormals();
   } else {
     // built for a north-attached cowl: parent on +Z, the attached edge is +Z, far edge -Z
     const h = TILE / 2;
