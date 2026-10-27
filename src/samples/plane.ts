@@ -36,7 +36,7 @@ Body
     }
     W:Chip(angle=90){ W:Wheel(){ } }
     E:Chip(angle=90){ E:Wheel(){ } }
-    S:Chip(angle=90){ S:Wheel(){ } }
+    S:Chip(){ S:Trim(angle=90){ S:Wheel(){ } } }
   }
 }
 Lua

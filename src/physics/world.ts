@@ -39,8 +39,12 @@ export interface PhysicsOptions {
 export const WHEEL_TORQUE_PER_POWER = 0.1; // N·m per power unit (corpus cars use power 2,000–20,000; 0.25 launched them, 0.02 crawled)
 /** spec: 6 power = 1 N */
 export const JET_NEWTON_PER_POWER = 1 / 6;
-/** flat-plate aero: N per (m/s)² of normal velocity, per unit drag coefficient of a tile */
-export const AIR_DRAG = 0.9;
+/** plate aero (per 1 m² tile): broadside drag N per (m/s)², and the lift slope N per (m/s)² per sin α.
+ *  ½ρ·Cd≈0.7 and ½ρ·2π≈3.8 for air; the original's numbers are unknown. */
+export const AIR_DRAG = 0.7;
+export const LIFT_SLOPE = 3.8;
+/** which plate aero law to use: 'quad' | 'newton' | 'slope' (probe with window.__tune.aero) */
+export const AERO_MODEL = 'slope';
 /** compliant joints (spring<1): N·m/rad at spring=1 and N·m·s/rad at damper=1 — guesses */
 /** tyre friction coefficient (rapier combines with the ground's 1.0 by averaging) */
 export const WHEEL_FRICTION = 1.4;
@@ -401,7 +405,15 @@ export class PhysicsWorld {
         // quadratic drag along the tile normal only (plates slip edge-on) → also the lift model
         const v = this.velocity(tb, pose);
         const vn = v.dot(normal);
-        const f = -AIR_DRAG * tile.spec.drag * vn * Math.abs(vn);
+        // Thin plate: normal force rises with the angle of attack (lift slope LIFT_SLOPE per
+        // sin α) and saturates at the broadside drag (AIR_DRAG per v²). Edge-on plates feel nothing.
+        const speed = v.length();
+        const aero = (globalThis as unknown as { __tune?: { aero?: string } }).__tune?.aero ?? AERO_MODEL;
+        let mag: number;
+        if (aero === 'quad') mag = 0.9 * vn * vn; // original guess: v_n·|v_n|
+        else if (aero === 'newton') mag = 0.9 * speed * Math.abs(vn);
+        else mag = Math.min(LIFT_SLOPE * speed * Math.abs(vn), AIR_DRAG * speed * speed);
+        const f = -Math.sign(vn) * tile.spec.drag * mag;
         if (Math.abs(f) > 1e-4) {
           body.addForceAtPoint(
             { x: normal.x * f, y: normal.y * f, z: normal.z * f },
