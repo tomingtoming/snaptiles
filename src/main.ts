@@ -52,6 +52,16 @@ function buildKeyCaps(s: Simulation): void {
     const el = document.createElement('div');
     el.className = 'cap';
     el.textContent = def.glyph;
+    // the keycap is also the touch control
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      keys.press(n);
+    });
+    const up = () => keys.release(n);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('lostpointercapture', up);
     keysEl.append(el);
     keyCaps.push({ el, n });
   }

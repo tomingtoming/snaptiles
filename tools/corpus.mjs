@@ -41,7 +41,7 @@ for (const f of files) {
   });
   rows.push({ file: f.replace(/\\/g, '/').split('/').slice(-2).join('/'), ...r, pageError: pageErrors[0] ?? '' });
   const bad = r.status || r.err || pageErrors.length;
-  console.log(`${bad ? 'FAIL' : 'ok  '} ${rows.at(-1).file} chips=${r.chips} ${r.lang} ${(r.status || r.err || pageErrors[0] || '').slice(0, 140)}`);
+  console.log(`${bad ? 'FAIL' : 'ok  '} ${rows.at(-1).file} chips=${r.chips} ${r.lang} ticks=${r.ticks} ${(r.status || r.err || pageErrors[0] || '').slice(0, 140)}`);
 }
 console.log(`\n${rows.filter((r) => !(r.status || r.err || r.pageError)).length}/${rows.length} ok`);
 await browser.close();

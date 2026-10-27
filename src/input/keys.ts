@@ -54,6 +54,14 @@ export class KeyState {
   isDown(n: number): boolean {
     return this.down.has(n);
   }
+
+  /** on-screen keycaps (touch / mouse) */
+  press(n: number): void {
+    this.down.add(n);
+  }
+  release(n: number): void {
+    this.down.delete(n);
+  }
 }
 
 function isTyping(e: KeyboardEvent): boolean {
