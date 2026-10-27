@@ -402,6 +402,7 @@ export class Simulation {
       _PLAYERY: () => 0,
       _PLAYERZ: () => 0,
       _PLAYERNAME: () => '',
+      _PLAYERNAME2: () => 0,
       _CCD: () => 0,
       _RED: () => 0,
       _GREEN: () => 0,
