@@ -104,6 +104,22 @@ function refreshSampleButtons(): void {
   [...samplesEl.children].forEach((c, i) => c.setAttribute('aria-current', String(i === current)));
 }
 runBtn.addEventListener('click', () => void loadAndShare(sourceEl.value));
+// ---- view modes (1-4 or the button; those digits carry no key number in the original) ----
+const VIEWS = [
+  { mode: 'chase', glyph: '◎' },
+  { mode: 'orbit', glyph: '✥' },
+  { mode: 'top', glyph: '⬒' },
+  { mode: 'onboard', glyph: '◉' },
+] as const;
+const viewBtn = $<HTMLButtonElement>('viewmode');
+let viewIndex = 0;
+function setView(i: number): void {
+  viewIndex = (i + VIEWS.length) % VIEWS.length;
+  scene.setView(VIEWS[viewIndex].mode);
+  viewBtn.textContent = VIEWS[viewIndex].glyph;
+}
+viewBtn.addEventListener('click', () => setView(viewIndex + 1));
+let paused = false;
 sourceEl.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     e.preventDefault();
@@ -132,6 +148,8 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (typing) return;
+  if (e.code === 'Space') { e.preventDefault(); paused = !paused; } // Space carries no key number in the original
+  if (e.code >= 'Digit1' && e.code <= 'Digit4') setView(Number(e.code.slice(5)) - 1);
   if (e.code === 'KeyR' && sim) { sim.reset(); scene.snap(sim.corePosition()); } // R: reset in place (OnReset)
   if (e.code === 'KeyU') void loadAndShare(sourceEl.value); // U: reload from source (OnInit)
 });
@@ -144,6 +162,11 @@ let lastY = 0;
 // one finger orbits, two fingers pinch to zoom
 const touches = new Map<number, { x: number; y: number }>();
 let pinchDist = 0;
+// pointer state for the model's _MX/_MY/_ML/_MR/_MM (canvas pixels)
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+canvas.addEventListener('pointermove', (e) => { const r = canvas.getBoundingClientRect(); keys.mouse.x = Math.round(e.clientX - r.left); keys.mouse.y = Math.round(e.clientY - r.top); });
+canvas.addEventListener('pointerdown', (e) => { if (e.button === 0) keys.mouse.l = 1; if (e.button === 2) keys.mouse.r = 1; if (e.button === 1) keys.mouse.m = 1; });
+window.addEventListener('pointerup', (e) => { if (e.button === 0) keys.mouse.l = 0; if (e.button === 2) keys.mouse.r = 0; if (e.button === 1) keys.mouse.m = 0; });
 canvas.addEventListener('pointerdown', (e) => {
   touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
   dragging = touches.size === 1;
@@ -195,8 +218,10 @@ function frame(now: number): void {
   acc += Math.min(0.1, (now - last) / 1000);
   last = now;
   if (sim) {
+    keys.pollGamepad();
     const FIXED = sim.frameDt();
     let n = 0;
+    if (paused) acc = 0;
     while (acc >= FIXED && n < 4) {
       sim.step();
       acc -= FIXED;
@@ -208,8 +233,9 @@ function frame(now: number): void {
     scene.setLines3d(sim.lines3d);
     scene.syncProjectiles(sim.physics.projectiles);
     drawHud(sim.lines2d, sim);
-    if (!dragging && performance.now() - lastDrag > 3000) scene.chaseYaw(sim.coreHeading());
-    scene.follow(sim.corePosition());
+    if (scene.viewMode === 'chase' && !dragging && performance.now() - lastDrag > 3000) scene.chaseYaw(sim.coreHeading());
+    scene.onboardFov = sim.zoomFov;
+    scene.follow(sim.corePosition(), 0.08, sim.physics.tiles[0] ? sim.physics.pose(sim.physics.tiles[0]).quaternion : undefined);
     updateOverlay(sim);
     updateSound(sim);
   }
@@ -265,6 +291,13 @@ function drawHud(buf: number[], s: Simulation): void {
     hud.height = h;
   }
   hudCtx.clearRect(0, 0, w, h);
+  if (paused) {
+    hudCtx.font = `${Math.round(h / 8)}px system-ui, sans-serif`;
+    hudCtx.textAlign = 'center';
+    hudCtx.textBaseline = 'middle';
+    hudCtx.fillStyle = 'rgba(255,255,255,0.7)';
+    hudCtx.fillText('\u23F8', w / 2, h / 2);
+  }
   // the original's dials: speed in km/h and altitude in m (the compass is the camera's job here)
   const core = s.physics.tiles[0];
   if (core) {

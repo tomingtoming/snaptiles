@@ -34,6 +34,11 @@ export class KeyState {
   private byCode = new Map<string, number>();
   /** extra physical keys standing in for a key number (WASD for the arrows when the model leaves 7/8/9/15 unused) */
   private aliases = new Map<string, number>();
+  /** key numbers held by a gamepad (left stick / d-pad -> 0..3, buttons -> 4..) and its raw axes for _ANALOG */
+  private pad = new Set<number>();
+  axes: number[] = [0, 0, 0, 0, 0, 0];
+  /** pointer over the view (canvas pixels) and its buttons, for _MX/_MY/_ML/_MR/_MM */
+  mouse = { x: 0, y: 0, l: 0, r: 0, m: 0 };
 
   constructor(private target: EventTarget = window) {
     KEY_TABLE.forEach((k, i) => this.byCode.set(k.code, i));
@@ -68,7 +73,24 @@ export class KeyState {
   }
 
   isDown(n: number): boolean {
-    return this.down.has(n);
+    return this.down.has(n) || this.pad.has(n);
+  }
+
+  /** poll the first connected gamepad (call once per frame) */
+  pollGamepad(): void {
+    if (typeof navigator === 'undefined' || !navigator.getGamepads) return;
+    const gp = [...navigator.getGamepads()].find((g) => g && g.connected);
+    this.pad.clear();
+    if (!gp) return;
+    this.axes = [0, 1, 2, 3, 4, 5].map((i) => gp.axes[i] ?? 0);
+    const x = gp.axes[0] ?? 0;
+    const y = gp.axes[1] ?? 0;
+    if (y < -0.5 || gp.buttons[12]?.pressed) this.pad.add(0);
+    if (y > 0.5 || gp.buttons[13]?.pressed) this.pad.add(1);
+    if (x < -0.5 || gp.buttons[14]?.pressed) this.pad.add(2);
+    if (x > 0.5 || gp.buttons[15]?.pressed) this.pad.add(3);
+    // face and shoulder buttons in order -> Z X C A S D V B
+    [0, 1, 2, 3, 4, 5, 6, 7].forEach((b, i) => { if (gp.buttons[b]?.pressed) this.pad.add(4 + i); });
   }
 
   /** on-screen keycaps (touch / mouse) */

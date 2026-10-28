@@ -56,6 +56,8 @@ export class Simulation {
   /** segments drawn by the script this frame: x1 y1 z1 x2 y2 z2 r g b / x1 y1 x2 y2 r g b */
   lines3d: number[] = [];
   lines2d: number[] = [];
+  /** CCD camera field of view in degrees (_ZOOM); the original's default readout */
+  zoomFov = 17.19;
   private penColor: [number, number, number] = [1, 1, 1];
   private pen3 = new THREE.Vector3();
   private pen2 = [0, 0];
@@ -153,7 +155,7 @@ export class Simulation {
   /** One fixed step: keys → vals → script → clamp → physics. */
   step(): void {
     this.keysPrev = this.keysNow;
-    this.keysNow = new Set(this.keys.down);
+    this.keysNow = new Set([...this.keys.down].concat([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].filter((n) => this.keys.isDown(n))));
     for (const v of this.vals.values()) v.touched = false;
 
     for (const k of this.model.keys) {
@@ -303,12 +305,12 @@ export class Simulation {
       _KEY: key,
       _KEYDOWN: keydown,
       _KEYUP: keyup,
-      _ANALOG: () => 0,
-      _MX: () => 0,
-      _MY: () => 0,
-      _ML: () => 0,
-      _MR: () => 0,
-      _MM: () => 0,
+      _ANALOG: (n: number) => (this.keys.axes[n] ?? 0) * 1000, // gamepad axis, +-1000 (the original's range is not measured)
+      _MX: () => this.keys.mouse.x,
+      _MY: () => this.keys.mouse.y,
+      _ML: () => this.keys.mouse.l,
+      _MR: () => this.keys.mouse.r,
+      _MM: () => this.keys.mouse.m,
       _WIDTH: () => (typeof innerWidth === 'number' ? innerWidth : 640),
       _HEIGHT: () => (typeof innerHeight === 'number' ? innerHeight : 480),
       _FPS: () => FRAME_RATE,
@@ -379,7 +381,7 @@ export class Simulation {
       _USER1: (n: number) => attrOf(n, 'user1'),
       _USER2: (n: number) => attrOf(n, 'user2'),
       _FACE: () => 0,
-      _ZOOM: () => 17.19,
+      _ZOOM: (fov: number) => { if (fov > 0) this.zoomFov = fov; return this.zoomFov; },
       _PLAYERS: () => 1,
       _PLAYERMYID: () => 0,
       _PLAYERHOSTID: () => 0,

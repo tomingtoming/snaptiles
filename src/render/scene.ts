@@ -109,6 +109,15 @@ export class SceneView {
   camYaw = 0.6;
   camPitch = 0.35;
   camDist = 12;
+  /** chase: orbit eased behind the model; orbit: free; top: straight down; onboard: from the core, FOV via _ZOOM */
+  viewMode: 'chase' | 'orbit' | 'top' | 'onboard' = 'chase';
+  private baseFov = 50;
+  onboardFov = 17.19;
+  setView(mode: 'chase' | 'orbit' | 'top' | 'onboard'): void {
+    this.viewMode = mode;
+    this.camera.up.set(0, 1, 0);
+    if (mode !== 'onboard') { this.camera.fov = this.baseFov; this.camera.updateProjectionMatrix(); }
+  }
   private camTarget = new THREE.Vector3();
   private sun: THREE.DirectionalLight;
   private tmpPose = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
@@ -322,15 +331,31 @@ export class SceneView {
     this.camera.lookAt(target);
   }
 
-  follow(target: THREE.Vector3, smooth = 0.08): void {
+  follow(target: THREE.Vector3, smooth = 0.08, coreQuat?: THREE.Quaternion): void {
     this.camTarget.lerp(target, smooth);
-    const cp = this.camPitch;
-    const cy = this.camYaw;
-    const off = new THREE.Vector3(Math.cos(cp) * Math.sin(cy), Math.sin(cp), Math.cos(cp) * Math.cos(cy)).multiplyScalar(this.camDist);
-    const eye = this.camTarget.clone().add(off);
-    eye.y = Math.max(eye.y, 0.4);
-    this.camera.position.lerp(eye, 0.15);
-    this.camera.lookAt(this.camTarget);
+    if (this.viewMode === 'onboard' && coreQuat) {
+      // the CCD camera: sits just above the core and looks along the model's N edge
+      const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(coreQuat);
+      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(coreQuat);
+      this.camera.position.copy(target).addScaledVector(up, 0.25).addScaledVector(fwd, 0.2);
+      this.camera.up.copy(up);
+      this.camera.lookAt(target.clone().addScaledVector(up, 0.25).addScaledVector(fwd, 10));
+      if (this.camera.fov !== this.onboardFov) { this.camera.fov = this.onboardFov; this.camera.updateProjectionMatrix(); }
+    } else if (this.viewMode === 'top') {
+      const eye = this.camTarget.clone().add(new THREE.Vector3(0, this.camDist * 1.6, 0.001));
+      this.camera.position.lerp(eye, 0.15);
+      this.camera.up.set(0, 0, -1);
+      this.camera.lookAt(this.camTarget);
+    } else {
+      const cp = this.camPitch;
+      const cy = this.camYaw;
+      const off = new THREE.Vector3(Math.cos(cp) * Math.sin(cy), Math.sin(cp), Math.cos(cp) * Math.cos(cy)).multiplyScalar(this.camDist);
+      const eye = this.camTarget.clone().add(off);
+      eye.y = Math.max(eye.y, 0.4);
+      this.camera.position.lerp(eye, 0.15);
+      this.camera.up.set(0, 1, 0);
+      this.camera.lookAt(this.camTarget);
+    }
     this.sun.target.position.copy(this.camTarget);
     this.sun.position.copy(this.camTarget).add(new THREE.Vector3(20, 40, 10));
     this.sun.target.updateMatrixWorld();
