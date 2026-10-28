@@ -21,3 +21,9 @@ model and `Resources/System.rcs` as the default scenario, so experiments replace
 - Replay in SnapTiles: `bun tools/orig-compare.ts <model> <out.csv> --allwheels --off=210`.
 
 Results are summarised in `docs/measured.md`.
+
+For the static-angle binding diagnostic, `standing-angle-variable.rcd` and
+`standing-angle-literal.rcd` are an 18-tile generated fixture pair. Run either with
+`harness_idle.rcs` through `run_probe.sh` (log name `idle.csv`). Their original
+240-frame traces were identical; `standing-angle-original.csv` stores the shared
+result. See `docs/sprints-45-47.md` for provenance and SnapTiles replay commands.

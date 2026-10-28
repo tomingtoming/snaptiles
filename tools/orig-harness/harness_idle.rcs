@@ -1,0 +1,7 @@
+n=0
+buf='frame,h,qx,qz,vx,vy,vz\n'
+function OnFrame()
+ n=n+1
+ if n<=240 then buf=buf..n..','.._H(0)..','.._QX(0)..','.._QZ(0)..','.._VX(0)..','.._VY(0)..','.._VZ(0)..'\n' end
+ if n==240 then local h=_FOPEN('idle.csv','w') if h>=0 then _FPUTS(h,buf) _FCLOSE(h) end end
+end

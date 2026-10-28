@@ -1,0 +1,21 @@
+Val {
+ A(default=0,min=-180,max=180)
+ B(default=85,min=-180,max=180)
+}
+Key {}
+Body {
+ Core(){ S:Weight(){} E:Weight(){} W:Weight(){}
+  S:Frame(angle=120,option=1){ S:Frame(angle=-30){
+   S:TrimF(angle=0,option=1){ E:RudderF(angle=-90){
+    W:Frame(angle=0,option=1){ W:Frame(angle=0,option=1){
+     W:Chip(angle=85){ E:Weight(angle=-10){} }
+    } }
+   } }
+   S:TrimF(angle=0,option=1){ W:RudderF(angle=90){
+    E:Frame(angle=0,option=1){ E:Frame(angle=0,option=1){
+     E:Chip(angle=85){ W:Weight(angle=-10){} }
+    } }
+   } }
+  } }
+ }
+}

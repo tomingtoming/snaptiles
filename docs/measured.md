@@ -181,3 +181,19 @@ stabilizes 2walk but destabilizes zrobo; global fixed constraints, articulated
 combinations, increased iterations and exact servo inertia did not pass the shared
 acceptance set. Those experiments were removed. 39 regression tests and the build
 pass. See [sprints 32–44](sprints-32-44.md) for measurements and retrospectives.
+
+## 2026-10-29 causal investigation (sprints 45–47)
+
+The conflicting walker fixes are now separated. In 2walk, the grounded-side inertia
+term in the pose update introduces the tipping rotation; removing only that term at
+frame 40 rescues the same landing history. In zrobo without this term, unchanged
+joint commands lose static support during physics stepping. Disabling repeated
+pose corrections does not prevent the fall, whereas replacing just the six leg
+fold constraints does.
+
+An 18-tile standing fixture reproduces the static defect: literal angles stand,
+identical values bound to unchanged variables fall in SnapTiles with hold=0. Both
+versions produce identical stable traces in the original. Production behavior is
+unchanged by this investigation. See [sprints 45–47](sprints-45-47.md) for controls,
+measurements, limitations and the required separation of static hold from active
+commanded rotation.
