@@ -120,6 +120,7 @@ function setView(i: number): void {
 }
 viewBtn.addEventListener('click', () => setView(viewIndex + 1));
 let paused = false;
+let windLevel = 0;
 sourceEl.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     e.preventDefault();
@@ -149,6 +150,9 @@ window.addEventListener('keydown', (e) => {
   }
   if (typing) return;
   if (e.code === 'Space') { e.preventDefault(); paused = !paused; } // Space carries no key number in the original
+  // the original's default scenario: H drops a ball (r 0.6, specific gravity 0.3) 6 m up at x = 2, J cycles the wind
+  if (e.code === 'KeyH' && sim) { const n = sim.physics.balls.length; sim.physics.addBall(0.6, 2, 6 + n, n / 10, 0.3); }
+  if (e.code === 'KeyJ' && sim) { windLevel = (windLevel + 1) % 4; sim.physics.wind.set([0, 5, 16, 50][windLevel], 0, 0); }
   if (e.code >= 'Digit1' && e.code <= 'Digit4') setView(Number(e.code.slice(5)) - 1);
   if (e.code === 'KeyR' && sim) { sim.reset(); scene.snap(sim.corePosition()); } // R: reset in place (OnReset)
   if (e.code === 'KeyU') void loadAndShare(sourceEl.value); // U: reload from source (OnInit)
@@ -309,6 +313,7 @@ function drawHud(buf: number[], s: Simulation): void {
     hudCtx.fillStyle = 'rgba(255,255,255,0.85)';
     hudCtx.fillText(`${kmh.toFixed(0)} km/h`, w - 12, h - 12);
     hudCtx.fillText(`${p.position.y.toFixed(1)} m`, w - 12, h - 12 - Math.round(h / 24));
+    if (s.physics.wind.lengthSq() > 0) hudCtx.fillText(`wind ${s.physics.wind.length().toFixed(0)} m/s`, w - 12, h - 12 - 2 * Math.round(h / 24));
   }
   if (buf.length === 0) return;
   hudCtx.lineWidth = 1.5;

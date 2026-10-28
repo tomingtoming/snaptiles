@@ -306,6 +306,29 @@ export class PhysicsWorld {
     }
   }
 
+  /** balls added by the player (the original's default scenario: H drops a magenta ball of radius 0.6 and
+   *  specific gravity 0.3 at x = 2, 6 m up; they survive a reset) and the wind the same scenario cycles with J */
+  balls: { body: RAPIER.RigidBody; radius: number; color: [number, number, number]; fixed: boolean }[] = [];
+  wind = new THREE.Vector3();
+  addBall(radius: number, x: number, y: number, z: number, gravity: number): number {
+    const R = this.R;
+    const body = this.world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(x, y, z).setLinearDamping(0.05).setAngularDamping(0.1));
+    const mass = gravity * 1000 * (4 / 3) * Math.PI * radius ** 3; // specific gravity against water
+    this.world.createCollider(R.ColliderDesc.ball(radius).setMass(Math.max(1, mass)).setFriction(0.6).setRestitution(0.3).setCollisionGroups(GROUND_GROUP), body);
+    this.balls.push({ body, radius, color: [1, 0, 1], fixed: false });
+    return this.balls.length - 1;
+  }
+  setBallFixed(i: number, fixed: boolean): void {
+    const b = this.balls[i];
+    if (!b) return;
+    b.fixed = fixed;
+    b.body.setBodyType(fixed ? this.R.RigidBodyType.Fixed : this.R.RigidBodyType.Dynamic, true);
+  }
+  clearBalls(): void {
+    for (const b of this.balls) this.world.removeRigidBody(b.body);
+    this.balls = [];
+  }
+
   /** knockable crates (course props), reset with the model */
   crates: RAPIER.RigidBody[] = [];
   resetCrates(): void {
@@ -1001,7 +1024,7 @@ export class PhysicsWorld {
       }
 
       if (tile.spec.drag > 0) {
-        const v = this.velocity(tb, pose);
+        const v = this.velocity(tb, pose).sub(this.wind); // air speed: the wind the scenario sets
         // isotropic air resistance per tile (the reference table lists a per-type coefficient:
         // Chip 1, Weight 1, Arm 0.7, Wheel 0.05, Frame/Jet 0) — caps top speeds
         const vl = v.length();
@@ -1015,6 +1038,7 @@ export class PhysicsWorld {
         // sin α) and saturates at the broadside drag (AIR_DRAG per v²). Edge-on plates feel nothing.
         const speed = v.length();
         const aero = (globalThis as unknown as { __tune?: { aero?: string } }).__tune?.aero ?? AERO_MODEL;
+        void this.wind;
         let mag: number;
         if (aero === 'quad') mag = 0.9 * vn * vn; // original guess: v_n·|v_n|
         else if (aero === 'newton') mag = 0.9 * speed * Math.abs(vn);

@@ -346,6 +346,11 @@ export class Simulation {
         else if (key === 'FUELMAX') this.physics.fuelMax.set(t.id, Math.max(0, v));
         return 0;
       },
+      _SETWIND: (x: number, y: number, z: number) => { this.physics.wind.set(x || 0, y || 0, z || 0); return 0; },
+      _GETWIND: () => this.physics.wind.x, // Lua multi-return is not modelled; x only
+      _ADDBALL: (r: number, x: number, y: number, z: number, g: number) => this.physics.addBall(r, x, y, z, g),
+      _SETOBJFIX: (i: number, v: number) => { this.physics.setBallFixed(i, !!v); return 0; },
+      _SETOBJCOLOR: (i: number, r: number, g: number, b: number) => { const ball = this.physics.balls[i]; if (ball) ball.color = [r, g, b]; return 0; },
       _SETREG: (...a: number[]) => { this.physics.regulations[String(a[0] as unknown).toUpperCase()] = a[1] ? 1 : 0; return 0; },
       _GETREG: (...a: number[]) => this.physics.regulations[String(a[0] as unknown).toUpperCase()] ?? 0,
       _E: (n: number) => { const t = this.tileOf(n); return t ? this.physics.armCharge.get(t.id) ?? 0 : 0; },

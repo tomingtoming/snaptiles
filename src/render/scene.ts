@@ -260,7 +260,26 @@ export class SceneView {
   }
 
   private crateMeshes: THREE.Mesh[] = [];
+  private ballMeshes: THREE.Mesh[] = [];
   sync(world: PhysicsWorld): void {
+    while (this.ballMeshes.length < world.balls.length) {
+      const b = world.balls[this.ballMeshes.length];
+      const m = new THREE.Mesh(new THREE.SphereGeometry(b.radius, 24, 16), new THREE.MeshStandardMaterial({ color: new THREE.Color(...b.color), roughness: 0.5 }));
+      m.castShadow = true;
+      m.receiveShadow = true;
+      this.scene.add(m);
+      this.ballMeshes.push(m);
+    }
+    this.ballMeshes.forEach((m, i) => {
+      const b = world.balls[i];
+      m.visible = !!b;
+      if (!b) return;
+      const t = b.body.translation();
+      const r = b.body.rotation();
+      m.position.set(t.x, t.y, t.z);
+      m.quaternion.set(r.x, r.y, r.z, r.w);
+      (m.material as THREE.MeshStandardMaterial).color.setRGB(...b.color);
+    });
     world.crates.forEach((b, i) => {
       const m = this.crateMeshes[i];
       const t = b.translation();
