@@ -22,6 +22,7 @@ const OFF = opt('off', 150);
 const FRAMES = opt('frames', 330);
 const GEOM_AT = opt('geomAt', 30);
 const CHIPS6 = args.includes('--chips6');
+const CHIPS10 = args.includes('--chips10'); // harness_servo2.rcs: x,y,z of chips 0..9
 const SELF = args.includes('--self'); // leave ENGINE to the model's own Lua/defaults
 const TURN = args.includes('--turn');
 const WHEELS = args.includes('--wheels');
@@ -59,13 +60,19 @@ const geomDump = (): string => {
 };
 const engine = sim.vals.get('ENGINE');
 if (!engine && !CHIPS6 && !SELF) throw new Error('model has no ENGINE val');
-const rows: string[] = [FUEL ? 'frame,x,y,z,vx,vy,vz,fuel,fuelmax,fuel0,fuelmax0,fuel1,chips' : ARM ? 'frame,x,y,z,vx,vy,vz,ex,ey,ez,' + Array.from({ length: 20 }, (_, i) => 't' + i).join(',') : WHEELS ? 'frame,x,y,z,vx,vy,vz,ex,ey,ez,w0,w1,w2,w3,w4,w5' : TURN ? 'frame,x,y,z,c1x,c1z,vx,vy,vz,wx,wy,wz,ax,ay,az,ex,ey,ez' : CHIPS6 ? 'frame,' + [0, 1, 2, 3, 4, 5].map((c) => `x${c},y${c},z${c},ex${c},ey${c},ez${c}`).join(',') : 'frame,x,y,z,vx,vy,vz,ex,ey,ez,chips,wheel,wheelpow,wheelwy,wheely'];
+const rows: string[] = [CHIPS10 ? 'frame,' + Array.from({ length: 10 }, (_, c) => `x${c},y${c},z${c}`).join(',') : FUEL ? 'frame,x,y,z,vx,vy,vz,fuel,fuelmax,fuel0,fuelmax0,fuel1,chips' : ARM ? 'frame,x,y,z,vx,vy,vz,ex,ey,ez,' + Array.from({ length: 20 }, (_, i) => 't' + i).join(',') : WHEELS ? 'frame,x,y,z,vx,vy,vz,ex,ey,ez,w0,w1,w2,w3,w4,w5' : TURN ? 'frame,x,y,z,c1x,c1z,vx,vy,vz,wx,wy,wz,ax,ay,az,ex,ey,ez' : CHIPS6 ? 'frame,' + [0, 1, 2, 3, 4, 5].map((c) => `x${c},y${c},z${c},ex${c},ey${c},ez${c}`).join(',') : 'frame,x,y,z,vx,vy,vz,ex,ey,ez,chips,wheel,wheelpow,wheelwy,wheely'];
 let prev = sim.corePosition().clone();
 for (let n = 1; n <= FRAMES; n++) {
   if (KEY) { if (n >= KEY[1] && n <= KEY[2]) keys.press(KEY[0]); else keys.release(KEY[0]); }
   const p = n >= ON && n <= OFF ? POWER : 0;
   if (engine && !SELF) { engine.default = p; engine.value = p; }
   sim.step();
+  if (CHIPS10) {
+    const a = api;
+    const m = a._CHIPS(0) - 1;
+    rows.push([n, ...Array.from({ length: 10 }, (_, c) => (c <= m ? [a._X(c), a._Y(c), a._Z(c)].map(f4).join(',') : ',,'))].join(','));
+    continue;
+  }
   if (FUEL) {
     const a = api as unknown as Record<string, (...x: unknown[]) => number>;
     rows.push([n, ...[a._X(0), a._Y(0), a._Z(0), a._VX(0), a._VY(0), a._VZ(0)].map(f4), a._FUEL(0), a._FUELMAX(0), a._GET(0, 'FUEL'), a._GET(0, 'FUELMAX'), a._GET(1, 'FUEL'), a._CHIPS(0)].join(','));
