@@ -1,0 +1,49 @@
+-- Turn test v2: log only. The model drives itself (Val ENGINE default) and steers itself (model Lua sets
+-- HANDLE at frame 150). Logs world position of core and chip 1 (heading), _V*, _W*, _A*, _E* of the core,
+-- the first Rudder's ANGLE and the first wheel's _W*.
+n=0
+buf=""
+wrote=-9
+lasterr="none"
+function OnInit()
+	n=0
+	buf="frame,x,y,z,c1x,c1z,vx,vy,vz,wx,wy,wz,ax,ay,az,ex,ey,ez,rudderangle,wheelwx,wheelwy,wheelwz\n"
+end
+
+function step()
+	local wheel=-1
+	local rudder=-1
+	for c=0,_CHIPS()-1 do
+		local t=_TYPE(c)
+		if (t==4 or t==5) and wheel<0 then wheel=c end
+		if t==2 and rudder<0 then rudder=c end
+	end
+	local ra=0
+	if rudder>=0 then ra=_GET(rudder,"ANGLE") end
+	local w=0
+	if wheel>=0 then w=wheel end
+	if n<=600 then
+		buf=buf..n..","..
+			_X(0)..",".._Y(0)..",".._Z(0)..",".._X(1)..",".._Z(1)..","..
+			_VX(0)..",".._VY(0)..",".._VZ(0)..","..
+			_WX(0)..",".._WY(0)..",".._WZ(0)..","..
+			_AX(0)..",".._AY(0)..",".._AZ(0)..","..
+			_EX(0)..",".._EY(0)..",".._EZ(0)..","..
+			ra..",".._WX(w)..",".._WY(w)..",".._WZ(w).."\n"
+	end
+	if n==600 then
+		local h=_FOPEN("log.txt","w")
+		if h>=0 then _FPUTS(h,buf) _FCLOSE(h) wrote=h else wrote=-1 end
+	end
+end
+
+function OnFrame()
+	n=n+1
+	local ok,err=pcall(step)
+	if not ok then lasterr=tostring(err) end
+	out(0,"frame ",n," wrote ",wrote)
+	out(1,"err ",lasterr)
+end
+
+function OnReset()
+end

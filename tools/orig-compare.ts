@@ -26,7 +26,10 @@ const SELF = args.includes('--self'); // leave ENGINE to the model's own Lua/def
 const TURN = args.includes('--turn');
 const WHEELS = args.includes('--wheels');
 const ARM = args.includes('--arm');
-const FUEL = args.includes('--fuel'); // harness_fuel.rcs columns // harness_arm.rcs columns: core pose/vel/euler + _T of chips 0..19 // harness_wheels.rcs columns: core pose/vel/euler + _WY of up to six wheels // harness_turn2.rcs columns: core pose, chip 1 xz, _V*, _W*, _A*, _E* // log chips 0..5 (x,y,z,ex,ey,ez) per frame instead, like harness_servo.rcs
+const FUEL = args.includes('--fuel'); // harness_fuel.rcs columns
+// --key=N:from:to holds key number N during frames [from, to] (xdotool held Up on the original)
+const keyArg = args.find((x) => x.startsWith('--key='));
+const KEY = keyArg ? keyArg.slice(6).split(':').map(Number) : null; // harness_arm.rcs columns: core pose/vel/euler + _T of chips 0..19 // harness_wheels.rcs columns: core pose/vel/euler + _WY of up to six wheels // harness_turn2.rcs columns: core pose, chip 1 xz, _V*, _W*, _A*, _E* // log chips 0..5 (x,y,z,ex,ey,ez) per frame instead, like harness_servo.rcs
 const tuneArg = args.find((x) => x.startsWith('--tune='));
 if (tuneArg) (globalThis as unknown as { __tune?: unknown }).__tune = JSON.parse(tuneArg.slice(7)); // same knobs as window.__tune (merged over TUNE_DEFAULTS)
 
@@ -59,6 +62,7 @@ if (!engine && !CHIPS6 && !SELF) throw new Error('model has no ENGINE val');
 const rows: string[] = [FUEL ? 'frame,x,y,z,vx,vy,vz,fuel,fuelmax,fuel0,fuelmax0,fuel1,chips' : ARM ? 'frame,x,y,z,vx,vy,vz,ex,ey,ez,' + Array.from({ length: 20 }, (_, i) => 't' + i).join(',') : WHEELS ? 'frame,x,y,z,vx,vy,vz,ex,ey,ez,w0,w1,w2,w3,w4,w5' : TURN ? 'frame,x,y,z,c1x,c1z,vx,vy,vz,wx,wy,wz,ax,ay,az,ex,ey,ez' : CHIPS6 ? 'frame,' + [0, 1, 2, 3, 4, 5].map((c) => `x${c},y${c},z${c},ex${c},ey${c},ez${c}`).join(',') : 'frame,x,y,z,vx,vy,vz,ex,ey,ez,chips,wheel,wheelpow,wheelwy,wheely'];
 let prev = sim.corePosition().clone();
 for (let n = 1; n <= FRAMES; n++) {
+  if (KEY) { if (n >= KEY[1] && n <= KEY[2]) keys.press(KEY[0]); else keys.release(KEY[0]); }
   const p = n >= ON && n <= OFF ? POWER : 0;
   if (engine && !SELF) { engine.default = p; engine.value = p; }
   sim.step();

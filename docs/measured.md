@@ -53,6 +53,7 @@ columns. Raw logs: `D:\snaptiles-models\quarantine\original\runs\*.csv` (not in 
 | Arm damage | durability `_T` 10000 → 5000 on a 25.2 kg Chip at option 50000 (= 2.52 × energy / mass); a Frame (12.6 kg) is destroyed by one such shot, a Chip by one at 200000. A destroyed chip reads **−1, comes loose and flies off** with the shot (≈ 50 m/s along it). A Frame was missed by the first three shots (smaller hit sphere?) | armline_o50000 (+_Frame), armline2_o200000 (chip 9 position) |
 | fuel | capacities per chip as the readme says: Core 2,000,000, Chip/Rudder/Trim 1,000,000, Frame types 500,000, Weight 6,000,000 (× option), Wheel/Jet/Arm 0 (`_FUELMAX` of a 4-wheel car = 6,000,000). With regulation **E off** (normal fuel) a wheel burns **0.025 × \|power\| per frame** at any speed or load (two wheels at 2500: 125/frame, also while airborne), a Jet **0.1 × \|power\|** (10000 → 1000/frame), an Arm its charge 1:1 (5000/frame while charging). Fuel is drawn from every chip in proportion to what it holds. With E on (the default) nothing is consumed | fuel_wheel / fuel_jet / fuel_arm (`harness_fuel.rcs`: `_SETREG("E",0)`) |
 | H key ball | pressing H three times adds no ball with the stock input configuration (the readme requires a keyboard "reset" in Configure Input first); `_ADDBALL(r, x, y, z, density)` is a scenario function and SnapTiles has no scenario layer | ball1/ball3.png |
+| Cowl shapes | option 0 plate, **1 outline** (edges only, open inside), **2 disc** inscribed in the tile, 3/4 right triangles (apex NE / NW), **5 tombstone** (attached half square, far half a semicircle, flat), 6/7 plates | cowl_0…7.png, cowl_montage.png |
 | axes | W is **+x**, N is −z, y up in the original (SnapTiles keeps W = −x internally and mirrors the x of `_X/_GX/_VX` and the axis vectors in the Lua API; the Euler and angular-velocity readouts are matched numerically, not by mirroring) | rest dumps, turn runs |
 | Trim / Rudder signs | consistent with `JOINT_SIGN` (+1 / −1) | trimrudder30 positions |
 | arrow keys | 0 ↑ 1 ↓ 2 ← 3 → (then Z X C A S D V B F G Q W E) | bike (0 engine, 1 brake), tonbo, zrobo |
@@ -130,13 +131,12 @@ acceleration, `_WY` = v/r). Hence the contact-force wheel above.
 | Arm shell life / range in air | 4 s placeholder (readme: 150 m under water); hit sphere of a Frame; damage on a Weight (the probe crashed the exe) | `ARM_SHELL_LIFE`, `ARM_HIT_RADIUS` |
 | fade of a **rolling** wheel above power 3700 | the ω0 = power/20.6 zero point is fitted on sliding wheels; a rolling wheel at high power is assumed to follow the same torque law (the original's power-5000 car still accelerated at 4.1 m/s² at 29.6 m/s, consistent with it). Corpus car1 now reaches 230 km/h | `WHEEL_SPIN_PER_POWER` |
 | friction-ellipse priority at high drive | the original keeps 0.4–0.9 g of lateral acceleration while its powered axle is saturated at 25–35 m/s; drive-first gives 0.2–0.7 (right trend, low early). At power 10000 the original is also 12% slower in a straight line than at 5000 (wheelspin?), SnapTiles is not | `TYRE_LATERAL_FIRST` |
-| cowl option 5 / 1 / 2 | bulging ribbon / plate / plate | `scene.ts` |
 | network, scenarios (`System.rcs`, `_ADDBALL`, rings, `_LOADLAND`) | stubs / absent | `simulation.ts` |
 | `_ANALOG` range, `_HAT` | gamepad axes returned as ±1000, hat 0 (not measured) | `simulation.ts` |
 
 ## Known failures
 
-- Corpus walkers: `zrobo`, `4leg1` and the walker sample walk with `SERVO_HOLD` 1000; `2walk` and `4leg2` tip over. With a weak hold (3) `2walk` walks fast and `zrobo` falls instead — the grounded-foot heuristic is only a proxy for the original's constraint solver, and no single setting carries every gait.
+- Corpus walkers (2026-10-28, Up held on the original from 4 s): the original walks all three — `zrobo` 2.4 m in 16 s, `2walk` 32 m (fast, curving), `4leg2` 23 m straight, all upright. SnapTiles: `zrobo` and `4leg1` walk with `SERVO_HOLD` 1000 (zrobo even faster than the original, 13 m); `2walk` flips at spawn with 1000 but stands and walks 18 m with hold 1 (or with the inertia split off); `4leg2` stands with 1000 or 30 and rolls over once it walks with any setting (hold 1: 3 m then ez 1.4). No single hold works for all three: the grounded-side hold is a heuristic for the original's momentum-free servo, not its model. Headless runs with `--key=0:120:540`.
 - `weapon/cannon.rcd` indexes an undefined Val (`math.mod(nil)`): the model itself.
 
 ## Root causes worth remembering

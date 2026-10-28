@@ -29,66 +29,80 @@ interface TileView {
 }
 
 /**
- * Cowl shapes (option): 0 plate, 3/4 the two right triangles of a tile cut on
- * its diagonal, 5 a curved plate (drawn flat), 1/2 undocumented (drawn as plates).
- * Which triangle is which was read off the model corpus: children of option 3
- * cowls attach on their east side (143 vs 5), option 4 on the west (156 vs 8),
- * with "north" meaning away from the parent. So option 3 keeps the attached edge
- * and the east edge, option 4 the attached edge and the west edge.
+ * Cowl shapes (option), read off the original (screenshots of each option standing on a core,
+ * 2026-10-28): 0 plate, 1 an outline (edges only, open inside), 2 a disc inscribed in the tile,
+ * 3/4 the two right triangles of a tile cut on its diagonal (apex NE for 3, NW for 4, with
+ * "north" meaning away from the parent, as the corpus attaches children on their east/west
+ * edges), 5 a tombstone: the attached edge full width, the far half rounded, 6/7 plates.
  */
 function cowlGeometry(option: number, dir: TileInstance['dir'], cache: Map<string, THREE.BufferGeometry>): THREE.BufferGeometry {
-  const shape = option === 3 || option === 4 || option === 5 ? option : 0;
+  const shape = option >= 1 && option <= 5 ? option : 0;
   const key = `${shape}${shape ? dir ?? 'N' : ''}`;
   let g = cache.get(key);
   if (g) return g;
-  if (shape === 0) {
-    g = new THREE.BoxGeometry(TILE, TILE_T * 0.5, TILE);
-  } else if (shape === 5) {
-    // "curved" cowl (shape undocumented): a ribbon spanning the tile that bulges up 0.18
-    const h = TILE / 2;
-    const n = 10;
+  const h = TILE / 2;
+  const t = TILE_T * 0.25;
+  // a flat polygon (counter-clockwise seen from +Y) extruded to thickness 2t; built for a north-attached
+  // cowl: parent on +Z, the attached edge is +Z, far edge -Z
+  const prism = (poly: [number, number][]): THREE.BufferGeometry => {
     const pos: number[] = [];
-    const idx: number[] = [];
-    for (let i = 0; i <= n; i++) {
-      const t = i / n;
-      const z = h - TILE * t;
-      const y = 0.18 * Math.sin(Math.PI * t);
-      pos.push(-h, y, z, h, y, z);
+    const push = (...v: number[][]) => v.forEach((q) => pos.push(...q));
+    const n = poly.length;
+    const top = poly.map(([x, z]) => [x, t, z]);
+    const bot = poly.map(([x, z]) => [x, -t, z]);
+    for (let i = 1; i < n - 1; i++) {
+      push(top[0], top[i + 1], top[i]);
+      push(bot[0], bot[i], bot[i + 1]);
     }
     for (let i = 0; i < n; i++) {
-      const a = i * 2;
-      idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      const j = (i + 1) % n;
+      push(top[i], top[j], bot[i]);
+      push(top[j], bot[j], bot[i]);
     }
-    g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setIndex(idx);
-    const turn = { N: 0, S: Math.PI, E: -Math.PI / 2, W: Math.PI / 2 }[dir ?? 'N'];
-    if (turn) g.rotateY(turn);
-    g.computeVertexNormals();
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    return geo;
+  };
+  if (shape === 0) {
+    g = new THREE.BoxGeometry(TILE, TILE_T * 0.5, TILE);
+  } else if (shape === 1) {
+    // outline: four thin bars along the edges
+    const w = 0.04;
+    const bar = (x: number, z: number, sx: number, sz: number) => new THREE.BoxGeometry(sx, TILE_T * 0.5, sz).translate(x, 0, z);
+    const parts = [bar(0, h - w / 2, TILE, w), bar(0, -h + w / 2, TILE, w), bar(h - w / 2, 0, w, TILE), bar(-h + w / 2, 0, w, TILE)];
+    g = mergeGeometries(parts);
+  } else if (shape === 2) {
+    const poly: [number, number][] = [];
+    for (let i = 0; i < 32; i++) { const a = (i / 32) * Math.PI * 2; poly.push([h * Math.cos(a), -h * Math.sin(a)]); }
+    g = prism(poly);
+  } else if (shape === 5) {
+    // tombstone: attached half square, far half a semicircle
+    const poly: [number, number][] = [[-h, h], [h, h]];
+    for (let i = 0; i <= 16; i++) { const a = (i / 16) * Math.PI; poly.push([h * Math.cos(a), -h * Math.sin(a)]); }
+    g = prism(poly);
   } else {
-    // built for a north-attached cowl: parent on +Z, the attached edge is +Z, far edge -Z
-    const h = TILE / 2;
-    const t = TILE_T * 0.25;
     const ax = shape === 3 ? h : -h; // apex corner on the far edge: NE for 3, NW for 4
-    const top = [[-h, t, h], [h, t, h], [ax, t, -h]];
-    const bot = top.map(([x, , z]) => [x, -t, z]);
-    const pos: number[] = [];
-    const push = (...v: number[][]) => v.forEach((p) => pos.push(...p));
-    push(top[0], top[1], top[2]);
-    push(bot[2], bot[1], bot[0]);
-    for (let i = 0; i < 3; i++) {
-      const j = (i + 1) % 3;
-      push(top[i], bot[i], top[j]);
-      push(top[j], bot[i], bot[j]);
-    }
-    g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g = prism([[-h, h], [h, h], [ax, -h]]);
+  }
+  if (shape) {
     // turn so the attached edge faces the parent: S parent is at -Z, E parent at -X, W parent at +X
     const turn = { N: 0, S: Math.PI, E: -Math.PI / 2, W: Math.PI / 2 }[dir ?? 'N'];
     if (turn) g.rotateY(turn);
     g.computeVertexNormals();
   }
   cache.set(key, g);
+  return g;
+}
+
+/** concatenate non-indexed box geometries (position only) */
+function mergeGeometries(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const pos: number[] = [];
+  for (const p of parts) {
+    const q = p.toNonIndexed();
+    pos.push(...(q.getAttribute('position').array as Float32Array));
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   return g;
 }
 
