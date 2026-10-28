@@ -140,6 +140,8 @@ export const SERVO_RATE = 180;
 export const SERVO_TELEPORT = true;
 /** extra inertia factor (× mass) for a grounded body a servo would drag along the ground */
 export const SERVO_HOLD = 1000;
+/** every hinge/yaw/roll tile is its own body on a hard-limited joint instead of being welded into a group */
+export const ALL_JOINTS = false;
 /** servo stiffness (N·m/rad at spring=1) when > 0; 0 = infinitely stiff (hard limits). Probe knob: window.__tune.softServo */
 export const SOFT_SERVO = 0;
 export const SERVO_BAND = (20 * Math.PI) / 180;
@@ -484,7 +486,11 @@ export class PhysicsWorld {
       // (spring=0.5: none) — spring joints are rigid for practical purposes, so they are welded unless asked
       const noSpring = !((globalThis as unknown as { __tune?: { springJoints?: boolean } }).__tune?.springJoints ?? false);
       const compliant = !noSpring && !!parentTb && !animated && tile.spec.joint !== 'wheel' && tile.spec.joint !== 'fixed' && springVal < 1;
-      const startsGroup = !parentTb || animated || compliant;
+      // every hinge its own body on a hard-limited revolute joint (probe knob allJoints): the original's joints are
+      // rigid statically but flex and recover under an impulse (measured 2026-10-28, leg probes), which a welded
+      // group cannot do and an iteratively solved chain of joints does
+      const everyJoint = ((globalThis as unknown as { __tune?: { allJoints?: boolean } }).__tune?.allJoints ?? ALL_JOINTS) && !!parentTb && !animated && !compliant && tile.spec.joint !== 'wheel' && tile.spec.joint !== 'fixed';
+      const startsGroup = !parentTb || animated || compliant || everyJoint;
 
       // Wheel = rim (a plate folded like a chip) + rotor (the disc). The rim is welded to the
       // parent, or gets its own fold joint when the angle is a variable.
@@ -579,7 +585,14 @@ export class PhysicsWorld {
         jointAnchorLocal = new THREE.Vector3(anchL.x, anchL.y, anchL.z);
         const jd = R.JointData.revolute(toLocal(parentTb.body, anchorW), toLocal(body, anchorW), axisL);
         joint = this.world.createImpulseJoint(jd, parentTb.body, body, true) as RAPIER.RevoluteImpulseJoint;
-        if (animated) joint.setLimits(0, 0);
+        if (animated || everyJoint) joint.setLimits(0, 0);
+        // a stiff position motor on top of the hard limits: rapier's limits alone give under static load
+        // (probe knob jointStiff = stiffness N·m/rad, damping = stiffness/100)
+        const stiff = (globalThis as unknown as { __tune?: { jointStiff?: number } }).__tune?.jointStiff ?? 0;
+        if (everyJoint && stiff > 0) {
+          joint.configureMotorModel(R.MotorModel.ForceBased);
+          joint.configureMotorPosition(0, stiff, stiff / 100);
+        }
         if (compliant) {
           const damper = tile.node.attrs.damper !== undefined ? attr(tile.node, 'damper', env, 0.5) : attr(tile.node, 'dumper', env, 0.5);
           joint.configureMotorModel(R.MotorModel.ForceBased);
