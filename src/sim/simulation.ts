@@ -321,8 +321,33 @@ export class Simulation {
       _CHIPS: () => this.assembly?.chipCount ?? 0,
       _WEIGHT: () => this.assembly?.tiles.reduce((s, t) => s + t.mass, 0) ?? 0,
       _M: (n: number) => this.tileOf(n)?.mass ?? 0,
-      _FUEL: () => 1_000_000,
-      _FUELMAX: () => 1_000_000,
+      _FUEL: () => this.physics.fuelTotal(),
+      _FUELMAX: () => this.physics.fuelMaxTotal(),
+      // scenario-style attribute access (the subset models use): FUEL/FUELMAX per chip, geometry and regulation
+      _GET: (...a: number[]) => {
+        const [n, name] = [a[0], String(a[1] as unknown)];
+        const t = this.tileOf(n);
+        if (!t) return 0;
+        const key = String(name).toUpperCase();
+        if (key === 'FUEL') return this.physics.fuel.get(t.id) ?? 0;
+        if (key === 'FUELMAX') return this.physics.fuelMax.get(t.id) ?? 0;
+        if (key === 'PARENT') return t.parent ? t.parent.chipIndex : -1;
+        if (key === 'TOP') { let r = t; while (r.parent && !r.detached) r = r.parent; return r.chipIndex; }
+        if (key === 'DIR') return t.dir ? DIR_CODE[t.dir] : 0;
+        if (key === 'OPTION') return t.option;
+        return attrOf(n, key.toLowerCase());
+      },
+      _SET: (...a: number[]) => {
+        const [n, name, v] = [a[0], String(a[1] as unknown), Number(a[2])];
+        const t = this.tileOf(n);
+        if (!t) return 0;
+        const key = String(name).toUpperCase();
+        if (key === 'FUEL') this.physics.fuel.set(t.id, Math.max(0, Math.min(this.physics.fuelMax.get(t.id) ?? 0, v)));
+        else if (key === 'FUELMAX') this.physics.fuelMax.set(t.id, Math.max(0, v));
+        return 0;
+      },
+      _SETREG: (...a: number[]) => { this.physics.regulations[String(a[0] as unknown).toUpperCase()] = a[1] ? 1 : 0; return 0; },
+      _GETREG: (...a: number[]) => this.physics.regulations[String(a[0] as unknown).toUpperCase()] ?? 0,
       _E: (n: number) => { const t = this.tileOf(n); return t ? this.physics.armCharge.get(t.id) ?? 0 : 0; },
       _T: (n: number) => { const t = this.tileOf(n); return t ? (t.durability ?? 10000) : -1; },
       _X: (n: number) => -pos(n, 'x'), // the original is left-handed: W = +x (rest geometry of Basic measured)

@@ -1,0 +1,38 @@
+-- Fuel probe: regulation E off (normal fuel), log the model's fuel and the core velocity every frame to 600.
+n=0
+buf=""
+wrote=-9
+lasterr="none"
+regerr="none"
+function OnInit()
+	n=0
+	local ok,err=pcall(function() _SETREG("E",0) end)
+	if not ok then regerr=tostring(err) end
+	buf="frame,x,y,z,vx,vy,vz,fuel,fuelmax,fuel0,fuelmax0,fuel1,chips\n"
+end
+
+function step()
+	local f1=-1
+	if _CHIPS()>1 then f1=_GET(1,"FUEL") or -1 end
+	if n<=600 then
+		buf=buf..n..","..
+			_X(0)..",".._Y(0)..",".._Z(0)..","..
+			_VX(0)..",".._VY(0)..",".._VZ(0)..","..
+			(_FUEL(0) or -1)..","..(_FUELMAX(0) or -1)..","..(_GET(0,"FUEL") or -1)..","..(_GET(0,"FUELMAX") or -1)..","..f1..",".._CHIPS().."\n"
+	end
+	if n==600 then
+		local h=_FOPEN("log.txt","w")
+		if h>=0 then _FPUTS(h,buf) _FCLOSE(h) wrote=h else wrote=-1 end
+	end
+end
+
+function OnFrame()
+	n=n+1
+	local ok,err=pcall(step)
+	if not ok then lasterr=tostring(err) end
+	out(0,"frame ",n," wrote ",wrote)
+	out(1,"err ",lasterr," reg ",regerr)
+end
+
+function OnReset()
+end

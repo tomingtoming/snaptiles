@@ -187,6 +187,17 @@ export const ARM_DAMAGE_PER_ENERGY = 2.52;
 /** recoil impulse per unit of shot energy (N·s): measured +0.42 m/s per shot on a 518 kg car at option 50000 */
 export const ARM_RECOIL_PER_ENERGY = 0.0043; // and +1.7 m/s per shot at 200000: linear in energy
 export const ARM_DESTROY_DETACH = true;
+
+/** Fuel (readme 15B24/B25, measured 2026-10-28 with regulation E off): capacities per chip Core 2,000,000,
+ *  Chip-type 1,000,000, Frame-type 500,000, Weight 6,000,000 × option, others 0. A wheel burns 0.025 × |power|
+ *  per 30 fps frame whatever its speed or load (two wheels at 2500: 125/frame), an Arm burns its charge
+ *  (5000/frame while charging), a Jet FUEL_PER_POWER_JET × |power|. Regulation E on (the default) is the
+ *  "high-efficiency fuel": nothing is consumed. Fuel is drawn from the whole model, Weights first. */
+export const FUEL_CAPACITY: Record<string, number> = { core: 2_000_000, chip: 1_000_000, rudder: 1_000_000, trim: 1_000_000, frame: 500_000, rudderf: 500_000, trimf: 500_000, weight: 6_000_000 };
+export const FUEL_PER_POWER_WHEEL = 0.025;
+export const FUEL_PER_POWER_JET = 0.1; // measured: a jet at 10000 burns 1000 per frame (the readme's efficiency 10); wheels burn power/40, not /30
+export const FUEL_PER_ARM_CHARGE = 1;
+export const REGULATION_DEFAULTS: Record<string, number> = { G: 1, A: 1, T: 1, J: 0, U: 0, C: 1, S: 1, E: 1 };
 export const ARM_SHELL_MASS = 2;
 export const ARM_SHELL_LIFE = 4 * 60;
 export const ARM_ARMED_AFTER_TICK = 150 * 2;
@@ -202,6 +213,38 @@ export class PhysicsWorld {
   totalMass = 0;
   projectiles: Projectile[] = [];
   armCharge = new Map<number, number>(); // tile id → energy
+  /** fuel per tile id and the regulation switches (letters of the original's HUD row) */
+  fuel = new Map<number, number>();
+  fuelMax = new Map<number, number>();
+  regulations: Record<string, number> = { ...REGULATION_DEFAULTS, ...((globalThis as unknown as { __tune?: { regulations?: Record<string, number> } }).__tune?.regulations ?? {}) };
+
+  /** total fuel / capacity of the model */
+  fuelTotal(): number { let t = 0; for (const v of this.fuel.values()) t += v; return t; }
+  fuelMaxTotal(): number { let t = 0; for (const v of this.fuelMax.values()) t += v; return t; }
+
+  /** burn `amount` (units per 30 fps frame, already scaled to the step) if regulation E is off; returns the
+   *  fraction of the demand that could be met (0 when the tanks are dry) */
+  useFuel(amount: number): number {
+    if (this.regulations.E || amount <= 0) return 1;
+    let total = this.fuelTotal();
+    if (total <= 0) return 0;
+    const take = Math.min(amount, total);
+    // Weights first, then every other chip in proportion to what it holds
+    let left = take;
+    const weights = this.tiles.filter((t) => t.tile.type === 'weight' && (this.fuel.get(t.tile.id) ?? 0) > 0);
+    const wsum = weights.reduce((a, t) => a + (this.fuel.get(t.tile.id) ?? 0), 0);
+    if (wsum > 0) {
+      const w = Math.min(left, wsum);
+      for (const t of weights) { const f = this.fuel.get(t.tile.id)!; this.fuel.set(t.tile.id, f - (w * f) / wsum); }
+      left -= w;
+    }
+    if (left > 0) {
+      const others = this.tiles.filter((t) => t.tile.type !== 'weight' && (this.fuel.get(t.tile.id) ?? 0) > 0);
+      const osum = others.reduce((a, t) => a + (this.fuel.get(t.tile.id) ?? 0), 0);
+      if (osum > 0) for (const t of others) { const f = this.fuel.get(t.tile.id)!; this.fuel.set(t.tile.id, f - (left * f) / osum); }
+    }
+    return take / amount;
+  }
   private assembly: Assembly | null = null;
   private env: ValEnv = () => undefined;
 
@@ -302,7 +345,9 @@ export class PhysicsWorld {
   private updateArm(tb: TileBody, pose: Pose, normal: THREE.Vector3, env: ValEnv): void {
     const tile = tb.tile;
     const option = Math.max(0, tile.option);
-    const charge = Math.min(option || Infinity, (this.armCharge.get(tile.id) ?? 0) + ARM_CHARGE_PER_STEP);
+    const have = this.armCharge.get(tile.id) ?? 0;
+    const want = Math.min(ARM_CHARGE_PER_STEP, Math.max(0, (option || Infinity) - have));
+    const charge = have + want * this.useFuel(FUEL_PER_ARM_CHARGE * want);
     this.armCharge.set(tile.id, charge);
     const power = tile.powerless ? 0 : attr(tile.node, 'power', env, 0);
     if (option <= 0 || power < option || charge < option || this.tick < ARM_ARMED_AFTER_TICK) return;
@@ -390,6 +435,16 @@ export class PhysicsWorld {
     this.assembly = a;
     this.env = env;
     this.totalMass = a.tiles.reduce((m, t) => m + t.mass, 0);
+    if (!opts.inPlace) {
+      // a fresh model: full tanks (a detach rebuild keeps what was left)
+      this.fuel.clear();
+      this.fuelMax.clear();
+      for (const t of a.tiles) {
+        const cap = (FUEL_CAPACITY[t.type] ?? 0) * (t.type === 'weight' ? Math.max(1, Math.min(8, t.option || 1)) : 1);
+        this.fuel.set(t.id, cap);
+        this.fuelMax.set(t.id, cap);
+      }
+    }
     const tyreColliders = new Map<number, import('@dimforge/rapier3d-compat').Collider>();
 
     for (const tile of a.tiles) {
@@ -633,7 +688,8 @@ export class PhysicsWorld {
       body = this.byId.get(t.id)?.body ?? body;
     }
     const DEG = Math.PI / 180;
-    const power = tile.powerless ? 0 : attr(tile.node, 'power', env, 0);
+    let power = tile.powerless ? 0 : attr(tile.node, 'power', env, 0);
+    if (power !== 0) power *= this.useFuel(FUEL_PER_POWER_WHEEL * Math.abs(power) * this.dt * 30);
     const brake = attr(tile.node, 'brake', env, 0);
     if (tb.rimJoint) {
       const a = jointSign('wheel', tile.dir) * (attr(tile.node, 'angle', env, 0) - tb.restAngle) * DEG; // rim fold
@@ -929,7 +985,8 @@ export class PhysicsWorld {
       if (tile.type === 'arm') this.updateArm(tb, pose, normal, env);
 
       if (tile.spec.jet) {
-        const power = tile.powerless ? 0 : attr(tile.node, 'power', env, 0);
+        let power = tile.powerless ? 0 : attr(tile.node, 'power', env, 0);
+        if (power !== 0) power *= this.useFuel(FUEL_PER_POWER_JET * Math.abs(power) * this.dt * 30);
         tb.jetPower = power;
         if (power !== 0) {
           // option 1/2 = balloon (wikiwiki: 1 hydrogen, 2 air): buoyancy straight up, whatever the tilt;
