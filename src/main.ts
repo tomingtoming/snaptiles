@@ -64,6 +64,7 @@ function buildKeyCaps(s: Simulation): void {
   // keys bound in Key{} plus any _KEY(n) literal the script polls
   const polled = [...(s.model.script?.source.matchAll(/_KEY(?:DOWN|UP)?\s*\(\s*(\d+)\s*\)/g) ?? [])].map((m) => Number(m[1]));
   const used = [...new Set([...s.model.keys.map((k) => k.key), ...polled])].sort((a, b) => a - b);
+  keys.setWasdAliases(used);
   for (const n of used) {
     const def = KEY_TABLE[n];
     if (!def) continue;
@@ -206,7 +207,7 @@ function frame(now: number): void {
     scene.updateDynamic(sim.env);
     scene.setLines3d(sim.lines3d);
     scene.syncProjectiles(sim.physics.projectiles);
-    drawHud(sim.lines2d);
+    drawHud(sim.lines2d, sim);
     if (!dragging && performance.now() - lastDrag > 3000) scene.chaseYaw(sim.coreHeading());
     scene.follow(sim.corePosition());
     updateOverlay(sim);
@@ -256,7 +257,7 @@ function updateOverlay(s: Simulation): void {
 // _MOVE2D/_LINE2D overlay: x spans -1..1 across the width, y is 1 at the top and -1 at the bottom
 const hud = $<HTMLCanvasElement>('hud');
 const hudCtx = hud.getContext('2d')!;
-function drawHud(buf: number[]): void {
+function drawHud(buf: number[], s: Simulation): void {
   const w = hud.clientWidth;
   const h = hud.clientHeight;
   if (hud.width !== w || hud.height !== h) {
@@ -264,6 +265,18 @@ function drawHud(buf: number[]): void {
     hud.height = h;
   }
   hudCtx.clearRect(0, 0, w, h);
+  // the original's dials: speed in km/h and altitude in m (the compass is the camera's job here)
+  const core = s.physics.tiles[0];
+  if (core) {
+    const p = s.physics.pose(core);
+    const kmh = s.physics.velocity(core, p).length() * 3.6;
+    hudCtx.font = `${Math.max(12, Math.round(h / 28))}px system-ui, sans-serif`;
+    hudCtx.textAlign = 'right';
+    hudCtx.textBaseline = 'bottom';
+    hudCtx.fillStyle = 'rgba(255,255,255,0.85)';
+    hudCtx.fillText(`${kmh.toFixed(0)} km/h`, w - 12, h - 12);
+    hudCtx.fillText(`${p.position.y.toFixed(1)} m`, w - 12, h - 12 - Math.round(h / 24));
+  }
   if (buf.length === 0) return;
   hudCtx.lineWidth = 1.5;
   for (let i = 0; i < buf.length; i += 7) {

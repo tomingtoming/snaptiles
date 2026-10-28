@@ -32,6 +32,8 @@ export const KEY_TABLE: KeyDef[] = [
 export class KeyState {
   down = new Set<number>();
   private byCode = new Map<string, number>();
+  /** extra physical keys standing in for a key number (WASD for the arrows when the model leaves 7/8/9/15 unused) */
+  private aliases = new Map<string, number>();
 
   constructor(private target: EventTarget = window) {
     KEY_TABLE.forEach((k, i) => this.byCode.set(k.code, i));
@@ -42,16 +44,28 @@ export class KeyState {
 
   private onDown = (e: KeyboardEvent) => {
     if (isTyping(e)) return;
-    const n = this.byCode.get(e.code);
+    const n = this.aliases.get(e.code) ?? this.byCode.get(e.code);
     if (n === undefined) return;
     this.down.add(n);
     e.preventDefault();
   };
   private onUp = (e: KeyboardEvent) => {
-    const n = this.byCode.get(e.code);
+    const n = this.aliases.get(e.code) ?? this.byCode.get(e.code);
     if (n === undefined) return;
     this.down.delete(n);
   };
+
+  /** The original's table (measured 2026-10-28): 0..3 are the arrows and W/A/S/D are their own numbers
+   *  15/7/8/9. A model that binds none of those gets WASD as a second way to press the arrows. */
+  setWasdAliases(usedNumbers: Iterable<number>): void {
+    this.aliases.clear();
+    const used = new Set(usedNumbers);
+    if ([7, 8, 9, 15].some((n) => used.has(n))) return;
+    this.aliases.set('KeyW', 0);
+    this.aliases.set('KeyS', 1);
+    this.aliases.set('KeyA', 2);
+    this.aliases.set('KeyD', 3);
+  }
 
   isDown(n: number): boolean {
     return this.down.has(n);
