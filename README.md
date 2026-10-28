@@ -24,10 +24,16 @@ bun run dev
 ```
 
 Paste a model into the editor and press ▶ (or Ctrl+Enter). `R` resets the
-model in place, `U` reloads it, Ctrl+S saves the editor as a `.rcd` file, and a
-`.rcd`/`.txt` can be dropped onto the editor. Drag to orbit, wheel or pinch to
-zoom. The keycaps at the bottom are the model's keys and work by touch. Sound
-is synthesized (engine, jets, shots, impacts); 🔊 mutes it.
+model in place, `U` reloads it, Space pauses, Ctrl+S saves the editor as a
+`.rcd` file, and a `.rcd`/`.txt` can be dropped onto the editor. Views: `1`
+chase, `2` free orbit, `3` top, `4` onboard (the model's `_ZOOM` sets its field
+of view), or the ◎ button. Drag to orbit, wheel or pinch to zoom. The keycaps
+at the bottom are the model's keys and work by touch; W/A/S/D double as the
+arrows when the model does not bind key numbers 7/8/9/15 of its own, and a
+gamepad's stick/d-pad and buttons press the arrows and Z X C A S D V B. Sound
+is synthesized (engine, jets, shots, impacts); 🔊 mutes it. Fuel is consumed
+only when a script turns regulation E off (`_SETREG("E", 0)`), as in the
+original.
 
 Samples: `car` (↑↓ drive, ←→ steer), `plane` (Z/X throttle, ↓ pull up),
 `walker` (↑ walk, ←→ turn; a Lua gait), `hover` (jets with a Lua attitude
@@ -46,7 +52,8 @@ Lua  { function OnFrame() out(0, "x", _X(0)) end }
 - `Val` declares variables (`default/min/max/step`; `step` is the per-frame
   return toward `default` when nothing touches the variable).
 - `Key` adds `step` to a variable every frame a key is held. Key numbers:
-  `0 ↑ 1 ↓ 2 ← 3 → 4 Z 5 X 6 C 7 A 8 S 9 D 10 V 11 B 12 F 13 G 14 Q 15 W 16 E`.
+  `0 ↑ 1 ↓ 2 ← 3 → 4 Z 5 X 6 C 7 A 8 S 9 D 10 V 11 B 12 F 13 G 14 Q 15 W 16 E`
+  (measured on the original; no other key has a number).
 - `Body` is a tree of tiles. Each child is attached to a side of its parent
   (`N S E W`). `Chip`/`Frame`/`Weight`/`Jet`/`Arm` fold about the shared edge
   (`angle`), `Rudder` turns about the parent's normal, `Trim` rolls about the
