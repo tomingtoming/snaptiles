@@ -45,6 +45,10 @@ export interface TileBody {
   /** the tyre collider (wheels) and the smoothed normal force it measured in the last steps */
   collider: import('@dimforge/rapier3d-compat').Collider | null;
   contactForce: number;
+  /** the wheel's static share of the weight (lever rule), kept for capping the grip load */
+  staticLoad: number;
+  /** steps since this tyre last (re)gained ground contact: a touchdown may use the full impact load for a while */
+  contactAge: number;
   /** wheels: the tyre is sliding against the ground (drive or brake beyond the grip), spin then integrates */
   slipping: boolean;
   /** revolute axis in the parent body's local frame (for measuring the current joint angle) */
@@ -110,6 +114,10 @@ export const TYRE_LOAD_SMOOTH = 0.3;
 /** dynamic load used for grip is capped at this multiple of the wheel's static share (the touchdown spike must still
  *  shove the car with the wheels' stored momentum, measured ~1000 N·s, but not explode) */
 export const TYRE_LOAD_CAP = 30;
+/** sustained grip load cap as a multiple of the static share (load transfer yes, aero downforce no) */
+export const TYRE_LOAD_CAP_SUSTAINED = 1.5;
+/** steps after a touchdown during which the full impact load (TYRE_LOAD_CAP) may be used for grip */
+export const TYRE_TOUCHDOWN_STEPS = 40;
 /** spec: 6 power = 1 N */
 export const JET_NEWTON_PER_POWER = 0.145; // measured 2026-10-28: a 530 kg wheeled car pushed by a jet at power 10000 accelerates at 2.74 m/s² (1452 N); the same at 5000 (1.38 m/s²); wheel option makes no difference
 /** plate aero (per 1 m² tile): broadside drag N per (m/s)², and the lift slope N per (m/s)² per sin α.
@@ -603,7 +611,7 @@ export class PhysicsWorld {
         }
       }
       const restAngle = angleAnimated ? attr(tile.node, 'angle', env, 0) : 0;
-      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0, servoAngle: 0, spin: 0, spinAngle: 0, contactPoint: null, load: 0, collider: null, contactForce: 0, slipping: false, jointAxisLocal, jointAnchorLocal };
+      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0, servoAngle: 0, spin: 0, spinAngle: 0, contactPoint: null, load: 0, collider: null, contactForce: 0, staticLoad: 0, contactAge: 0, slipping: false, jointAxisLocal, jointAnchorLocal };
       tb.collider = tyreColliders.get(tile.id) ?? null;
       this.tiles.push(tb);
       this.byId.set(tile.id, tb);
@@ -796,13 +804,17 @@ export class PhysicsWorld {
         const vl = vP.dot(l);
         const k = (globalThis as unknown as { __tune?: { wheelTorque?: number } }).__tune?.wheelTorque ?? WHEEL_TORQUE_PER_POWER;
         const wheels = this.assembly ? this.assembly.tiles.filter((t) => t.spec.wheel).length : 1;
+        tb.contactAge = tb.contactPoint ? tb.contactAge + 1 : 0;
         tb.contactPoint = P;
         const load = (((globalThis as unknown as { __tune?: { tyreStaticLoad?: boolean } }).__tune?.tyreStaticLoad ?? TYRE_STATIC_LOAD) && tb.load > 0 ? tb.load : (this.totalMass * 9.8) / Math.max(1, wheels)) * TYRE_LOAD_SHARE;
         // motor torque: k·power·(1 − spin/ω0). Measured: at power 1000 and 2500 the push fades linearly to zero at
         // 180 rad/s; a sliding wheel at power 5000/10000 settles near 135/375 rad/s against ~1030 N of ground
         // force, which only fits if the fade's zero point grows with power above ~3700 (ω0 = power/20.6)
-        const w0 = Math.max(WHEEL_SPIN_FADE, Math.abs(power) * WHEEL_SPIN_PER_POWER);
-        let tau = power !== 0 ? power * k * (1 - (Math.sign(power) * tb.spin) / w0) : 0;
+        // two regimes (measured): a rolling wheel's push fades to zero at 180 rad/s whatever the power (power 1000
+        // and 2500 straight runs; the corpus car1 on the original stops accelerating near 54 m/s = 180 rad/s on
+        // 0.3 m wheels and takes off), while a sliding wheel spins on to p/20.6 rad/s (135 at 5000, 376 at 10000)
+        const w0 = tb.slipping ? Math.max(WHEEL_SPIN_FADE, Math.abs(power) * WHEEL_SPIN_PER_POWER) : WHEEL_SPIN_FADE;
+        let tau = power !== 0 ? power * k * Math.max(0, 1 - (Math.sign(power) * tb.spin) / w0) : 0;
         if (brake > 0) {
           // measured: a 530 kg car with brake=10 on four wheels sheds 2.2 m/s² (0.22 g), brake=50 7.7 m/s²
           // (0.78 g) at any speed — Coulomb, ≈0.022 g per brake unit, saturating near 0.8 g
@@ -846,7 +858,8 @@ export class PhysicsWorld {
               // only a real speed difference (a landing wheel, > 1 m/s of slip) carries momentum worth applying;
               // the small in/out chatter of a wheel grazing its grip limit in a corner must not eat the lateral grip
               const stored = Math.abs(slip) > 1 ? (I * (target - tb.spin)) / this.dt : 0;
-              Ff = Math.max(-limit, Math.min(limit, (tau - stored) / r));
+              const impulseLimit = mu * Math.min(tb.contactForce > 0 ? tb.contactForce : load, ((globalThis as unknown as { __tune?: { tyreLoadCap?: number } }).__tune?.tyreLoadCap ?? TYRE_LOAD_CAP) * Math.max(tb.staticLoad, 1));
+              Ff = Math.max(-impulseLimit, Math.min(impulseLimit, (tau - stored) / r));
               tb.slipping = false;
               tb.spin = target;
             } else tb.spin = spinNext;
@@ -883,7 +896,7 @@ export class PhysicsWorld {
           Fl = Math.max(-lateralLimit, Math.min(lateralLimit, Fl));
         }
         const F = f.clone().multiplyScalar(Ff).addScaledVector(l, Fl);
-        if ((globalThis as unknown as { __tune?: { debugWheels?: boolean } }).__tune?.debugWheels) console.log('wheel', tile.chipIndex, 'toi', hit.timeOfImpact.toFixed(3), 'n', normal.toArray().map((x) => x.toFixed(2)).join(','), 'f', f.toArray().map((x) => x.toFixed(2)).join(','), 'vf', vf.toFixed(3), 'power', power, 'Ff', Ff.toFixed(1), 'Fl', Fl.toFixed(1), 'spin', tb.spin.toFixed(2), 'bodyv', [body.linvel().x, body.linvel().y, body.linvel().z].map((x) => x.toFixed(2)).join(','), 'mass', body.mass().toFixed(0), 'load', load.toFixed(0), 'brake', brake, 'P', P.toArray().map((x) => x.toFixed(2)).join(','));
+        if ((globalThis as unknown as { __tune?: { debugWheels?: boolean } }).__tune?.debugWheels) console.log('wheel', tile.chipIndex, 'toi', hit.timeOfImpact.toFixed(3), 'n', normal.toArray().map((x) => x.toFixed(2)).join(','), 'f', f.toArray().map((x) => x.toFixed(2)).join(','), 'vf', vf.toFixed(3), 'power', power, 'Ff', Ff.toFixed(1), 'Fl', Fl.toFixed(1), 'spin', tb.spin.toFixed(2), 'bodyv', [body.linvel().x, body.linvel().y, body.linvel().z].map((x) => x.toFixed(2)).join(','), 'mass', body.mass().toFixed(0), 'load', load.toFixed(0), 'static', tb.staticLoad.toFixed(0), 'cf', tb.contactForce.toFixed(0), 'brake', brake, 'P', P.toArray().map((x) => x.toFixed(2)).join(','));
         // applied at the contact patch: the ground force below the hub is what pitches a segway's body back
         // when its wheels drive forward (self-balancers need it); the chassis rocking seen earlier came
         // from the cylinder tyre, not from this moment
@@ -977,7 +990,15 @@ export class PhysicsWorld {
     const dynamic = (globalThis as unknown as { __tune?: { tyreDynamicLoad?: boolean } }).__tune?.tyreDynamicLoad ?? TYRE_DYNAMIC_LOAD;
     // the landing impact spikes the contact force for a frame; the grip must not eat a spinning wheel's
     // momentum in one step (measured: the original's wheels keep spinning for ~15 frames after touchdown)
-    if (dynamic) for (const w of wheels) if (w.contactForce > 0) w.load = Math.min(w.contactForce, ((globalThis as unknown as { __tune?: { tyreLoadCap?: number } }).__tune?.tyreLoadCap ?? TYRE_LOAD_CAP) * w.load);
+    for (const w of wheels) w.staticLoad = w.load;
+    // sustained grip follows the contact force only up to TYRE_LOAD_CAP_SUSTAINED × the static share (measured: the
+    // original's car1 keeps a constant 13.5 m/s² to 54 m/s while its tilted plates press it down ever harder, so
+    // aero downforce does not buy grip there); the touchdown impulse uses the higher cap in driveWheel
+    if (dynamic) for (const w of wheels) if (w.contactForce > 0) {
+      const fresh = w.contactAge < TYRE_TOUCHDOWN_STEPS;
+      const cap = fresh ? ((globalThis as unknown as { __tune?: { tyreLoadCap?: number } }).__tune?.tyreLoadCap ?? TYRE_LOAD_CAP) : ((globalThis as unknown as { __tune?: { tyreLoadCapSustained?: number } }).__tune?.tyreLoadCapSustained ?? TYRE_LOAD_CAP_SUSTAINED);
+      w.load = Math.min(w.contactForce, cap * w.load);
+    }
   }
 
   /** normal force each tyre carried in the step just taken (sum of contact impulses / dt), smoothed */
@@ -1111,7 +1132,8 @@ export class PhysicsWorld {
         const aero = (globalThis as unknown as { __tune?: { aero?: string } }).__tune?.aero ?? AERO_MODEL;
         void this.wind;
         let mag: number;
-        if (aero === 'quad') mag = 0.9 * vn * vn; // original guess: v_n·|v_n|
+        if (aero === 'none') mag = 0;
+        else if (aero === 'quad') mag = 0.9 * vn * vn; // original guess: v_n·|v_n|
         else if (aero === 'newton') mag = 0.9 * speed * Math.abs(vn);
         else if (aero === 'slope') mag = Math.min(LIFT_SLOPE * speed * Math.abs(vn), AIR_DRAG * speed * speed);
         else {
@@ -1122,6 +1144,7 @@ export class PhysicsWorld {
           mag = speed * speed * (AERO_K * Math.pow(sinA, AERO_P) + AERO_K2 * Math.pow(sinA, AERO_P2));
         }
         const f = -Math.sign(vn) * tile.spec.drag * mag;
+        if ((globalThis as unknown as { __tune?: { debugAero?: number } }).__tune?.debugAero === this.tick) console.log('aero', tile.chipIndex, tile.type, 'angle', tile.node.attrs.angle ?? '', 'sinA', (speed > 1e-6 ? Math.abs(vn) / speed : 0).toFixed(3), 'Fy', (f * normal.y).toFixed(0), 'speed', speed.toFixed(1));
         if (Math.abs(f) > 1e-4) {
           body.addForceAtPoint(
             { x: normal.x * f, y: normal.y * f, z: normal.z * f },
