@@ -77,6 +77,8 @@ export const TYRE_FRICTION_CIRCLE = true;
 export const TYRE_LATERAL_MU = 1.2;
 /** which force wins inside the ellipse when both saturate (see driveWheel) */
 export const TYRE_LATERAL_FIRST = false;
+/** fraction of the lateral grip a wheel keeps when its drive saturates the circle (0 = pure circle) */
+export const TYRE_LATERAL_FLOOR = 0;
 /** wheels slide and spin up when the motor exceeds the grip (measured: powered wheels at 135-155 rad/s at power
  *  5000 while rolling would be 25-100, 315-390 at 10000); false: kinematic spin v/r with a capped force */
 export const WHEEL_SPIN_DYNAMICS = true;
@@ -85,7 +87,7 @@ export const WHEEL_SPIN_DYNAMICS = true;
 export const WHEEL_SPIN_PER_POWER = 1 / 20.6;
 /** wheel inertia as a fraction of ½mr² with m the hub+tyre mass: the air spin-up at power 10000 (34→207 rad/s in
  *  12 frames) and the sliding spin-up on the ground both fit ≈ 0.7 */
-export const WHEEL_INERTIA_SCALE = 0.7;
+export const WHEEL_INERTIA_SCALE = 0.5;
 /** the motor torque reacts on the chassis (Wheel); RLW is the reactionless one */
 export const WHEEL_REACTION = true;
 /** spin drag on a sliding wheel (N·m·s); 0 once the fade zero point scales with power */
@@ -105,8 +107,9 @@ export const SPAWN_DROP = true;
  *  steered car's powered (leading) axle saturates at 1030 N per wheel on ~990 N of contact load */
 export const TYRE_DYNAMIC_LOAD = true;
 export const TYRE_LOAD_SMOOTH = 0.3;
-/** dynamic load used for grip is capped at this multiple of the wheel's static share */
-export const TYRE_LOAD_CAP = 3;
+/** dynamic load used for grip is capped at this multiple of the wheel's static share (the touchdown spike must still
+ *  shove the car with the wheels' stored momentum, measured ~1000 N·s, but not explode) */
+export const TYRE_LOAD_CAP = 30;
 /** spec: 6 power = 1 N */
 export const JET_NEWTON_PER_POWER = 0.145; // measured 2026-10-28: a 530 kg wheeled car pushed by a jet at power 10000 accelerates at 2.74 m/s² (1452 N); the same at 5000 (1.38 m/s²); wheel option makes no difference
 /** plate aero (per 1 m² tile): broadside drag N per (m/s)², and the lift slope N per (m/s)² per sin α.
@@ -762,6 +765,7 @@ export class PhysicsWorld {
         const limit = mu * load;
         const wheelSpin = (globalThis as unknown as { __tune?: { wheelSpin?: boolean } }).__tune?.wheelSpin ?? WHEEL_SPIN_DYNAMICS;
         let Ff = tau / r;
+        let slideDir: { f: number; l: number } | null = null; // set while the tyre slides: kinetic friction direction
         if (!wheelSpin) {
           tb.spin = vf / r;
           Ff = Math.max(-limit, Math.min(limit, Ff));
@@ -777,20 +781,32 @@ export class PhysicsWorld {
             if (!tb.slipping) tb.slipping = true;
             const dir = Math.abs(slip) > 0.1 ? Math.sign(slip) : Math.sign(Ff);
             Ff = dir * limit;
+            // kinetic friction opposes the contact patch's total slip (the tyre surface running against the
+            // road lengthwise plus the sideways velocity): a wheel spinning hard keeps little lateral grip
+            // (measured: the steered car corners at 0.4-0.7 g with power 5000 on its sliding axle, 0.2 g at 10000)
+            const sl = Math.abs(slip) > 0.1 ? slip : dir * 0.1;
+            const mag = Math.hypot(sl, vl);
+            slideDir = { f: sl / mag, l: -vl / mag };
             const I = WHEEL_INERTIA_SCALE * 0.5 * tile.mass * r * r;
             const spinNext = tb.spin + (this.dt * (tau - Ff * r - WHEEL_SPIN_DRAG * tb.spin)) / I;
             const slipNext = spinNext * r - vf;
             if ((Math.abs(slip) > 0.1 && slip * slipNext < 0) || (Math.abs(slipNext) < 0.05 && Math.abs(tau / r) <= limit)) {
-              // the slip closed: back to rolling
+              // the slip closed within this step: the ground force is whatever brought the wheel from its spin
+              // to the road speed (a landing wheel shoves the car with its stored momentum), then rolling
+              const target = vf / r;
+              // only a real speed difference (a landing wheel, > 1 m/s of slip) carries momentum worth applying;
+              // the small in/out chatter of a wheel grazing its grip limit in a corner must not eat the lateral grip
+              const stored = Math.abs(slip) > 1 ? (I * (target - tb.spin)) / this.dt : 0;
+              Ff = Math.max(-limit, Math.min(limit, (tau - stored) / r));
               tb.slipping = false;
-              tb.spin = vf / r;
-              Ff = Math.max(-limit, Math.min(limit, tau / r));
+              tb.spin = target;
             } else tb.spin = spinNext;
+            if (!tb.slipping) slideDir = null;
           }
         }
         // the motor (and brake) torque acts between wheel and chassis: its reaction pitches the body (measured:
         // a car at power 10000 pitches 0.7 rad nose-up while still falling after spawn; RLW has no reaction)
-        if (!tile.spec.noReaction && WHEEL_REACTION) {
+        if (!tile.spec.noReaction && ((globalThis as unknown as { __tune?: { wheelReaction?: boolean } }).__tune?.wheelReaction ?? WHEEL_REACTION)) {
           const T = normal.clone().multiplyScalar(tau);
           body.addTorque({ x: T.x, y: T.y, z: T.z }, true);
         }
@@ -802,13 +818,19 @@ export class PhysicsWorld {
         const circle = (globalThis as unknown as { __tune?: { frictionCircle?: boolean } }).__tune?.frictionCircle ?? TYRE_FRICTION_CIRCLE;
         const muL = (globalThis as unknown as { __tune?: { tyreLateralMu?: number } }).__tune?.tyreLateralMu ?? TYRE_LATERAL_MU;
         const lateralFirst = (globalThis as unknown as { __tune?: { tyreLateralFirst?: boolean } }).__tune?.tyreLateralFirst ?? TYRE_LATERAL_FIRST;
-        if (circle && lateralFirst) {
+        if (slideDir) {
+          Ff = limit * slideDir.f;
+          Fl = limit * slideDir.l;
+        } else if (circle && lateralFirst) {
           // lateral grip first, the drive gets what is left of the ellipse
           Fl = Math.max(-muL * load, Math.min(muL * load, Fl));
           const driveLimit = limit * Math.sqrt(Math.max(0, 1 - (Fl / (muL * load)) * (Fl / (muL * load))));
           Ff = Math.max(-driveLimit, Math.min(driveLimit, Ff));
         } else {
-          const lateralLimit = muL * load * (circle ? Math.sqrt(Math.max(0, 1 - (Ff / limit) * (Ff / limit))) : 1);
+          // a drive-saturated wheel keeps a floor of its lateral grip (measured: the steered car at power 5000
+          // still corners at 0.4-0.9 g with its powered axle sliding; probe knob tyreLateralFloor)
+          const floor = (globalThis as unknown as { __tune?: { tyreLateralFloor?: number } }).__tune?.tyreLateralFloor ?? TYRE_LATERAL_FLOOR;
+          const lateralLimit = muL * load * (circle ? Math.max(floor, Math.sqrt(Math.max(0, 1 - (Ff / limit) * (Ff / limit)))) : 1);
           Fl = Math.max(-lateralLimit, Math.min(lateralLimit, Fl));
         }
         const F = f.clone().multiplyScalar(Ff).addScaledVector(l, Fl);
@@ -831,7 +853,7 @@ export class PhysicsWorld {
         const k = (globalThis as unknown as { __tune?: { wheelTorque?: number } }).__tune?.wheelTorque ?? WHEEL_TORQUE_PER_POWER;
         const tau = power * k * (1 - (Math.sign(power) * tb.spin) / w0);
         tb.spin += (this.dt * tau) / (WHEEL_INERTIA_SCALE * 0.5 * tile.mass * r * r);
-        if (!tile.spec.noReaction && WHEEL_REACTION) {
+        if (!tile.spec.noReaction && ((globalThis as unknown as { __tune?: { wheelReaction?: boolean } }).__tune?.wheelReaction ?? WHEEL_REACTION)) {
           const T = normal.clone().multiplyScalar(tau);
           body.addTorque({ x: T.x, y: T.y, z: T.z }, true);
         }
@@ -906,7 +928,7 @@ export class PhysicsWorld {
     const dynamic = (globalThis as unknown as { __tune?: { tyreDynamicLoad?: boolean } }).__tune?.tyreDynamicLoad ?? TYRE_DYNAMIC_LOAD;
     // the landing impact spikes the contact force for a frame; the grip must not eat a spinning wheel's
     // momentum in one step (measured: the original's wheels keep spinning for ~15 frames after touchdown)
-    if (dynamic) for (const w of wheels) if (w.contactForce > 0) w.load = Math.min(w.contactForce, TYRE_LOAD_CAP * w.load);
+    if (dynamic) for (const w of wheels) if (w.contactForce > 0) w.load = Math.min(w.contactForce, ((globalThis as unknown as { __tune?: { tyreLoadCap?: number } }).__tune?.tyreLoadCap ?? TYRE_LOAD_CAP) * w.load);
   }
 
   /** normal force each tyre carried in the step just taken (sum of contact impulses / dt), smoothed */
