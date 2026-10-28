@@ -34,7 +34,7 @@ Body
     }
     W:Weight(color=#55632e){ } E:Weight(color=#55632e){ }
     N:Rudder(angle=TURRET, color=#55632e){
-      N:Chip(angle=-90, color=#55632e){ N:Arm(angle=180, power=FIRE, option=30000, name=GUN, color=#2b2b2b){ } }
+      N:Chip(angle=-90, color=#55632e){ N:Arm(angle=90, power=FIRE, option=30000, name=GUN, color=#2b2b2b){ } }
     }
   }
 }

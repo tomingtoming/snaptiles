@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
-import { TILE, TILE_T, assemblyBottom, attr, jointSign, refreshJointFrames, type Assembly, type TileInstance, type ValEnv } from '../model/assemble';
+import { DIR_VEC, TILE, TILE_T, assemblyBottom, attr, jointSign, refreshJointFrames, type Assembly, type TileInstance, type ValEnv } from '../model/assemble';
 import { exprIsConstant } from '../rc/expr';
 import { COURSE, CRATES } from '../model/course';
 
@@ -171,11 +171,22 @@ export interface Projectile {
   body: RAPIER.RigidBody;
   born: number; // tick
   energy: number;
+  /** position at the previous step, for the swept hit test against chip spheres */
+  prev: THREE.Vector3;
 }
 
-/** Arm: charge per step (spec says 2500 per 30 fps frame), muzzle speed and shell mass are guesses */
-export const ARM_CHARGE_PER_STEP = 2500 / 2;
-export const ARM_MUZZLE_SPEED = 80;
+/** Arm: charge per step (spec says 2500 per 30 fps frame); muzzle speed 300 m/s from the original's readme
+ *  (15B13: "150 → 300 m/s"); the shell mass is a guess. Shells hit every chip as a sphere of radius
+ *  ARM_HIT_RADIUS around its centre (readme 15B11: all chips are spheres r = 0.3 for shell hits, own chips
+ *  included) and take ARM_DAMAGE_PER_ENERGY × energy / chip mass off its durability (`_T`, 0..10000) */
+export const ARM_CHARGE_PER_STEP = 5000 / 2; // measured: shots every 11 / 21 frames at option 50000 / 100000
+export const ARM_MUZZLE_SPEED = 300;
+export const ARM_HIT_RADIUS = 0.3;
+/** durability taken per hit = this × energy / chip mass: measured 5000 off a 25.2 kg Chip at option 50000 */
+export const ARM_DAMAGE_PER_ENERGY = 2.52;
+/** recoil impulse per unit of shot energy (N·s): measured +0.42 m/s per shot on a 518 kg car at option 50000 */
+export const ARM_RECOIL_PER_ENERGY = 0.0043; // and +1.7 m/s per shot at 200000: linear in energy
+export const ARM_DESTROY_DETACH = true;
 export const ARM_SHELL_MASS = 2;
 export const ARM_SHELL_LIFE = 4 * 60;
 export const ARM_ARMED_AFTER_TICK = 150 * 2;
@@ -298,22 +309,70 @@ export class PhysicsWorld {
     this.armCharge.set(tile.id, 0);
     const R = this.R;
     const v = this.velocity(tb, pose);
-    const muzzle = pose.position.clone().add(normal.clone().multiplyScalar(0.6));
-    const vel = v.clone().add(normal.clone().multiplyScalar(ARM_MUZZLE_SPEED));
+    // the shell leaves along the Arm's own forward edge (away from the chip it hangs on), not its normal:
+    // measured on the original, an Arm standing on an upright column recoils vertically, and the readme
+    // forbids attaching chips in the firing direction
+    const fwd = DIR_VEC[tile.dir ?? 'N'].clone().applyQuaternion(pose.quaternion);
+    void normal;
+    const muzzle = pose.position.clone().add(fwd.clone().multiplyScalar(0.6));
+    const vel = v.clone().add(fwd.clone().multiplyScalar(ARM_MUZZLE_SPEED));
     const body = this.world.createRigidBody(
       R.RigidBodyDesc.dynamic().setTranslation(muzzle.x, muzzle.y, muzzle.z).setLinvel(vel.x, vel.y, vel.z).setCcdEnabled(true),
     );
-    this.world.createCollider(R.ColliderDesc.ball(0.15).setMass(ARM_SHELL_MASS).setCollisionGroups(SHELL_GROUP), body);
-    this.projectiles.push({ body, born: this.tick, energy: option });
-    const recoil = normal.clone().multiplyScalar(-ARM_SHELL_MASS * ARM_MUZZLE_SPEED);
+    // the shell's momentum is the measured recoil impulse (its mass follows from the muzzle speed)
+    const impulse = ARM_RECOIL_PER_ENERGY * option;
+    // a sensor: the shell never bounces, chip hits and the ground hit are swept tests in cullProjectiles
+    this.world.createCollider(R.ColliderDesc.ball(0.15).setMass(Math.max(0.01, impulse / ARM_MUZZLE_SPEED)).setCollisionGroups(SHELL_GROUP).setSensor(true), body);
+    this.projectiles.push({ body, born: this.tick, energy: option, prev: muzzle.clone() });
+    const recoil = fwd.clone().multiplyScalar(-impulse);
     tb.body.applyImpulseAtPoint({ x: recoil.x, y: recoil.y, z: recoil.z }, { x: pose.position.x, y: pose.position.y, z: pose.position.z }, true);
   }
 
   private cullProjectiles(): void {
+    const hitTargets = this.tiles.filter((tb) => (tb.tile.durability ?? 10000) >= 0);
     this.projectiles = this.projectiles.filter((p) => {
       const t = p.body.translation();
-      const dead = this.tick - p.born > ARM_SHELL_LIFE || t.y < 0.16;
+      const cur = new THREE.Vector3(t.x, t.y, t.z);
+      let dead = this.tick - p.born > ARM_SHELL_LIFE || t.y < -1;
+      if (!dead) {
+        // swept sphere test against every chip centre (closest chip along the path wins); the ground (and
+        // course) is hit by a ray along the same path - shells skim the ground when an Arm lies flat on it
+        const seg = cur.clone().sub(p.prev);
+        const len2 = seg.lengthSq();
+        let best: TileBody | null = null;
+        let bestS = Infinity;
+        if (len2 > 0) {
+          const len = Math.sqrt(len2);
+          const ray = new this.R.Ray({ x: p.prev.x, y: p.prev.y, z: p.prev.z }, { x: seg.x / len, y: seg.y / len, z: seg.z / len });
+          const g = this.world.castRay(ray, len, true, undefined, 0x0004_0002);
+          if (g) { bestS = g.timeOfImpact / len; dead = true; }
+        }
+        for (const tb of hitTargets) {
+          const c = this.pose(tb).position;
+          const w = c.clone().sub(p.prev);
+          const sParam = len2 > 0 ? Math.max(0, Math.min(1, w.dot(seg) / len2)) : 0;
+          const d2 = w.clone().sub(seg.clone().multiplyScalar(sParam)).lengthSq();
+          if (d2 <= ARM_HIT_RADIUS * ARM_HIT_RADIUS && sParam < bestS) { best = tb; bestS = sParam; }
+        }
+        if (best) {
+          dead = true;
+          best.tile.durability = (best.tile.durability ?? 10000) - (ARM_DAMAGE_PER_ENERGY * p.energy) / Math.max(1, best.tile.mass);
+          const m = p.body.mass();
+          const lv = p.body.linvel();
+          const hitAt = this.pose(best).position;
+          if (best.tile.durability <= 0) {
+            // measured: the destroyed chip reads _T −1, comes loose and flies off with the shell's momentum
+            // (a Chip hit at option 200000 leaves at ~50 m/s along the shot)
+            best.tile.durability = -1;
+            if (ARM_DESTROY_DETACH && best.tile.parent) this.detach(best.tile, true);
+          }
+          const tb = this.byId.get(best.tile.id) ?? best;
+          tb.body.applyImpulseAtPoint({ x: m * lv.x, y: m * lv.y, z: m * lv.z }, { x: hitAt.x, y: hitAt.y, z: hitAt.z }, true);
+          dead = true;
+        }
+      }
       if (dead) this.world.removeRigidBody(p.body);
+      else p.prev.copy(cur);
       return !dead;
     });
   }

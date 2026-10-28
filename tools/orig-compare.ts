@@ -24,7 +24,8 @@ const GEOM_AT = opt('geomAt', 30);
 const CHIPS6 = args.includes('--chips6');
 const SELF = args.includes('--self'); // leave ENGINE to the model's own Lua/defaults
 const TURN = args.includes('--turn');
-const WHEELS = args.includes('--wheels'); // harness_wheels.rcs columns: core pose/vel/euler + _WY of up to six wheels // harness_turn2.rcs columns: core pose, chip 1 xz, _V*, _W*, _A*, _E* // log chips 0..5 (x,y,z,ex,ey,ez) per frame instead, like harness_servo.rcs
+const WHEELS = args.includes('--wheels');
+const ARM = args.includes('--arm'); // harness_arm.rcs columns: core pose/vel/euler + _T of chips 0..19 // harness_wheels.rcs columns: core pose/vel/euler + _WY of up to six wheels // harness_turn2.rcs columns: core pose, chip 1 xz, _V*, _W*, _A*, _E* // log chips 0..5 (x,y,z,ex,ey,ez) per frame instead, like harness_servo.rcs
 const tuneArg = args.find((x) => x.startsWith('--tune='));
 if (tuneArg) (globalThis as unknown as { __tune?: unknown }).__tune = JSON.parse(tuneArg.slice(7)); // same knobs as window.__tune (merged over TUNE_DEFAULTS)
 
@@ -54,12 +55,18 @@ const geomDump = (): string => {
 };
 const engine = sim.vals.get('ENGINE');
 if (!engine && !CHIPS6 && !SELF) throw new Error('model has no ENGINE val');
-const rows: string[] = [WHEELS ? 'frame,x,y,z,vx,vy,vz,ex,ey,ez,w0,w1,w2,w3,w4,w5' : TURN ? 'frame,x,y,z,c1x,c1z,vx,vy,vz,wx,wy,wz,ax,ay,az,ex,ey,ez' : CHIPS6 ? 'frame,' + [0, 1, 2, 3, 4, 5].map((c) => `x${c},y${c},z${c},ex${c},ey${c},ez${c}`).join(',') : 'frame,x,y,z,vx,vy,vz,ex,ey,ez,chips,wheel,wheelpow,wheelwy,wheely'];
+const rows: string[] = [ARM ? 'frame,x,y,z,vx,vy,vz,ex,ey,ez,' + Array.from({ length: 20 }, (_, i) => 't' + i).join(',') : WHEELS ? 'frame,x,y,z,vx,vy,vz,ex,ey,ez,w0,w1,w2,w3,w4,w5' : TURN ? 'frame,x,y,z,c1x,c1z,vx,vy,vz,wx,wy,wz,ax,ay,az,ex,ey,ez' : CHIPS6 ? 'frame,' + [0, 1, 2, 3, 4, 5].map((c) => `x${c},y${c},z${c},ex${c},ey${c},ez${c}`).join(',') : 'frame,x,y,z,vx,vy,vz,ex,ey,ez,chips,wheel,wheelpow,wheelwy,wheely'];
 let prev = sim.corePosition().clone();
 for (let n = 1; n <= FRAMES; n++) {
   const p = n >= ON && n <= OFF ? POWER : 0;
   if (engine && !SELF) { engine.default = p; engine.value = p; }
   sim.step();
+  if (ARM) {
+    const a = api;
+    const ts = Array.from({ length: 20 }, (_, c) => (c < a._CHIPS(0) ? a._T(c) : -2));
+    rows.push([n, ...[a._X(0), a._Y(0), a._Z(0), a._VX(0), a._VY(0), a._VZ(0), a._EX(0), a._EY(0), a._EZ(0)].map(f4), ...ts].join(','));
+    continue;
+  }
   if (WHEELS) {
     const a = api;
     const ws = sim.assembly!.tiles.filter((t) => t.spec.wheel).slice(0, 6).map((t) => a._WY(t.chipIndex));

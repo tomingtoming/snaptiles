@@ -1,0 +1,32 @@
+-- Key table probe: log _KEY(0..39) every frame up to frame 2400 (xdotool presses known keys at known times)
+n=0
+buf=""
+wrote=-9
+lasterr="none"
+function OnInit()
+	n=0
+	local h="frame"
+	for k=0,39 do h=h..",k"..k end
+	buf=h.."\n"
+end
+
+function step()
+	local row=""..n
+	for k=0,39 do row=row..","..(_KEY(k) or 0) end
+	if n<=2400 then buf=buf..row.."\n" end
+	if n==2400 then
+		local h=_FOPEN("log.txt","w")
+		if h>=0 then _FPUTS(h,buf) _FCLOSE(h) wrote=h else wrote=-1 end
+	end
+end
+
+function OnFrame()
+	n=n+1
+	local ok,err=pcall(step)
+	if not ok then lasterr=tostring(err) end
+	out(0,"frame ",n," wrote ",wrote)
+	out(1,"err ",lasterr)
+end
+
+function OnReset()
+end

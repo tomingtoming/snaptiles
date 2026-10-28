@@ -322,7 +322,7 @@ export class Simulation {
       _FUEL: () => 1_000_000,
       _FUELMAX: () => 1_000_000,
       _E: (n: number) => { const t = this.tileOf(n); return t ? this.physics.armCharge.get(t.id) ?? 0 : 0; },
-      _T: (n: number) => (this.tileOf(n) ? 10000 : -1),
+      _T: (n: number) => { const t = this.tileOf(n); return t ? (t.durability ?? 10000) : -1; },
       _X: (n: number) => -pos(n, 'x'), // the original is left-handed: W = +x (rest geometry of Basic measured)
       _Y: (n: number) => pos(n, 'y'),
       _Z: (n: number) => pos(n, 'z'),

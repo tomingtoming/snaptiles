@@ -1,0 +1,39 @@
+-- Arm test: log only. Core world position/velocity plus _T (durability) of chips 0..19.
+n=0
+buf=""
+wrote=-9
+lasterr="none"
+function OnInit()
+	n=0
+	buf="frame,x,y,z,vx,vy,vz,ex,ey,ez,t0,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11,t12,t13,t14,t15,t16,t17,t18,t19\n"
+end
+
+function step()
+	local ts=""
+	for c=0,19 do
+		local v=-2
+		if c<_CHIPS() then v=_T(c) end
+		ts=ts..","..v
+	end
+	if n<=330 then
+		buf=buf..n..","..
+			_X(0)..",".._Y(0)..",".._Z(0)..","..
+			_VX(0)..",".._VY(0)..",".._VZ(0)..","..
+			_EX(0)..",".._EY(0)..",".._EZ(0)..ts.."\n"
+	end
+	if n==330 then
+		local h=_FOPEN("log.txt","w")
+		if h>=0 then _FPUTS(h,buf) _FCLOSE(h) wrote=h else wrote=-1 end
+	end
+end
+
+function OnFrame()
+	n=n+1
+	local ok,err=pcall(step)
+	if not ok then lasterr=tostring(err) end
+	out(0,"frame ",n," wrote ",wrote)
+	out(1,"err ",lasterr)
+end
+
+function OnReset()
+end

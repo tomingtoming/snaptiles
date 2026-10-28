@@ -108,6 +108,8 @@ export interface TileInstance {
   spec: TypeSpec;
   parent: TileInstance | null;
   dir: 'N' | 'S' | 'E' | 'W' | null;
+  /** Arm-shell durability (`_T`): 10000 fresh, −1 destroyed; lives on the instance so a detach rebuild keeps it */
+  durability?: number;
   name: string | null;
   position: THREE.Vector3;
   quaternion: THREE.Quaternion;

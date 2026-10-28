@@ -18,7 +18,7 @@ describe('physics behaviours measured against the corpus', () => {
     const { sim, keys } = await run(`
       Val { P(default=0, min=0, max=100000, step=100000) }
       Key { 4:P(step=100000) }
-      Body { Core(){ W:Weight(){} E:Weight(){} S:Chip(){} N:Chip(angle=-90){ N:Arm(angle=180, power=P, option=30000, name=GUN){} } } }
+      Body { Core(){ W:Weight(){} E:Weight(){} S:Chip(){} N:Chip(angle=-90){ N:Arm(angle=90, power=P, option=30000, name=GUN){} } } }
       Lua { function OnFrame() E = _E(GUN) end }
     `);
     for (let i = 0; i < 160; i++) sim.step(); // > 150 frames: armed and charged
