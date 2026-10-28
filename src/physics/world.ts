@@ -142,6 +142,8 @@ export const SERVO_TELEPORT = true;
 export const SERVO_HOLD = 1000;
 /** every hinge/yaw/roll tile is its own body on a hard-limited joint instead of being welded into a group */
 export const ALL_JOINTS = false;
+/** reallocate a servo step away from a side the ground blocks (see servoTeleport) */
+export const SERVO_GROUND = false;
 /** servo stiffness (N·m/rad at spring=1) when > 0; 0 = infinitely stiff (hard limits). Probe knob: window.__tune.softServo */
 export const SOFT_SERVO = 0;
 export const SERVO_BAND = (20 * Math.PI) / 180;
@@ -703,9 +705,43 @@ export class PhysicsWorld {
       }
     };
     const split = (globalThis as unknown as { __tune?: { servoSplit?: boolean } }).__tune?.servoSplit ?? true;
+    // the ground as a constraint on the split (knob servoGround): a side whose rotation would push one of its
+    // tiles below the ground only turns as far as the ground allows, the remainder of the step goes to the other
+    // side (which then lifts) - no energy is added, the rotation is merely reallocated. Measured: a foot driven
+    // into the ground lifts the body 0.17 m within a frame
+    const groundRule = (globalThis as unknown as { __tune?: { servoGround?: boolean } }).__tune?.servoGround ?? SERVO_GROUND;
+    let shareUsed = shareSub;
+    if (split && groundRule) {
+      const lowestAfter = (bodies: Map<number, RAPIER.RigidBody>, angle: number): number => {
+        const rot = new THREE.Quaternion().setFromAxisAngle(axisW, angle);
+        let minY = Infinity;
+        const h = TILE / 2;
+        const corners = [new THREE.Vector3(-h, 0, -h), new THREE.Vector3(h, 0, -h), new THREE.Vector3(-h, 0, h), new THREE.Vector3(h, 0, h)];
+        for (const t of this.tiles) {
+          if (!bodies.has(t.body.handle)) continue;
+          const pose = this.pose(t);
+          const p = pose.position.clone().sub(anchorW).applyQuaternion(rot).add(anchorW);
+          const q = rot.clone().multiply(pose.quaternion);
+          if (t.tile.spec.wheel) { minY = Math.min(minY, p.y - wheelRadius(t.tile.option)); continue; }
+          for (const c of corners) minY = Math.min(minY, c.clone().applyQuaternion(q).add(p).y - TILE_T / 2);
+        }
+        return minY;
+      };
+      // largest fraction f of the planned angle a side can take before any of its tiles goes below the ground
+      const allowed = (bodies: Map<number, RAPIER.RigidBody>, angle: number): number => {
+        if (lowestAfter(bodies, angle) >= -0.01) return 1;
+        let lo = 0, hi = 1;
+        for (let i = 0; i < 8; i++) { const mid = (lo + hi) / 2; if (lowestAfter(bodies, angle * mid) >= -0.01) lo = mid; else hi = mid; }
+        return lo;
+      };
+      const fSub = allowed(sub, delta * shareSub);
+      const fRest = allowed(rest, -delta * (1 - shareSub));
+      if (fSub < 1 && fRest >= 1) shareUsed = shareSub * fSub; // the leg is blocked: the body takes the rest of the step
+      else if (fRest < 1 && fSub >= 1) shareUsed = 1 - (1 - shareSub) * fRest; // the body is blocked: the leg takes it
+    }
     if (split) {
-      turn(sub, delta * shareSub);
-      turn(rest, -delta * (1 - shareSub));
+      turn(sub, delta * shareUsed);
+      turn(rest, -delta * (1 - shareUsed));
     } else turn(sub, delta);
   }
 
