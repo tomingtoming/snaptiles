@@ -32,12 +32,12 @@ export const COURSE: Block[] = [
 
 /** knockable crates (dynamic): a pyramid in front of the wall and a few on the field */
 export const CRATES: { pos: [number, number, number]; size: number; color: number }[] = [
-  { pos: [-2, 0.5, 34], size: 1, color: 0xd9a066 },
-  { pos: [0, 0.5, 34], size: 1, color: 0xd9a066 },
-  { pos: [2, 0.5, 34], size: 1, color: 0xd9a066 },
-  { pos: [-1, 1.5, 34], size: 1, color: 0xc98e5a },
-  { pos: [1, 1.5, 34], size: 1, color: 0xc98e5a },
-  { pos: [0, 2.5, 34], size: 1, color: 0xb97e4e },
+  { pos: [4, 0.5, 34], size: 1, color: 0xd9a066 },
+  { pos: [6, 0.5, 34], size: 1, color: 0xd9a066 },
+  { pos: [8, 0.5, 34], size: 1, color: 0xd9a066 },
+  { pos: [5, 1.5, 34], size: 1, color: 0xc98e5a },
+  { pos: [7, 1.5, 34], size: 1, color: 0xc98e5a },
+  { pos: [6, 2.5, 34], size: 1, color: 0xb97e4e },
   // (moved off the spawn's straight line: cars drive north at 60 km/h within seconds)
   { pos: [6, 0.5, -30], size: 1, color: 0xd9a066 },
   { pos: [6, 1.5, -30], size: 1, color: 0xc98e5a },

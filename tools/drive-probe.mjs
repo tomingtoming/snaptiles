@@ -10,7 +10,8 @@ for (const f of files) {
   const buf = readFileSync(f);
   let text = new TextDecoder('utf-8', { fatal: false }).decode(buf);
   if (/�/.test(text)) text = new TextDecoder('shift_jis').decode(buf);
-  if (process.env.TUNE) await page.evaluate((c) => { window.__tune = c; }, JSON.parse(process.env.TUNE));
+  // bare ground by default: the course's wall 40 m south is reached within the 4 s probe by fast cars
+  await page.evaluate((c) => { window.__tune = c; }, { noCourse: true, ...JSON.parse(process.env.TUNE ?? '{}') });
   await page.fill('#source', text);
   await page.click('#run');
   await page.waitForTimeout(1500);
