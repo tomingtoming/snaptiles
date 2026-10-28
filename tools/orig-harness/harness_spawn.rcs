@@ -1,0 +1,6 @@
+function OnFrame()
+ if done then return end
+ local s='chip,x,y,z,h\n'
+ for i=0,_CHIPS()-1 do s=s..i..','.._X(i)..','.._Y(i)..','.._Z(i)..','.._H(i)..'\n' end
+ local h=_FOPEN('spawn.csv','w') if h>=0 then _FPUTS(h,s) _FCLOSE(h) done=true end
+end

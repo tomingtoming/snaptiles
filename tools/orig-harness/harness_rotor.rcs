@@ -1,0 +1,9 @@
+n=0
+buf='frame,chip,x,y,z,qx,qy,qz,qw,wy\n'
+function OnFrame()
+ n=n+1
+ if n<=90 then
+  for i=0,_CHIPS()-1 do buf=buf..n..','..i..','.._X(i)..','.._Y(i)..','.._Z(i)..','.._QX(i)..','.._QY(i)..','.._QZ(i)..','.._QW(i)..','.._WY(i)..'\n' end
+ end
+ if n==90 then local h=_FOPEN('s23-rotor.csv','w') if h>=0 then _FPUTS(h,buf) _FCLOSE(h) end end
+end

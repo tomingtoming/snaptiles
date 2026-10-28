@@ -153,3 +153,31 @@ acceleration, `_WY` = v/r). Hence the contact-force wheel above.
 - Readme of the original (`Doc/readme15B26.txt`, in the quarantine) lists physics changes per
   version: chip collisions as spheres r = 0.3 for **bullets**, Weight = 4× chip mass, air drag ∝
   projected area^1.3 with an angle term, fuel coefficients. Not yet cross-checked.
+
+## 2026-10-28 follow-up: orientation API and joint-model acceptance
+
+`_QY/_QZ` and `_RX/_RY/_RZ` had wrong signs. A generated single-axis and compound-orientation
+probe on original 1.5B26 establishes the corrected values; `tests/calibration.test.ts` stores them.
+The articulated model is **not ready to become the default**. A 20-second bare-ground rerun did
+not reproduce the previously recorded car1 rollover, so tyre-force rerouting remains an unconfirmed
+hypothesis. 4leg2 still fails. It also exposes two unmodelled mechanisms: a wheel's physical rotor
+carrying child chips, and a variable wheel fold that is handled differently from ordinary servos.
+Its frame-zero feet penetrate the ground by 0.5 m under the current spawn rule. See
+[sprints 22–31](sprints-22-31.md) for exact conditions, rejected experiments, and the next measurement.
+The centre-of-mass velocity correction was rejected for now because it regressed long-run bike
+stability; changing the formula requires recalibrating the coupled tyre/control behavior.
+
+## 2026-10-29 follow-up: radius spawn and loaded wheel folds
+
+Independent flat, vertical, diagonal, Cowl and ghost-Frame probes establish the
+spawn-height increment as maximum 3D tile-centre distance from the core. The old
+z-only rule is corrected. A loaded 90°→60° wheel-fold probe reaches its target in
+one original frame. Variable wheel rims now use fixed frames instead of equal
+revolute limits, eliminating the large loaded fold drift.
+
+The default run keeps 4leg2 upright for 20 s (2.31 m net, min up .980), but it is
+still too slow and 2walk still falls during idle landing. Removing ground hold
+stabilizes 2walk but destabilizes zrobo; global fixed constraints, articulated
+combinations, increased iterations and exact servo inertia did not pass the shared
+acceptance set. Those experiments were removed. 39 regression tests and the build
+pass. See [sprints 32–44](sprints-32-44.md) for measurements and retrospectives.

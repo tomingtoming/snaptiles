@@ -22,7 +22,7 @@ export interface TileBody {
   animated: boolean;
   /** wheels with a variable angle: the rim body and its fold joint (otherwise the rim is welded) */
   rim: RAPIER.RigidBody | null;
-  rimJoint: RAPIER.RevoluteImpulseJoint | null;
+  rimJoint: RAPIER.FixedImpulseJoint | null;
   /** rest orientation of `body` (model frame). Every body in a joint chain shares its
    *  parent's orientation so rapier's single joint axis means the same thing in both. */
   bodyRestQuat: THREE.Quaternion;
@@ -463,11 +463,12 @@ export class PhysicsWorld {
   build(a: Assembly, env: ValEnv, spawn = new THREE.Vector3(0, 0, 0), opts: BuildOptions = {}): void {
     this.clear();
     const R = this.R;
-    // measured on the original: the core spawns 1.0 m + the model's reach along z (tile centres) above the ground
-    // and the model falls from there (core only 1.03, one chip 1.63, three chips in a row 2.83, the Basic
-    // car 2.37); the wheels of a powered car spin up during the fall and the landing pitches it
+    // Original 1.5B26: spawn-height differences equal the maximum 3D distance from core to tile centre,
+    // including Cowl and non-colliding Frame. Flat/tall/diagonal probes distinguish this from z reach.
+    // The existing 1 m base offset is retained; these measurements establish the relative height.
+    // The model falls from there; powered wheels spin up during the fall.
     const drop = (globalThis as unknown as { __tune?: { spawnDrop?: boolean } }).__tune?.spawnDrop ?? SPAWN_DROP;
-    const reach = a.tiles.reduce((m, t) => Math.max(m, Math.abs(t.position.z - a.tiles[0].position.z)), 0);
+    const reach = a.tiles.reduce((m, t) => Math.max(m, t.position.distanceTo(a.tiles[0].position)), 0);
     const lift = opts.inPlace ? 0 : drop ? 1.0 + reach - a.tiles[0].position.y : -assemblyBottom(a) + 0.02;
     const offset = spawn.clone().add(new THREE.Vector3(0, lift, 0));
     this.assembly = a;
@@ -505,7 +506,7 @@ export class PhysicsWorld {
       // Wheel = rim (a plate folded like a chip) + rotor (the disc). The rim is welded to the
       // parent, or gets its own fold joint when the angle is a variable.
       let rim: RAPIER.RigidBody | null = null;
-      let rimJoint: RAPIER.RevoluteImpulseJoint | null = null;
+      let rimJoint: RAPIER.FixedImpulseJoint | null = null;
       if (tile.spec.wheel && parentTb) {
         const rimQuat = parentTb.bodyRestQuat;
         if (angleAnimated) {
@@ -516,9 +517,13 @@ export class PhysicsWorld {
             .setCcdEnabled(true);
           rim = this.world.createRigidBody(rb);
           const anchorW = tile.rimAnchor.clone().add(offset);
-          const jd = R.JointData.revolute(toLocal(parentTb.body, anchorW), toLocal(rim, anchorW), toLocalDir(parentTb.body, tile.rimAxis));
-          rimJoint = this.world.createImpulseJoint(jd, parentTb.body, rim, true) as RAPIER.RevoluteImpulseJoint;
-          rimJoint.setLimits(0, 0);
+          // Equal revolute limits drifted by 85 degrees under walker loads.
+          // A fixed frame holds the commanded fold without guessed motor constants.
+          const jd = R.JointData.fixed(
+            toLocal(parentTb.body, anchorW), { x: 0, y: 0, z: 0, w: 1 },
+            toLocal(rim, anchorW), { x: 0, y: 0, z: 0, w: 1 },
+          );
+          rimJoint = this.world.createImpulseJoint(jd, parentTb.body, rim, true) as RAPIER.FixedImpulseJoint;
         }
       }
 
@@ -775,8 +780,10 @@ export class PhysicsWorld {
     if (power !== 0) power *= this.useFuel(FUEL_PER_POWER_WHEEL * Math.abs(power) * this.dt * 30);
     const brake = attr(tile.node, 'brake', env, 0);
     if (tb.rimJoint) {
-      const a = jointSign('wheel', tile.dir) * (attr(tile.node, 'angle', env, 0) - tb.restAngle) * DEG; // rim fold
-      tb.rimJoint.setLimits(a, a);
+      const a = jointSign('wheel', tile.dir) * (attr(tile.node, 'angle', env, 0) - tb.restAngle) * DEG;
+      const parent = this.byId.get(tile.parent!.id)!;
+      const axis = tile.rimAxis.clone().applyQuaternion(parent.bodyRestQuat.clone().invert());
+      tb.rimJoint.setFrameX1(new THREE.Quaternion().setFromAxisAngle(axis, a));
     }
     const r = wheelRadius(tile.option);
     // down, projected into the wheel plane
@@ -1033,7 +1040,6 @@ export class PhysicsWorld {
       const { tile, joint, body } = tb;
       const pose = this.pose(tb);
       const normal = UP.clone().applyQuaternion(pose.quaternion);
-
       if (tile.spec.wheel && tile.parent) {
         this.driveWheel(tb, pose, normal, env);
       } else if (joint && tile.parent) {

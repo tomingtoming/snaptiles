@@ -1,0 +1,7 @@
+n=0
+buf='frame,rxrim,rxrotor,x0,y0,z0,x5,y5,z5,x6,y6,z6,x7,y7,z7\n'
+function OnFrame()
+ n=n+1
+ if n<=240 then buf=buf..n..','.._RX(5,4)..','.._RX(6,4)..','.._X(0)..','.._Y(0)..','.._Z(0)..','.._X(5)..','.._Y(5)..','.._Z(5)..','.._X(6)..','.._Y(6)..','.._Z(6)..','.._X(7)..','.._Y(7)..','.._Z(7)..'\n' end
+ if n==240 then local h=_FOPEN('rim-loaded.csv','w') if h>=0 then _FPUTS(h,buf) _FCLOSE(h) end end
+end

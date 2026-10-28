@@ -260,7 +260,8 @@ export class Simulation {
       const pose = this.poseOf(n);
       return pose ? new THREE.Euler().setFromQuaternion(pose.quaternion, 'YXZ') : new THREE.Euler();
     };
-    const quat = (n: number, c: 'x' | 'y' | 'z' | 'w') => this.poseOf(n)?.quaternion[c] ?? (c === 'w' ? 1 : 0);
+    // Measured on 1.5B26: mirroring x coordinates negates quaternion y/z.
+    const quat = (n: number, c: 'x' | 'y' | 'z' | 'w') => (this.poseOf(n)?.quaternion[c] ?? (c === 'w' ? 1 : 0)) * (c === 'y' || c === 'z' ? -1 : 1);
     // Sign / frame conventions of the original are undocumented; `window.__tune` lets probes
     // flip them at runtime (see tools/tune-probe.mjs). Defaults are the current best guess.
     // Measured 2026-10-27 by driving the corpus' self-balancing models (unicycle, segway, drum,
@@ -419,9 +420,9 @@ export class Simulation {
       _TORAD: (d: number) => (d * Math.PI) / 180,
       _RND: () => Math.random(),
       // relative euler angles of chip a as seen from chip b
-      _RX: (a: number, b: number) => relEuler(a, b).x,
-      _RY: (a: number, b: number) => relEuler(a, b).y,
-      _RZ: (a: number, b: number) => relEuler(a, b).z,
+      _RX: (a: number, b: number) => -relEuler(a, b).x,
+      _RY: (a: number, b: number) => -relEuler(a, b).y,
+      _RZ: (a: number, b: number) => -relEuler(a, b).z,
       // drawing
       _SETCOLOR: (rgb: number) => {
         const c = Math.max(0, Math.floor(rgb)) & 0xffffff;

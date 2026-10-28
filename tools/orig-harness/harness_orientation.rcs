@@ -1,0 +1,10 @@
+-- Read the public quaternion and relative-angle API at the first frame.
+function OnFrame()
+ if done then return end
+ local s='chip,qx,qy,qz,qw,ex,ey,ez,rx,ry,rz\n'
+ for i=0,_CHIPS()-1 do
+  s=s..i..','.._QX(i)..','.._QY(i)..','.._QZ(i)..','.._QW(i)..','.._EX(i)..','.._EY(i)..','.._EZ(i)..','.._RX(i,0)..','.._RY(i,0)..','.._RZ(i,0)..'\n'
+ end
+ local h=_FOPEN('s22-api.csv','w')
+ if h>=0 then _FPUTS(h,s) _FCLOSE(h) done=true end
+end

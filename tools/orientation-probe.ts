@@ -1,0 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { initRapier } from '../src/physics/world';
+import { Simulation } from '../src/sim/simulation';
+import { KeyState } from '../src/input/keys';
+const src='Val {} Key {} Body { Core(){ N:Chip(angle=30){} S:Rudder(angle=30){} E:Trim(angle=30){} W:Chip(angle=20){ N:Rudder(angle=40){ E:Trim(angle=15){} } } } }';
+const model=process.argv[2] ? new TextDecoder('shift_jis').decode(readFileSync(process.argv[2])) : src;
+const sim=new Simulation(await initRapier(),model,new KeyState(new EventTarget())); await sim.start();
+for(let i=0;i<Number(process.argv[3]||0);i++) sim.step();
+const a=sim.api() as any;
+for(let n=0;n<a._CHIPS();n++) console.log(n,...['_QX','_QY','_QZ','_QW','_EX','_EY','_EZ'].map(k=>a[k](n)),...['_RX','_RY','_RZ'].map(k=>a[k](n,0)),a._X(n),a._Y(n),a._Z(n),a._GET(n,'ANGLE'));
+await sim.lua.dispose();
