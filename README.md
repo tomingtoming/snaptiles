@@ -4,10 +4,12 @@ A browser sandbox for building vehicles out of square tiles and driving them
 with the keyboard or Lua. Runs on [Rapier](https://rapier.rs) (3D rigid bodies,
 WebAssembly), [three.js](https://threejs.org) and [wasmoon](https://github.com/ceifa/wasmoon) (Lua 5.4).
 
-It reads the `.rc` model format and the `_KEY()`/`_X()`/`out()` script API of
-RigidChips, so models written for it can be pasted in and played. SnapTiles is
-a clean-room reimplementation: it was written from the public documentation
-and wikis only (see `docs/spec/`), without reading any RigidChips source code.
+It reads the `.rc` model format and implements parts of the RigidChips script
+API, including `_KEY()`/`_X()`/`out()`. Supported models can be pasted in and
+played; compatibility is incomplete. SnapTiles is
+a clean-room reimplementation: it was written from public documentation,
+wikis and black-box observations (see `docs/spec/` and `docs/measured.md`),
+without reading any RigidChips source code.
 It shares no code with it and is not affiliated with its author. RigidChips
 itself was made by 学生 (Yasuhiko Takeya); its last release, 1.5B26 (2006), was
 used as the reference for the physics constants recorded in `docs/measured.md`
@@ -42,39 +44,52 @@ ramp, kerbs, a gate, a wall and crates to knock over.
 
 ## Build visually
 
-Press **組む** to pause simulation and edit the assembled model. **新規** starts
-with a single Core; Undo restores the previous model. Click a tile
-in the 3D view or select it in the part list. Choose a part type and N/S/E/W
-to attach it, change the selected tile's type or numeric angle, or delete
-its branch. **コピー** keeps the selected branch; select its new parent and an
-N/S/E/W edge to attach a copy. Expressions and controls remain shared. Named
-branches are protected against name collisions, and pasting requires the
-referenced variables to exist. Core cannot be deleted or copied. Adding or removing parts can change numerical
-chip indices; Lua that refers to chip numbers may need corresponding edits. ↶ / ↷ undo and redo edits, including
-after a test run; **保存** downloads the model. Imported filenames survive edits and local draft recovery; New clears the name, and Undo restores it with the contents. Exports use the `.rcd` extension. **共有リンク** creates a link from the current editor contents without running it. Copy it from the dialog; if clipboard access is unavailable, the URL remains selectable. Press ▶ to test it and update
-the shareable URL, then **組む** to return to its construction pose.
+Press **組む** to pause simulation and edit the construction pose. **新規** starts
+with one Core; Undo restores the previous model. Select a part in the 3D view
+or list. Add parts at N/S/E/W, change their type or angle, or delete a branch.
+Yellow letters and endpoint dots show the selected part's actual attachment
+edges. **コピー** copies a branch to another selected parent/edge; its expressions
+and controls remain shared. Named branches are rejected to avoid duplicate
+identities, and referenced variables must already exist. Core cannot be deleted
+or copied. Adding/removing parts changes numerical chip indices; Lua that uses
+those numbers may need manual updates.
 
-Edits patch only the affected source ranges. Other attributes, comments,
-Val/Key definitions and scripts are retained. Variable-driven angles remain
-read-only in the visual panel; edit their expressions in the source. Manual
-source edits reset visual undo history. Wheel/Jet/Arm power can be fixed, linked to an existing Val, or assigned a new
-↑/↓ control from the 操作 menu. New controls use the current positive power
-magnitude (1000 when it is zero or an expression), return to zero on release,
-and never overwrite existing variables. Select a variable marked （逆） to reverse
-a wheel on the opposite side. Rudder/Trim parts can also receive a new ←/→
-control (±30°, returning to zero on release). GUI-generated controls expose
-**最大出力（共通）** / **最大角度（共通）**: changing the magnitude updates its
-bounds, both keys and release together for every connected part. Manually
-altered or arbitrary controls remain source-only. Colours, other key mappings and Lua
-still use the text editor; mirroring and multi-selection are not implemented.
-Edits are also saved as the latest draft in this browser. After reloading,
-open **組む** and use **下書きを復元** to recover unpublished or unfinished text.
-Restoration is undoable. This is one browser-local draft, not a cloud backup;
-use **保存** for a file. **全体** fits the model to the view and a yellow outline
-marks the selected tile. **選択へ** zooms to it; the list marks it with ● and
-scrolls it into view. Drag and zoom work while editing. Ctrl/Cmd+Z and
-Ctrl/Cmd+Shift+Z undo/redo visual edits when focus is outside text controls.
-The editor is independently implemented, without RCD/RCM source or assets.
+Wheel/RLW/Jet/Arm power can be constant, bound to an existing Val, or assigned
+new ↑/↓ controls. New controls use the current positive magnitude (1000 for
+zero or expressions), return to zero on release and avoid existing names.
+Choose （逆） for an opposite-side wheel. Rudder/Trim can receive new ←/→ controls
+(±30°, returning to zero on release). **最大出力（共通）** and **最大角度（共通）**
+change GUI-generated controls for every bound part. Arbitrary expressions or
+manually altered controls remain source-only.
+
+The panel also edits wheel radius, Weight multiplier and Cowl shape. **色**
+sets a constant part colour or restores its type's default. Dynamic colour
+expressions stay in the source. Patches preserve unrelated attributes,
+comments and Lua. Source typing and visual edits share Undo/Redo, including
+incomplete syntax, selection and source caret/scroll state. Ctrl/Cmd+Z and
+Ctrl/Cmd+Shift+Z use this history in the source or construction controls;
+other text/number fields retain native editing Undo.
+
+**全体** fits the model; **選択へ** focuses the selected part. Drag and zoom also
+work while editing. Loaded models get an initial driving distance based on
+their size; ordinary driving preserves manual zoom. **?** opens the in-app guide.
+
+**保存名** names a variant and previews its actual .rcd filename; **保存** downloads
+it. Imported/assigned names survive edits and draft recovery. New clears the
+name, and Undo restores it. **開く** reads a saved file. **共有リンク** encodes the
+current source without running it; it does not include the local filename.
+The dialog provides a selectable URL when automatic copying is unavailable.
+Press ▶ to test the model and update the URL, then **組む** to return to editing.
+
+This browser keeps one latest draft, including unfinished text and its filename.
+The recovery card identifies its name and local save time before **下書きを復元**.
+Restoration is undoable. It is not a multi-model library or cloud backup; save
+files for durable copies. The editor is independently implemented without
+RCD/RCM source or assets. Mirroring, multi-selection, a general key-mapping GUI
+and a Lua programming GUI are not implemented; the source remains editable.
+A working construction loop does not establish compatibility with every
+RigidChips model, script or physical behavior. See `docs/editor-sprints.md` for
+measured scope. Local checkout behavior may differ from the deployed website.
 
 Production-build browser regression: `bun run build && bun run test:editor`
 (install Chromium first with `bun x playwright install chromium`). This runs

@@ -737,3 +737,45 @@ executed target must agree with what the user saw. Existing saved metadata was
 enough; no new persistence schema or confirmation step was needed. Next: audit
 remaining gaps against the full build/control/test/save/share workflow and the
 independent-implementation scope before adding more local UI features.
+
+
+## 2026-10-30 — Audit the complete creation loop against outcome evidence
+
+Goal: return to the requested creation/control/test/save/share loop rather than
+adding UI details without checking the actual outcome. The existing drive probe
+proved forward travel and steering-variable changes, but not a vehicle turn.
+A new integration test constructs the same seven-part car through ModelDocument
+operations, settles for two seconds, then compares two seconds of straight,
+left and right input in separate fresh simulations. Straight travel is 6.78m
+with less than 0.1m lateral drift. Left/right inputs move laterally -2.52m/+2.74m
+and change heading +82.88/-84.21 degrees, with ground height near 0.60m. Release
+returns throttle and steering controls to zero. This proves this constructed
+vehicle's controllability, not original-engine fidelity or every vehicle.
+
+| Requirement | Current evidence | Limit |
+| --- | --- | --- |
+| Build from a blank Core | GUI-built steering car, type/angle/branch/colour/option and selection probes | No mirroring or multi-selection; arbitrary scripts remain source-edited |
+| Set controls | Shared/reversed throttle and steering, strengths, keys/touch, mixed-input release tests | General key-mapping GUI and physical-device coverage are incomplete |
+| Try the result | Forward travel, new left/right trajectory test, shared-link touch drive, camera tests | One constructed-car outcome fixture; not a universal physics-compatibility proof |
+| Save/reopen | Exact downloaded bytes, UTF-8/legacy import, naming, draft restore, Undo/caret tests | One latest local draft; no cloud backup or multi-model library |
+| Share/resume | Fresh browser context receives exact source, drives and re-edits it | Local filenames are not in links; deployed website not validated by local tests |
+| Retrospectives | This chronological sprint log records implementation, evidence and next action | It is engineering evidence, not user approval of publication |
+| Independent implementation | Current editor work uses local parser/public behavior and original tests; no RCD/RCM source/assets used | Full RCD/RCM parity and original physics equivalence are not claimed |
+
+The README still said source typing erased Undo, colour required manual source,
+and Undo excluded the source field. Updated it to the current behavior and
+explicit limitations, including named saves, draft identification, options,
+selection and camera changes. Also qualified the opening compatibility claim.
+
+Validation: 98 unit/integration tests and typecheck/build pass. Application code
+and built JS hash (index-BVfEZGL2.js) are unchanged from Sprint 31, whose 20 browser
+probes passed; this documentation/test-only sprint does not repeat that suite.
+Read-only GitHub check on 2026-10-30: PR 1 remains OPEN at 1f3f884f0f12a659e6c58d49da3a8b5166f034b3
+(https://github.com/tomingtoming/snaptiles/pull/1). Editor work through local
+02d92c4 is not that remote head. No push or deployment was performed.
+
+Retrospective: input plumbing and a changing control value are weaker evidence
+than trajectory and heading. Documentation can also lag implementation and
+wrongly discourage supported workflows. Next: check browser portability of the
+core creation loop; current browser evidence is Chromium-only, distinct from
+physical-device and original-engine calibration.
