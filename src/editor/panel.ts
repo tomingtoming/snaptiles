@@ -27,6 +27,7 @@ export class BuildPanel {
   private clipboard: CopiedBranch | null = null;
   private copy = document.getElementById('copy-branch') as HTMLButtonElement;
   private mirror = document.getElementById('mirror-branch') as HTMLButtonElement;
+  private namePart = document.getElementById('name-part') as HTMLButtonElement;
   private move = document.getElementById('move-branch') as HTMLButtonElement;
   assembly: Assembly | null = null;
   private panel = document.getElementById('builder')!;
@@ -100,6 +101,7 @@ export class BuildPanel {
       else this.document.bindAngle(this.selected, value);
     });
     document.getElementById('new-model')!.onclick = () => this.edit(() => { this.document.newModel(); this.selected = 0; }, true);
+    this.namePart.onclick = () => this.openPartName();
     this.move.onclick = () => this.openMoveBranch();
     this.mirror.onclick = () => this.edit(() => { this.selected = this.document.mirrorBranch(this.selected); });
     this.copy.onclick = () => {
@@ -238,7 +240,7 @@ export class BuildPanel {
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = false);
     } catch (e) {
       this.assembly = null; this.tree.replaceChildren(); this.scene.clearModel();
-      this.type.disabled = this.angle.disabled = this.remove.disabled = this.copy.disabled = this.mirror.disabled = this.move.disabled = true;
+      this.type.disabled = this.angle.disabled = this.remove.disabled = this.copy.disabled = this.mirror.disabled = this.move.disabled = this.namePart.disabled = true;
       this.sourceHelp.hidden = true; this.sourceHelp.replaceChildren();
       this.powerRow.hidden = this.angleRow.hidden = true; this.angleSettings.disabled = true; this.angleSettings.setAttribute('aria-expanded','false');
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = true);
@@ -252,6 +254,25 @@ export class BuildPanel {
     const row = option.getBoundingClientRect(), box = this.tree.getBoundingClientRect();
     if (row.bottom > box.bottom - 4) this.tree.scrollTop += row.bottom - box.bottom + 4;
     else if (row.top < box.top + 4) this.tree.scrollTop -= box.top + 4 - row.top;
+  }
+  private openPartName(): void {
+    const dialog = document.getElementById('part-name-dialog') as HTMLDialogElement;
+    const input = document.getElementById('part-name-input') as HTMLInputElement;
+    const status = document.getElementById('part-name-status')!;
+    const index = this.selected, original = this.document.text, originalStatus = this.status.textContent;
+    input.value = this.document.nodes()[index].attrs.name ?? ''; status.textContent = '';
+    input.oninput = () => { status.textContent = ''; };
+    document.getElementById('part-name-cancel')!.onclick = () => dialog.close();
+    dialog.onclose = () => this.namePart.focus();
+    (document.getElementById('part-name-form') as HTMLFormElement).onsubmit = event => {
+      event.preventDefault();
+      if (this.document.text !== original) { status.textContent = 'モデルが変更されました。閉じて選び直してください。'; return; }
+      let changed = false;
+      this.edit(() => { this.document.name(index,input.value); changed = true; });
+      if (changed) dialog.close();
+      else { status.textContent = this.status.textContent; this.status.textContent = originalStatus; }
+    };
+    dialog.showModal(); input.focus(); input.select();
   }
   private openMoveBranch(): void {
     const dialog = document.getElementById('move-branch-dialog') as HTMLDialogElement;
@@ -319,6 +340,7 @@ export class BuildPanel {
     this.scene.selectTile(tile.id);
     this.type.value = TYPES.find(t => t.toLowerCase() === tile.type) ?? 'Core';
     this.type.disabled = !tile.parent;
+    this.namePart.disabled = false;
     this.color.value = this.scene.tileColorHex(tile.id);
     this.color.disabled = !!tile.node.attrs.color && !exprIsConstant(tile.node.attrs.color);
     this.resetColor.disabled = this.color.disabled || !tile.node.attrs.color;

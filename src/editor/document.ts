@@ -76,6 +76,22 @@ export class ModelDocument {
     if (s.argsEnd !== undefined) return [s.argsEnd, s.argsEnd, `${Object.keys(n.attrs).length ? ', ' : ''}${attribute}=${value}`];
     return [s.headerEnd, s.headerEnd, `(${attribute}=${value})`];
   }
+  name(index: number, value: string): void {
+    const nodes = this.nodes(), node = nodes[index];
+    if (!node) throw new Error('部品を選んでください');
+    const name = value.trim().toUpperCase();
+    if (name && !/^[A-Z][A-Z0-9_]*$/.test(name)) throw new Error('名前は英字で始め、半角英数字と_を使ってください');
+    if (name && nodes.some((n,i) => i !== index && n.attrs.name?.replace(/\s/g, '').toUpperCase() === name)) throw new Error('同じ名前の部品があります');
+    if (name && parseRc(this.text).vals.some(v => v.name.toUpperCase() === name)) throw new Error('同じ名前の変数があります');
+    if (name) this.replace(...this.attributeEdit(index, 'name', name));
+    else {
+      const ranges = node.source!.attributeTokens.name ?? [];
+      const unique = [...new Map(ranges.map(r => [r.join(':'),r])).values()];
+      let next = this.text;
+      for (const [start,end] of unique.sort((a,b) => b[0]-a[0])) next = next.slice(0,start)+next.slice(end);
+      this.replace(0,this.text.length,next);
+    }
+  }
   angle(index: number, value: number): void {
     if (!Number.isFinite(value)) throw new Error('角度には数値を入力してください');
     const n = this.nodes()[index];

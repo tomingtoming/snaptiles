@@ -233,9 +233,20 @@ key. Reusing a key remains allowed and keeps the original assignments. Script
 input polling and implicit WASD arrow aliases are explicitly outside this list.
 
 
-Under **接続先**, **枝を移動…** relocates the selected subtree to another parent
+Under **名前・接続先**, **枝を移動…** relocates the selected subtree to another parent
 and direction in one undoable operation. Names, internal comments and controls
 are retained. Core roots, self/descendant destinations and occupied edges are
 rejected. New parent transforms and declaration order can change poses and chip
 numbers; numeric script references are not rewritten. This preserves local
 attributes, not the branch's previous world-space pose.
+
+
+**部品名…** in **名前・接続先** assigns or clears a part's name, including Core.
+Names start with an ASCII letter, contain letters/digits/underscores, and are
+stored in uppercase. Other part names and Val/Var names cannot collide. The
+part list updates immediately; changes support Undo/Redo and survive file/share
+round trips. Empty input removes all name attributes while preserving comments.
+Scripts are not rewritten on rename/removal; inspect references in the source.
+This is a script identifier, not a free-form display label. Existing named-branch
+copy/mirror restrictions still apply. Script-defined globals are not analyzed
+for collisions by this dialog.

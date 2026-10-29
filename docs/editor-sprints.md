@@ -1792,3 +1792,38 @@ application code changed, so the Sprint 58 build/unit/full-suite evidence remain
 applicable; only the extended move scenario was rerun. No push/deployment.
 Next: improve identification of parts while building larger models, evaluating
 how to assign names without silently breaking existing script references.
+
+
+## 2026-10-30 — Assign part names from the builder (Sprint 60)
+
+Goal: identify parts in larger constructions without editing source syntax.
+Added a part-name dialog under the existing disclosure, now 名前・接続先, without
+adding a permanent toolbar row. Core and child parts can be named or cleared.
+Names are uppercase ASCII identifiers beginning with a letter; duplicate part
+names and Val/Var collisions are rejected case-insensitively. One transaction
+updates only the name attribute, or removes all duplicate name tokens while
+preserving comments and unrelated attributes. Selection and Undo/Redo persist.
+
+The dialog and guide explain that names are script identities. Rename/removal
+does not rewrite scripts, and existing named-branch copy/mirror guards remain.
+This does not offer arbitrary display labels or analyze script-defined globals
+for collisions. Stale-source submission is rejected; validation stays in the
+dialog and cancel returns focus without changing source.
+
+Validation: 167 tests in 23 files and production build pass. New unit cases cover
+syntax/collisions, insertion into bare headers, Core naming, duplicate-token
+removal, preserved comments/Lua, selection, no-op history and exact Undo/Redo.
+Chromium browser flow covers cancel/focus, validation, normalization, name-list
+updates, a live Lua _GET lookup of 42, removal without Lua rewriting, exact export
+and a fresh shared context. The move (including four folded-parent directions),
+short-height editing and guide scenarios pass. Default suite now has 36 scripts;
+it was not fully rerun after this feature. The 320x568 dialog screenshot was
+visually inspected: input, instructions, warning and both actions fit without
+clipping. Physical on-screen keyboards and other browser engines remain untested
+for this dialog. Existing build warnings remain.
+
+Retrospective: part naming looks like cosmetic labeling but changes the script
+namespace. Explicit scope, collision guards and reversible narrow edits matter
+more than silently rewriting arbitrary program text. Next: make named parts
+easier to locate in a large construction, using the existing part list. No push
+or deployment.

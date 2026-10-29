@@ -126,13 +126,13 @@ button:disabled { opacity: .4; cursor: default !important; }
 
 #status:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
-#control-key-dialog, #move-branch-dialog { width:min(440px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); overflow:auto; padding:20px; border:1px solid #59636e; border-radius:8px; background:var(--panel); color:var(--ink); }
-#control-key-dialog::backdrop, #move-branch-dialog::backdrop { background:#0009; }
-#control-key-dialog label, #move-branch-dialog label { display:grid; gap:4px; margin:10px 0; }
-#control-key-dialog select, #move-branch-dialog select { min-height:44px; background:var(--bg); color:var(--ink); }
+#part-name-dialog, #control-key-dialog, #move-branch-dialog { width:min(440px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); overflow:auto; padding:20px; border:1px solid #59636e; border-radius:8px; background:var(--panel); color:var(--ink); }
+#part-name-dialog::backdrop, #control-key-dialog::backdrop, #move-branch-dialog::backdrop { background:#0009; }
+#part-name-dialog label, #control-key-dialog label, #move-branch-dialog label { display:grid; gap:4px; margin:10px 0; }
+#part-name-dialog input, #control-key-dialog select, #move-branch-dialog select { min-height:44px; background:var(--bg); color:var(--ink); }
 #control-key-status { color:var(--err); }
 
 #control-key-usage { white-space:pre-wrap; overflow-wrap:anywhere; }
 
-#move-branch { min-height:44px; margin:6px 0; }
-#move-branch-status { color:var(--err); }
+#name-part, #move-branch { min-height:44px; margin:6px 0; }
+#part-name-status, #move-branch-status { color:var(--err); }
