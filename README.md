@@ -227,3 +227,7 @@ in the 17-key model input table. The held-power variant is also available.
 Direction semantics are stated in the dialog. Existing four preset pairs remain;
 custom pairs participate in strength editing, separation and Undo/Redo. This
 creates a new control rather than changing every binding of an existing one.
+
+The custom-key dialog lists existing Key-section assignments for each selected
+key. Reusing a key remains allowed and keeps the original assignments. Script
+input polling and implicit WASD arrow aliases are explicitly outside this list.

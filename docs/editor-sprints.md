@@ -1593,3 +1593,30 @@ it to await the actual focus return, which passes on all three engines. A field
 change also clears old validation text. Next: check custom control ownership and
 conflicting assignments in more complex models, without silently reassigning
 other parts. No push or deployment.
+
+
+## 2026-10-30 — Show existing key assignments before adding controls (Sprint 54)
+
+Goal: make intentional simultaneous controls distinguishable from accidental key
+reuse. The custom-key dialog lists existing Key-section variable assignments for
+each selected key, updates on selection changes and deduplicates names. It does
+not block reuse or change old bindings. Empty entries say no Key definition,
+not globally unused; script polling and implicit WASD arrow aliases are explicitly
+excluded. Diagnostics use textContent and wrapping for arbitrary variable names.
+
+A browser fixture has C assigned to OLD and OTHER. The dialog shows both, updates
+when selecting Q, and cancels without modifying source. Adding C/V then preserves
+the original Key text and actual C input drives OLD=100, OTHER=50 and the new
+power=1000 simultaneously; release returns the momentary controls to zero.
+Production build, the usage scenario and the full custom-key creation scenario
+pass. Independent 320px image review confirms usage names, scope disclaimer and
+action buttons fit and are readable. No model logic changed, so the previous
+158-unit baseline and full suite were not rerun. Default browser suite now has
+33 scenarios; non-Chromium runs were not repeated for this display addition.
+
+Retrospective: key reuse is not inherently a conflict; it is how linked mechanisms
+can be controlled. Expose the existing assignments and preserve intentional
+sharing, while making the limits of static inspection explicit. Next: inspect
+construction operations that still require manual source changes, prioritising
+moving or reorganising existing branches over adding more isolated controls.
+No push or deployment.

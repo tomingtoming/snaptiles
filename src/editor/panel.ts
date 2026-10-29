@@ -261,7 +261,15 @@ export class BuildPanel {
     const magnitude = attribute === 'angle' ? 30 : Math.abs(Number(this.power.value)) || 1000;
     for (const select of [first,second]) { select.replaceChildren(); KEY_TABLE.forEach((key,i) => select.add(new Option(key.glyph,String(i)))); }
     first.value = attribute === 'angle' ? '2' : '4'; second.value = attribute === 'angle' ? '3' : '5';
-    status.textContent = ''; first.onchange = second.onchange = () => { status.textContent = ''; };
+    const bindings = parseRc(original).keys;
+    const updateUsage = () => {
+      status.textContent = '';
+      document.getElementById('control-key-usage')!.textContent = [...new Set([Number(first.value),Number(second.value)])].map(key => {
+        const names = [...new Set(bindings.filter(binding => binding.key === key).map(binding => binding.var.toUpperCase()))];
+        return `${KEY_TABLE[key].glyph}：${names.length ? '既存の割り当て ' + names.join('、') : 'Key定義に割り当てなし'}`;
+      }).join('\n');
+    };
+    first.onchange = second.onchange = updateUsage; updateUsage();
     document.getElementById('control-key-description')!.textContent = attribute === 'angle' ? '1つ目で角度を負方向、2つ目で正方向に動かします。離すと0に戻ります。' : held ? '1つ目で出力を増やし、2つ目で減らします。離すと値を保ちます。' : '1つ目で出力を正方向、2つ目で負方向に動かします。離すと0に戻ります。';
     document.getElementById('control-key-cancel')!.onclick = () => dialog.close();
     dialog.onclose = () => selector.focus();

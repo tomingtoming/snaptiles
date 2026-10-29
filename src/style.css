@@ -131,3 +131,5 @@ button:disabled { opacity: .4; cursor: default !important; }
 #control-key-dialog label { display:grid; gap:4px; margin:10px 0; }
 #control-key-dialog select { min-height:44px; background:var(--bg); color:var(--ink); }
 #control-key-status { color:var(--err); }
+
+#control-key-usage { white-space:pre-wrap; overflow-wrap:anywhere; }
