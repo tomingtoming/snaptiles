@@ -1,6 +1,6 @@
 import { exprIsConstant } from '../rc/expr';
 import { DraftStore, type Draft } from './draft';
-import { OPTION_SETTINGS, ModelDocument, type CopiedBranch } from './document';
+import { CONTROL_KEYS, OPTION_SETTINGS, ModelDocument, type CopiedBranch, type ControlKeys } from './document';
 import { parseRc } from '../rc/parser';
 import { assemble, type Assembly } from '../model/assemble';
 import type { SceneView } from '../render/scene';
@@ -79,12 +79,12 @@ export class BuildPanel {
     });
     this.powerControl.onchange = () => this.edit(() => {
       const value = this.powerControl.value;
-      if (value === 'new') this.document.addPowerControl(this.selected, Math.abs(Number(this.power.value)) || 1000);
+      if (value === 'new' || value.startsWith('new:')) this.document.addPowerControl(this.selected, Math.abs(Number(this.power.value)) || 1000, value === 'new' ? 'vertical' : value.slice(4) as ControlKeys);
       else this.document.power(this.selected, value === 'constant' ? 0 : value);
     });
     this.angleControl.onchange = () => this.edit(() => {
       const value = this.angleControl.value;
-      if (value === 'new') this.document.addSteeringControl(this.selected);
+      if (value === 'new' || value.startsWith('new:')) this.document.addSteeringControl(this.selected, 30, value === 'new' ? 'horizontal' : value.slice(4) as ControlKeys);
       else if (value === 'constant') this.document.fixedAngle(this.selected);
       else this.document.bindAngle(this.selected, value);
     });
@@ -271,11 +271,14 @@ export class BuildPanel {
     this.angle.title = this.angle.disabled && tile.parent ? `ソースで編集: ${angle}` : '';
     this.angleRow.hidden = !tile.parent || !['rudder', 'rudderf', 'trim', 'trimf'].includes(tile.type);
     this.angleControl.replaceChildren(new Option('固定', 'constant'));
-    for (const v of parseRc(this.document.text).vals) this.angleControl.add(new Option(v.name, v.name.toUpperCase()));
+    for (const v of parseRc(this.document.text).vals) {
+      const keys = this.document.controlKeyLabel(v.name);
+      this.angleControl.add(new Option(keys ? `${keys} · ${v.name}` : v.name, v.name.toUpperCase()));
+    }
     const angleExpression = angle.replace(/\s/g, '').toUpperCase();
     const fixedAngle = Number.isFinite(Number(angleExpression));
     if (!fixedAngle && ![...this.angleControl.options].some(o => o.value === angleExpression)) this.angleControl.add(new Option(angle, angleExpression));
-    this.angleControl.add(new Option('← / → を追加', 'new'));
+    for (const [key,pair] of Object.entries(CONTROL_KEYS)) this.angleControl.add(new Option(`${pair.label} を追加`, key === 'horizontal' ? 'new' : `new:${key}`));
     this.angleControl.value = fixedAngle ? 'constant' : angleExpression;
     this.powerRow.hidden = !['wheel', 'rlw', 'jet', 'arm'].includes(tile.type);
     const power = (tile.node.attrs.power ?? '0').replace(/\s/g, '');
@@ -286,11 +289,12 @@ export class BuildPanel {
     document.getElementById('power-label')!.textContent = powerStrength === null ? '出力' : '最大出力（共通）';
     this.powerControl.replaceChildren(new Option('固定', 'constant'));
     for (const v of parseRc(this.document.text).vals) {
-      this.powerControl.add(new Option(v.name, v.name.toUpperCase()));
-      this.powerControl.add(new Option(`${v.name}（逆）`, `-${v.name.toUpperCase()}`));
+      const keys = this.document.controlKeyLabel(v.name), label = keys ? `${keys} · ${v.name}` : v.name;
+      this.powerControl.add(new Option(label, v.name.toUpperCase()));
+      this.powerControl.add(new Option(`${label}（逆）`, `-${v.name.toUpperCase()}`));
     }
     if (!constant && ![...this.powerControl.options].some(o => o.value === power.toUpperCase())) this.powerControl.add(new Option(power, power.toUpperCase()));
-    this.powerControl.add(new Option('↑ / ↓ を追加', 'new'));
+    for (const [key,pair] of Object.entries(CONTROL_KEYS)) this.powerControl.add(new Option(`${pair.label} を追加`, key === 'vertical' ? 'new' : `new:${key}`));
     this.powerControl.value = constant ? 'constant' : power.toUpperCase();
     this.remove.disabled = this.copy.disabled = this.mirror.disabled = !tile.parent;
     this.remove.textContent = tile.children.length ? '枝ごと削除' : '削除';

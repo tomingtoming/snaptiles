@@ -979,3 +979,43 @@ Final regression: all 21 Chromium browser scenarios pass against the production
 build, in addition to the Firefox/WebKit mirrored-car loops and 115 unit/
 integration tests. No regression was observed in the covered save/share, input,
 source history, camera, naming and recovery flows.
+
+## 2026-10-30 — Assign independent keys for multiple control axes
+
+Goal: stop assuming a steering car's two input axes cover an aircraft. Existing
+GUI generation fixed all angle controls to left/right and all power controls to
+up/down. The plane sample instead needs separate pitch, roll, yaw and thrust
+bindings. Added ↑/↓, ←/→, Z/X and A/D choices for generated angle/power controls.
+Existing defaults and their signs remain unchanged; generated symmetric controls
+still return to zero on release. Recognized controls show their key pair in the
+selector, and shared magnitude editing retains the chosen keys.
+
+Ten new tests cover all four key pairs for angle and power, magnitude changes,
+exact Undo/Redo, invalid-pair rejection and a seven-part control fixture with
+separate pitch/roll/yaw/thrust. Simulation checks individual keys, simultaneous
+inputs and releasing one axis while others stay held. Total: 125 tests pass.
+These assertions establish control independence, not stable aircraft flight.
+
+The new browser flow builds the fixture entirely through GUI operations, edits
+strength, checks Undo/Redo, drives the separate controls with physical keys,
+verifies W does not alias pitch when A/D are explicitly bound, presses/releases
+the screen Z key, and shares the source to a fresh context with the exact key
+bindings retained. Help documents that reusing a pair intentionally operates
+several controls together. The browser scenario joins the default CI runner.
+
+Retrospective: generating fresh variable names does not make controls independent
+when the input keys remain shared. Verify simultaneous axes and partial release,
+not only one changing value. A second gap remains: the existing plane throttle
+accumulates input and holds its value, while these generated controls spring
+back to zero. Next: make held throttle behavior configurable and test its bounds,
+release behavior and separation from pitch, then assess actual aircraft motion.
+This sprint does not claim a GUI-built airworthy airplane or physical fidelity
+to the original. No push or deployment was performed.
+
+Final validation: typecheck/build, all 125 unit/integration tests and seven
+selected production browser flows (new key-pair scenario, help, options,
+keyboard, mirror, Firefox and WebKit core loops) pass. Independent 320px image
+review confirms Z/X remains readable in the selector even when the variable
+name is truncated, and all eight screen keys fit in two rows with readable
+labels. The full Chromium suite last passed in Sprint 37; this sprint reran
+relevant scenarios rather than relabeling that older full run as current.

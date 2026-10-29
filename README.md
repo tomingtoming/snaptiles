@@ -63,10 +63,12 @@ occupied opposite edge, named branch or expression-controlled Cowl shape is
 rejected instead of silently overlapping or guessing.
 
 Wheel/RLW/Jet/Arm power can be constant, bound to an existing Val, or assigned
-new ↑/↓ controls. New controls use the current positive magnitude (1000 for
+new controls using ↑/↓, ←/→, Z/X or A/D. New power controls use the current positive magnitude (1000 for
 zero or expressions), return to zero on release and avoid existing names.
-Choose （逆） for an opposite-side wheel. Rudder/Trim can receive new ←/→ controls
-(±30°, returning to zero on release). **最大出力（共通）** and **最大角度（共通）**
+Choose （逆） for an opposite-side wheel. Rudder/Trim can use any of the same key
+pairs (±30°, returning to zero on release). Selectors show the keys for recognized
+GUI controls; assigning the same keys to several controls operates them together.
+These are momentary controls, not an incrementally held aircraft throttle. **最大出力（共通）** and **最大角度（共通）**
 change GUI-generated controls for every bound part. Arbitrary expressions or
 manually altered controls remain source-only.
 

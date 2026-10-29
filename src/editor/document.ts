@@ -14,6 +14,14 @@ export const OPTION_SETTINGS: Record<string, {label: string; choices: [number, s
   weight: {label: '重さ倍率', choices: [[0, '1倍（既定）'], ...Array.from({length:8}, (_, i): [number, string] => [i + 1, `${i + 1}倍`])]},
 };
 
+export const CONTROL_KEYS = {
+  vertical: {label: '↑ / ↓', keys: [0, 1]},
+  horizontal: {label: '← / →', keys: [2, 3]},
+  zx: {label: 'Z / X', keys: [4, 5]},
+  ad: {label: 'A / D', keys: [7, 9]},
+} as const;
+export type ControlKeys = keyof typeof CONTROL_KEYS;
+
 export interface CopiedBranch { text: string; variables: string[]; count: number }
 
 /** Edits use parser offsets: scripts, comments and unrelated attributes remain byte-for-byte. */
@@ -109,8 +117,16 @@ export class ModelDocument {
     const model = parseRc(this.text), v = model.vals.find(v => v.name.toUpperCase() === name);
     const keys = model.keys.filter(k => k.var.toUpperCase() === name);
     if (!v || v.default !== 0 || v.min !== -v.max || v.max <= 0 || v.step !== v.max || keys.length !== 2) return null;
-    const expected = name.startsWith('ST_POWER') ? [0, 1] : [3, 2];
-    return keys.some(k => k.key === expected[0] && k.step === v.max) && keys.some(k => k.key === expected[1] && k.step === -v.max) ? v.max : null;
+    const sign = name.startsWith('ST_POWER') ? 1 : -1;
+    return Object.values(CONTROL_KEYS).some(pair =>
+      keys.some(k => k.key === pair.keys[0] && k.step === sign * v.max) &&
+      keys.some(k => k.key === pair.keys[1] && k.step === -sign * v.max)) ? v.max : null;
+  }
+  controlKeyLabel(variable: string): string | null {
+    if (this.controlStrength(variable) === null) return null;
+    const name = variable.replace(/\s/g, '').replace(/^-/, '').toUpperCase();
+    const keys = parseRc(this.text).keys.filter(k=>k.var.toUpperCase()===name).map(k=>k.key);
+    return Object.values(CONTROL_KEYS).find(pair=>pair.keys.every(key=>keys.includes(key)))?.label ?? null;
   }
   setControlStrength(variable: string, magnitude: number): void {
     if (this.controlStrength(variable) === null) throw new Error('変更済みの操作はソースで編集してください');
@@ -132,8 +148,8 @@ export class ModelDocument {
     for (const [start, end, value] of edits.sort((a,b) => b[0] - a[0])) next = next.slice(0,start) + value + next.slice(end);
     this.replace(0, this.text.length, next);
   }
-  addPowerControl(index: number, magnitude: number): void { this.addControl(index, 'power', magnitude, [0, 1]); }
-  addSteeringControl(index: number, magnitude = 30): void { this.addControl(index, 'angle', magnitude, [2, 3]); }
+  addPowerControl(index: number, magnitude: number, pair: ControlKeys = 'vertical'): void { this.addControl(index, 'power', magnitude, pair); }
+  addSteeringControl(index: number, magnitude = 30, pair: ControlKeys = 'horizontal'): void { this.addControl(index, 'angle', magnitude, pair); }
   bindAngle(index: number, variable: string): void {
     if (!parseRc(this.text).vals.some(v => v.name.toUpperCase() === variable.toUpperCase())) throw new Error('定義済みの変数を選んでください');
     this.replace(...this.attributeEdit(index, 'angle', variable));
@@ -169,7 +185,10 @@ export class ModelDocument {
     this.undoStack.push(this.snapshot()); this.redoStack = []; this.filename = next;
   }
   newModel(): void { this.restore('Body {\n  Core() {\n  }\n}\n'); }
-  private addControl(index: number, attribute: 'power' | 'angle', magnitude: number, keys: [number, number]): void {
+  private addControl(index: number, attribute: 'power' | 'angle', magnitude: number, pair: ControlKeys): void {
+    const binding = CONTROL_KEYS[pair];
+    if (!binding) throw new Error('操作に使うキーを選んでください');
+    const keys = binding.keys;
     if (!Number.isFinite(magnitude) || magnitude <= 0) throw new Error('出力の大きさは正の数で指定してください');
     const names = new Set(this.text.toUpperCase().match(/[A-Z_][A-Z0-9_]*/g));
     const prefixName = attribute === 'power' ? 'ST_POWER' : 'ST_STEER';
