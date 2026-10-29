@@ -133,6 +133,10 @@ export class SceneView {
   camYaw = 0.6;
   camPitch = 0.35;
   camDist = 12;
+  private zoomLimit = 60;
+  zoomBy(factor: number, editing = false): void {
+    this.camDist = Math.max(editing ? 0.5 : 3, Math.min(this.zoomLimit, this.camDist * factor));
+  }
   /** chase: orbit eased behind the model; orbit: free; top: straight down; onboard: from the core, FOV via _ZOOM */
   viewMode: 'chase' | 'orbit' | 'top' | 'onboard' = 'chase';
   private baseFov = 50;
@@ -226,6 +230,7 @@ export class SceneView {
       const newLimit = Math.atan(Math.tan(halfFov) * Math.min(1, this.camera.aspect));
       const scale = Math.sin(oldLimit) / Math.sin(newLimit);
       this.camDist *= scale;
+      this.zoomLimit = Math.max(60, this.zoomLimit * scale);
       this.camera.position.sub(this.camTarget).multiplyScalar(scale).add(this.camTarget);
     }
     this.camera.updateProjectionMatrix();
@@ -291,6 +296,23 @@ export class SceneView {
     }
   }
 
+  /** Fit around the followed Core, including asymmetric models extending far to one side. */
+  frameSimulation(target: THREE.Vector3): void {
+    this.resize();
+    this.group.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(this.group);
+    if (bounds.isEmpty()) return;
+    const farthest = new THREE.Vector3(
+      Math.max(Math.abs(bounds.min.x - target.x), Math.abs(bounds.max.x - target.x)),
+      Math.max(Math.abs(bounds.min.y - target.y), Math.abs(bounds.max.y - target.y)),
+      Math.max(Math.abs(bounds.min.z - target.z), Math.abs(bounds.max.z - target.z)),
+    );
+    const halfFov = Math.atan(Math.tan(THREE.MathUtils.degToRad(this.baseFov) / 2) * Math.min(1, this.camera.aspect));
+    this.camDist = Math.max(3, farthest.length() / Math.sin(halfFov) * 1.2);
+    this.zoomLimit = Math.max(60, this.camDist * 4);
+    this.snap(target);
+  }
+
   frameModel(): void {
     this.group.updateMatrixWorld(true);
     const bounds = new THREE.Box3().setFromObject(this.group);
@@ -300,6 +322,7 @@ export class SceneView {
     const vertical = THREE.MathUtils.degToRad(this.camera.fov);
     const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * this.camera.aspect);
     this.camDist = Math.max(2, radius / Math.sin(Math.min(vertical, horizontal) / 2) * 1.15);
+    this.zoomLimit = Math.max(60, this.camDist * 4);
     this.snap(center);
   }
 
@@ -310,6 +333,7 @@ export class SceneView {
     const radius = bounds.getSize(new THREE.Vector3()).length() / 2;
     const halfFov = Math.atan(Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) * Math.min(1, this.camera.aspect));
     this.camDist = Math.max(1, radius / Math.sin(halfFov) * 1.4);
+    this.zoomLimit = Math.max(60, this.camDist * 4);
     this.snap(bounds.getCenter(new THREE.Vector3()));
   }
 

@@ -67,7 +67,8 @@ async function load(source: string, request: number): Promise<boolean> {
     const t3 = performance.now();
     (window as unknown as { __loadTimes: number[] }).__loadTimes = [t1 - t0, t2 - t1, t3 - t2].map(v => Math.round(v));
     scene.camYaw = 0.7;
-    scene.snap(next.corePosition());
+    scene.sync(next.physics);
+    scene.frameSimulation(next.corePosition());
     acc = 0; last = performance.now(); lastCoreVel = null; lastShells = 0; crateVel.length = 0;
     buildKeyCaps(next);
     if (document.activeElement === focusBeforeLoad) canvas.focus({preventScroll: true});
@@ -238,7 +239,7 @@ canvas.addEventListener('pointermove', (e) => {
   if (touches.size >= 2) {
     const [a, b] = [...touches.values()];
     const d = Math.hypot(a.x - b.x, a.y - b.y);
-    if (pinchDist > 0) scene.camDist = Math.max(builder?.active ? 0.5 : 3, Math.min(60, scene.camDist * (pinchDist / Math.max(1, d))));
+    if (pinchDist > 0) scene.zoomBy(pinchDist / Math.max(1, d), builder?.active);
     pinchDist = d;
     return;
   }
@@ -265,7 +266,7 @@ window.addEventListener('blur', () => {
 (window as unknown as { __scene: SceneView }).__scene = scene; // probe hook
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
-  scene.camDist = Math.max(builder?.active ? 0.5 : 3, Math.min(60, scene.camDist * Math.exp(e.deltaY * 0.001)));
+  scene.zoomBy(Math.exp(e.deltaY * 0.001), builder?.active);
 }, { passive: false });
 canvas.tabIndex = 0;
 

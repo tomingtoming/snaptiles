@@ -647,3 +647,35 @@ state; an immediate simulation-value assertion does not settle a CSS transition.
 The receiver's default chase view makes this small vehicle hard to inspect.
 Next: evaluate initial camera framing against model size on first shared-link
 load, while preserving intentional manual zoom during ordinary driving.
+
+
+## 2026-10-30 — Frame newly loaded models for driving
+
+Goal: make a first shared-link load readable without manual zoom setup.
+The small-car fixture initially occupied only 48px at the fixed 12m camera
+distance. Loading now synchronizes actual physics poses into the rendered
+model before measuring its bounds. A bounding radius around the followed Core
+sets initial distance using the narrower viewport field of view and 20% margin,
+with a 3m minimum. It uses Core rather than bounds center so asymmetric models
+remain inside a camera that will continue following Core.
+
+The same probe exposed an additional discontinuity: fitting a long model beyond
+60m and then zooming out snapped inward to the old fixed limit. Wheel and pinch
+now share one zoom method with a limit of at least 60m or four times the fitted
+distance. Editor fit/focus and resize update this range too. Fitting occurs on
+load or explicit editor fit actions, not continuously during driving.
+
+Validation: 96 unit tests, typecheck/build and all 18 browser probes pass.
+Small, long and very long fresh shared-link fixtures occupy about
+143px, 161px and 160px respectively; initial distances are 4.05m, 45.78m and 88.35m.
+All geometry fits, zoom-out increases distance, and subsequent simulation frames
+do not overwrite manual zoom. Independent visual review finds the small model
+readable and the long model fully visible without overlapping controls. Large
+models remain visually thin by nature of a full-model view. Dynamic articulation
+beyond the initial bounds is not continuously auto-framed.
+
+Retrospective: a camera constant is not a usable default across model scales.
+Measure actual rendered poses and use the same target as the follow camera.
+Expanding the fit range also requires auditing manual-control limits. Next:
+review how a creator names and distinguishes saved models and shared variants
+when completing several build/test iterations.
