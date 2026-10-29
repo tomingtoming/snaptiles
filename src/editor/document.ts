@@ -50,6 +50,9 @@ export class ModelDocument {
     this.replace(...this.attributeEdit(index, 'angle', variable));
   }
   fixedAngle(index: number): void { this.replace(...this.attributeEdit(index, 'angle', '0')); }
+  restore(text: string): void {
+    this.undoStack.push(this.text); this.redoStack = []; this.text = text.replace(/\r\n?/g, '\n');
+  }
   newModel(): void { this.replace(0, this.text.length, 'Body {\n  Core() {\n  }\n}\n'); }
   private addControl(index: number, attribute: 'power' | 'angle', magnitude: number, keys: [number, number]): void {
     if (!Number.isFinite(magnitude) || magnitude <= 0) throw new Error('出力の大きさは正の数で指定してください');

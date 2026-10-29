@@ -66,6 +66,29 @@ try {
  for (const selector of ['#part-power', '#power-control', '#add-type', '[data-edge="S"]']) {
    assert.equal(await page.locator(selector).evaluate(el => { const b = el.getBoundingClientRect(), p = document.querySelector('#builder').getBoundingClientRect(); return b.top >= p.top && b.bottom <= p.bottom; }), true, `${selector} must fit with power controls`);
  }
+ // Orbit and zoom must update the rendered camera while simulation is suspended.
+ const cameraBefore = await page.evaluate(() => window.__scene.camera.position.toArray());
+ const canvasBox = await page.locator('#view').boundingBox();
+ await page.mouse.move(canvasBox.x + 100, canvasBox.y + 100); await page.mouse.down();
+ await page.mouse.move(canvasBox.x + 160, canvasBox.y + 120, {steps: 8}); await page.mouse.up();
+ await page.waitForTimeout(100);
+ const cameraAfter = await page.evaluate(() => window.__scene.camera.position.toArray());
+ assert.notDeepEqual(cameraBefore,cameraAfter);
+ await page.mouse.wheel(0,180); await page.waitForTimeout(100);
+ assert.notDeepEqual(cameraAfter,await page.evaluate(() => window.__scene.camera.position.toArray()));
+ await page.click('#frame-model');
+ assert.equal(await page.evaluate(()=>Boolean(window.__scene.selectionBox)),true);
+ // A text draft not yet run survives reload, including invalid/incomplete source.
+ const published = await page.inputValue('#source');
+ const unfinished = published + '\nBody { Core(';
+ await page.fill('#source',unfinished);
+ await page.reload(); await page.waitForFunction(()=>window.__sim);
+ await page.click('#build'); assert.equal(await page.locator('#restore-draft').isVisible(),true);
+ await page.click('#restore-draft'); assert.equal(await page.inputValue('#source'),unfinished);
+ await page.click('#edit-undo'); assert.equal(await page.inputValue('#source'),published);
+ await page.setViewportSize({width:1280,height:800}); await page.selectOption('#parts','1');
+ await page.screenshot({path:`${out}/editor-recovery-desktop.png`});
+ await page.setViewportSize({width:390,height:844}); await page.screenshot({path:`${out}/editor-recovery-mobile.png`});
  assert.deepEqual(errors, []);
- console.log(JSON.stringify({ result: 'pass', count, checks: ['add', 'angle', 'undo-redo', '3D pick', 'save contents', 'run', 'history after run', 'URL reload', 'mobile overflow', 'invalid source recovery'], errors }));
+ console.log(JSON.stringify({ result: 'pass', count, checks: ['add', 'angle', 'undo-redo', '3D pick', 'save contents', 'run', 'history after run', 'URL reload', 'mobile overflow', 'invalid source recovery', 'motor keys and release', 'orbit and zoom', 'draft reload and undo'], errors }));
 } finally { await browser.close(); }

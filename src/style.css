@@ -73,3 +73,5 @@ button:disabled { opacity: .4; cursor: default !important; }
   .building { grid-template-rows: 40vh 60vh; }
   #builder { max-height: 43vh; }
 }
+
+#builder > .edit-row:first-child { flex-wrap: wrap; }

@@ -110,6 +110,7 @@ export class SceneView {
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
   camera: THREE.PerspectiveCamera;
+  private selectionBox: THREE.BoxHelper | null = null;
   private views = new Map<number, TileView>();
   private plateGeo = new THREE.BoxGeometry(TILE, TILE_T, TILE);
   // a tyre is drawn as a short cylinder (0.12 m wide) with a pale spoke; the physics sphere has the same radius
@@ -206,6 +207,7 @@ export class SceneView {
   }
 
   rebuild(tiles: TileInstance[], env: ValEnv): void {
+    this.selectTile(null);
     for (const v of this.views.values()) v.material.dispose();
     this.group.clear();
     this.views.clear();
@@ -258,7 +260,32 @@ export class SceneView {
     this.group.updateMatrixWorld(true);
   }
 
+  frameModel(): void {
+    this.group.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(this.group);
+    if (bounds.isEmpty()) return;
+    const center = bounds.getCenter(new THREE.Vector3());
+    const radius = bounds.getSize(new THREE.Vector3()).length() / 2;
+    const vertical = THREE.MathUtils.degToRad(this.camera.fov);
+    const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * this.camera.aspect);
+    this.camDist = Math.max(2, radius / Math.sin(Math.min(vertical, horizontal) / 2) * 1.15);
+    this.snap(center);
+  }
+
+  updateEditorCamera(): void { this.follow(this.camTarget, 1); }
+
   selectTile(id: number | null): void {
+    if (this.selectionBox) {
+      this.scene.remove(this.selectionBox);
+      this.selectionBox.geometry.dispose(); this.selectionBox.material.dispose(); this.selectionBox = null;
+    }
+    const selected = id === null ? null : this.views.get(id);
+    if (selected) {
+      this.selectionBox = new THREE.BoxHelper(selected.mesh, 0xffd900);
+      this.selectionBox.material.depthTest = false;
+      this.selectionBox.renderOrder = 10;
+      this.scene.add(this.selectionBox);
+    }
     for (const [key, v] of this.views) {
       v.material.emissive.setHex(key === id ? 0xffb000 : 0x000000);
       v.material.emissiveIntensity = key === id ? 0.65 : 0;

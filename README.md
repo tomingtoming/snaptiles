@@ -60,6 +60,11 @@ and never overwrite existing variables. Select a variable marked （逆） to re
 a wheel on the opposite side. Rudder/Trim parts can also receive a new ←/→
 control (±30°, returning to zero on release). Colours, other key mappings and Lua
 still use the text editor; mirroring and multi-selection are not implemented.
+Edits are also saved as the latest draft in this browser. After reloading,
+open **組む** and use **下書きを復元** to recover unpublished or unfinished text.
+Restoration is undoable. This is one browser-local draft, not a cloud backup;
+use **保存** for a file. **全体** fits the model to the view and a yellow outline
+marks the selected tile. Drag and zoom work while editing.
 The editor is independently implemented, without RCD/RCM source or assets.
 
 Browser regression (against an already running dev server):

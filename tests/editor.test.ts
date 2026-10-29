@@ -1,3 +1,4 @@
+import { DraftStore } from '../src/editor/draft';
 import { describe, it, expect } from 'vitest';
 import { ModelDocument } from '../src/editor/document';
 import { parseRc } from '../src/rc/parser';
@@ -75,5 +76,20 @@ describe('blank vehicles and steering', () => {
     d.bindAngle(3, 'ST_STEER_1'); expect(d.nodes()[3].attrs.angle).toBe('ST_STEER_1');
     d.fixedAngle(3); expect(d.nodes()[3].attrs.angle).toBe('0');
     expect(d.nodes()[1].attrs.angle).toBe('ST_STEER_1');
+  });
+});
+
+describe('draft recovery', () => {
+  it('keeps unfinished text and makes restoration undoable', () => {
+    const store = new Map<string,string>();
+    const drafts = new DraftStore({getItem:k=>store.get(k)??null,setItem:(k,v)=>{store.set(k,v);}});
+    expect(drafts.save('Body { Core(')).toBe(true);
+    const d = new ModelDocument(source); d.restore(drafts.read()!.text);
+    expect(d.text).toBe('Body { Core('); d.undo(); expect(d.text).toBe(source);
+  });
+  it('tolerates unavailable or corrupt browser storage', () => {
+    const drafts = new DraftStore({getItem:()=>{throw new Error('blocked');},setItem:()=>{throw new Error('quota');}});
+    expect(drafts.read()).toBeNull(); expect(drafts.save('x')).toBe(false);
+    expect(new DraftStore({getItem:()=>'{bad',setItem:()=>{}}).read()).toBeNull();
   });
 });

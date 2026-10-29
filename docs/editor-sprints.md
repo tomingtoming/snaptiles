@@ -37,3 +37,20 @@ opposing wheels cancelled one another. A threshold of 0.1 m was too weak.
 Added reversed bindings and raised the minimum distance to 1 m. A user goal
 must be tested by its outcome, not merely by nonzero movement. Next: preserve
 work across reloads and improve selection/framing before widening the editor.
+
+## 2026-10-29 — Recovery and editing camera
+
+Goal: avoid losing unpublished work and keep the editing target visible.
+Added one browser-local draft with explicit, undoable restoration (including
+invalid unfinished text), selection outlines and fit-to-model framing.
+
+Validation: 56 tests and build; browser reloads an unpublished malformed draft,
+restores its exact text and undoes restoration. Storage denial/corruption are
+handled. Browser probes check actual camera movement on drag and wheel zoom.
+
+Retrospective: static screenshots missed that the paused editor never called
+the camera-follow update. The fix updates the editor camera independently of
+simulation. A selection highlight also needed an outline because its colour
+could be confused with the Core material. Next: run the production build and
+integration checks, and make these workflows part of CI rather than relying
+on repeated manual probes.

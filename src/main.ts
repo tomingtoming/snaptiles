@@ -252,7 +252,7 @@ function frame(now: number): void {
     updateOverlay(sim);
     updateSound(sim);
   }
-  if (builder?.active) acc = 0;
+  if (builder?.active) { acc = 0; scene.updateEditorCamera(); }
   scene.render();
 }
 function updateSound(s: Simulation): void {

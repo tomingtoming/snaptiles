@@ -1,3 +1,4 @@
+import { DraftStore } from './draft';
 import { ModelDocument } from './document';
 import { parseRc } from '../rc/parser';
 import { assemble, type Assembly } from '../model/assemble';
@@ -6,6 +7,8 @@ import type { SceneView } from '../render/scene';
 const TYPES = ['Chip', 'Frame', 'Wheel', 'Rudder', 'RudderF', 'Trim', 'TrimF', 'Jet', 'Weight', 'Cowl', 'Arm', 'RLW'];
 export class BuildPanel {
   active = false;
+  private drafts = new DraftStore({ getItem: key => localStorage.getItem(key), setItem: (key, value) => localStorage.setItem(key, value) });
+  private restoreButton = document.getElementById('restore-draft') as HTMLButtonElement;
   document: ModelDocument;
   selected = 0;
   assembly: Assembly | null = null;
@@ -27,6 +30,8 @@ export class BuildPanel {
     this.document = new ModelDocument(source.value);
     this.type.add(new Option('Core', 'Core'));
     for (const type of TYPES) { this.type.add(new Option(type, type)); this.addType.add(new Option(type, type)); }
+    this.restoreButton.onclick = () => { const draft = this.drafts.read(); if (draft) this.edit(() => { this.document.restore(draft.text); this.selected = 0; }, true); };
+    document.getElementById('frame-model')!.onclick = () => this.scene.frameModel();
     this.toggle.onclick = () => this.open();
     this.tree.onchange = () => { this.selected = Number(this.tree.value); this.paintSelection(); };
     this.type.onchange = () => this.edit(() => this.document.type(this.selected, this.type.value));
@@ -58,7 +63,7 @@ export class BuildPanel {
         this.selected = next;
       });
     });
-    source.addEventListener('input', () => { if (this.active) { this.document = new ModelDocument(source.value); this.refresh(); } });
+    source.addEventListener('input', () => { if (this.active) { this.document = new ModelDocument(source.value); this.refresh(); } this.saveDraft(); });
     const canvas = document.getElementById('view')!;
     let down: { x: number; y: number; id: number } | null = null;
     canvas.addEventListener('pointerdown', e => { down = e.isPrimary && e.button === 0 ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null; });
@@ -76,7 +81,7 @@ export class BuildPanel {
     this.active = true; this.selected = 0;
     this.panel.hidden = false; this.toggle.setAttribute('aria-pressed', 'true');
     document.body.classList.add('building');
-    this.enter(); this.scene.setView('orbit'); this.refresh(true);
+    this.paintDraft(); this.enter(); this.scene.setView('orbit'); this.refresh(true);
   }
   close(): void {
     this.active = false; this.panel.hidden = true;
@@ -84,8 +89,16 @@ export class BuildPanel {
     this.scene.selectTile(null);
   }
   private edit(action: () => void, fit = false): void {
-    try { action(); this.source.value = this.document.text; this.refresh(fit); }
+    try { action(); this.source.value = this.document.text; this.refresh(fit); this.saveDraft(); }
     catch (e) { this.status.textContent = e instanceof Error ? e.message : String(e); }
+  }
+  private paintDraft(): void {
+    const draft = this.drafts.read();
+    this.restoreButton.hidden = !draft || draft.text === this.source.value;
+  }
+  private saveDraft(): void {
+    if (!this.drafts.save(this.source.value)) this.status.textContent ||= '下書きを保存できません。保存ボタンでファイルに残してください。';
+    this.paintDraft();
   }
   private refresh(fit = false): void {
     try {
@@ -102,7 +115,7 @@ export class BuildPanel {
         this.tree.add(new Option(`${'　'.repeat(depth)}${t.dir ? t.dir + ': ' : ''}${t.node.type}${t.name ? ' · ' + t.name : ''}`, String(t.id)));
       }
       this.selected = Math.min(this.selected, assembly.tiles.length - 1);
-      if (fit) { this.scene.snap(assembly.tiles[0].position); this.scene.camDist = Math.max(4, ...assembly.tiles.map(t => t.position.length() * 2 + 2)); }
+      if (fit) this.scene.frameModel();
       this.status.textContent = ''; this.paintSelection();
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = false);
     } catch (e) {
