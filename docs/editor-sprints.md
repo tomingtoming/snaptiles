@@ -1487,3 +1487,31 @@ No push or deployment.
 
 Existing independent-control-key and held-throttle browser probes also pass.
 Full default suite and non-Chromium runs were not repeated this sprint.
+
+
+## 2026-10-30 — Explain shared strength and keyboard separation (Sprint 51)
+
+Goal: make the new separation operation understandable alongside the existing
+「共通」strength labels. The help guide now explains that changing a shared
+maximum affects parts using the same variable, how to separate one field before
+adjusting it, and that key pair/reversal/hold behavior remain unchanged. It also
+states that choosing different keys requires adding an operation on those keys.
+No additional persistent builder rows or layout changes were introduced.
+
+The guide browser probe checks the explanation and retains its 390/320px bounds,
+Escape/close focus return and source-preservation checks. The existing separation
+scenario now reaches angle and power selectors using Tab from their inputs and
+uses the native End key to choose the separation option, rather than programmatic
+selectOption. The complete strength/history/live-input/export flow still passes.
+Production build and both targeted Chromium probes pass. Unit/model code is
+unchanged, so the 155-unit baseline and full browser suite were not rerun.
+
+Retrospective: separating definitions and separating physical keys are distinct
+operations; documentation must not imply one does the other. Keyboard reachability
+is demonstrated through actual focus traversal, but this is not a user study of
+discoverability. Next: revisit the full build/play loop with the latest control
+and diagnostic changes, including cross-browser checks rather than continuing
+to accumulate isolated UI changes. No push or deployment.
+
+Independent 390px image review found the shared-strength paragraph fully
+readable and all four distinctions explicit, without overlap or clipping.

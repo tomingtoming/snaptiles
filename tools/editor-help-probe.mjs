@@ -13,6 +13,10 @@ try {
  await page.getByRole('button',{name:'使い方',exact:true}).click();
  assert.equal(await page.getByRole('dialog',{name:'作って、走らせる'}).isVisible(),true);
  assert.ok((await page.locator('#help-dialog').textContent()).includes('共有リンク'));
+ const sharing=await page.locator('#shared-control-help').textContent();
+ assert.ok(sharing.includes('この部品用に分ける')&&sharing.includes('同じキーで動きます'));
+ await page.locator('#shared-control-help').scrollIntoViewIfNeeded();
+ await page.screenshot({path:fileURLToPath(new URL('../.shots/editor-sharing-help.png',import.meta.url))});
  await page.screenshot({path:fileURLToPath(new URL('../.shots/editor-help-mobile.png',import.meta.url))});
  await page.keyboard.press('Escape'); assert.equal(await page.evaluate(()=>document.activeElement.id),'help');
  assert.equal(await page.inputValue('#source'),text); assert.equal(await page.locator('#builder').isVisible(),true);
