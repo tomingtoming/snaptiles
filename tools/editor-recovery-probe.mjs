@@ -1,7 +1,8 @@
-import {chromium} from 'playwright';
+import {chromium,firefox,webkit} from 'playwright';
 import assert from 'node:assert/strict';
 import {fileURLToPath} from 'node:url';
-const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const engine=process.argv[3]??'chromium';
+const browser=await {chromium,firefox,webkit}[engine].launch(engine==='chromium'?{args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']}:{});
 try {
  const context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'Asia/Tokyo'});
  const page=await context.newPage();
@@ -28,5 +29,38 @@ try {
  assert.equal(await page.locator('#draft-filename').textContent(),'名前未設定のモデル');
  await page.click('#restore-draft');assert.equal(await page.inputValue('#source'),unnamed.text);
  await page.click('#edit-undo');assert.equal(await page.inputValue('#source'),b.text);
- await other.close();console.log('Recovery: named timestamp, visible snapshot identity, Undo, cross-tab refresh, unnamed/invalid-date/incomplete-source recovery pass');
+ // At 320x568, restoring by keyboard must land on a visible editing target.
+ const active=()=>page.evaluate(()=>document.activeElement.id);
+ const visibleFocus=async()=>{
+  assert.equal(await page.evaluate(()=>{
+   const e=document.activeElement,r=e.getBoundingClientRect(),p=document.querySelector('#builder').getBoundingClientRect();
+   return r.width>0&&r.height>0&&r.left>=0&&r.right<=innerWidth&&r.top>=p.top-1&&r.bottom<=p.bottom+1;
+  }),true,'focused editor control is within the scrolled panel');
+ };
+ const reach=async(id,reverse=false)=>{
+  for(let i=0;i<35;i++){if(await active()===id)return;await page.keyboard.press(reverse?'Shift+Tab':'Tab');}
+  throw new Error(`Keyboard cannot reach ${id}`);
+ };
+ await put(other,a);await page.waitForFunction(()=>document.querySelector('#draft-filename').textContent==='試作車 A.rcd');
+ await page.focus('#build');await reach('restore-draft');await page.keyboard.press('Enter');
+ assert.equal(await active(),'parts');await visibleFocus();
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ await page.screenshot({path:fileURLToPath(new URL(`../.shots/editor-recovery-focus-${engine}.png`,import.meta.url))});
+ await page.keyboard.press('ArrowDown');assert.equal(await page.inputValue('#parts'),'1');
+ await reach('rename-model',true);await visibleFocus();await page.keyboard.press('Enter');
+ assert.equal(await active(),'filename-input');await page.keyboard.press('Control+a');await page.keyboard.type('keyboard-recovered');
+ const keyboardDownload=page.waitForEvent('download');await page.keyboard.press('Control+s');
+ assert.equal((await keyboardDownload).suggestedFilename(),'keyboard-recovered.rcd');
+ assert.equal(await active(),'rename-model');await visibleFocus();
+ await put(other,unnamed);await page.waitForFunction(()=>document.querySelector('#draft-saved').textContent==='保存時刻不明');
+ await reach('restore-draft',true);await page.keyboard.press('Enter');assert.equal(await active(),'source');
+ await page.keyboard.press('Control+z');assert.equal(await page.inputValue('#source'),a.text);
+ // A cross-tab removal hides the card, moving focus only if that card owned it.
+ await put(other,b);await page.waitForFunction(()=>!document.querySelector('#draft-recovery').hidden);
+ await page.focus('#restore-draft');await other.evaluate(()=>localStorage.removeItem('snaptiles.editor.draft.v1'));
+ await page.waitForFunction(()=>document.querySelector('#draft-recovery').hidden);assert.equal(await active(),'parts');
+ await put(other,b);await page.waitForFunction(()=>!document.querySelector('#draft-recovery').hidden);
+ await page.focus('#part-angle');await other.evaluate(()=>localStorage.removeItem('snaptiles.editor.draft.v1'));
+ await page.waitForFunction(()=>document.querySelector('#draft-recovery').hidden);assert.equal(await active(),'part-angle');
+ await other.close();console.log('Recovery: named timestamp, visible snapshot identity, Undo, cross-tab refresh, unnamed/invalid-date/incomplete-source recovery, keyboard edit/save and conditional focus recovery pass');
 }finally{await browser.close();}

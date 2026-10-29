@@ -183,7 +183,11 @@ export class BuildPanel {
     const draft = this.drafts.read();
     const same = draft?.text === this.source.value && draft?.filename === this.document.filename;
     this.recoveryDraft = draft && !same ? draft : null;
-    document.getElementById('draft-recovery')!.hidden = !this.recoveryDraft;
+    const recovery = document.getElementById('draft-recovery')!;
+    const hadFocus = recovery.contains(document.activeElement);
+    recovery.hidden = !this.recoveryDraft;
+    // A restored/replaced card must not leave keyboard focus on a hidden button.
+    if (recovery.hidden && hadFocus) (this.assembly ? this.tree : this.source).focus();
     if (!this.recoveryDraft) return;
     document.getElementById('draft-filename')!.textContent = draft!.filename || '名前未設定のモデル';
     const saved = new Date(draft!.savedAt);

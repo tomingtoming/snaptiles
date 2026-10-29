@@ -900,3 +900,37 @@ Independent visual review: toolbar wrapping, select contrast and selected-row
 readability pass in all three captured engines. Chromium and the recaptured
 Firefox model/selection/ground pass. WebKit DOM review passes, while its 3D
 capture remains unverified under the diagnosed limitation.
+
+## 2026-10-30 — Keep keyboard focus usable after draft recovery
+
+Goal: exercise the compact-screen recovery/edit/save path through keyboard
+navigation. At 320x568, pressing Enter on Restore hid its card while leaving
+activeElement on the now-hidden restore button. Tab could continue to the
+next toolbar action, but the immediate focus indicator disappeared.
+
+When a recovery card containing focus disappears, focus now moves to the part
+list for a valid model or the source field for incomplete/invalid source. This
+also handles a cross-tab removal of the displayed draft. A card update/removal
+does not move focus if the user is editing a different field.
+
+The recovery browser probe now navigates from Build to Restore by Tab, restores,
+selects the child with ArrowDown, reaches Rename by Shift+Tab, names and downloads
+via Ctrl+S, checks dialog focus return and verifies each editing target is inside
+the scrolled panel. It also checks incomplete-source focus, Undo, cross-tab card
+removal with focus on the card, and removal while an unrelated input owns focus.
+The same probe accepts an optional engine argument for Firefox/WebKit checks.
+
+Validation: 105 tests and build pass. Production-build Chromium recovery,
+keyboard and general-editor probes pass. The expanded recovery flow also passes
+on development builds in Firefox and WebKit; this is DOM/focus coverage, not
+WebKit 3D visual acceptance. Independent Chromium/Firefox image review confirms
+the focused part list is fully visible, Core/Chip readable and native focus
+indicators distinguishable at 320x568. No clipping or overlap in that target.
+
+Retrospective: a control can vanish correctly while keyboard state still points
+at it. The successor should match the task after the operation (choose a part,
+or repair the source), and unsolicited storage events must not steal unrelated
+focus. Next: move from recovery hardening back to construction effort; inspect
+how existing branch-copy operations can reduce repeated left/right vehicle
+assembly, with geometry and control signs verified before offering symmetry.
+No push or deployment was performed.
