@@ -249,3 +249,23 @@ describe('source and construction history', () => {
     d.redo(); expect(d.text).toBe('broken');
   });
 });
+
+
+describe('source view history', () => {
+  it('remaps a caret after a GUI edit and snapshots selection metadata independently', () => {
+    const text = 'Body { Core(){N:Chip(angle=0)} }\n// tail';
+    const d = new ModelDocument(text);
+    const view = {start:text.length-4,end:text.length,direction:'backward' as const,top:300,left:40};
+    d.sourceView = view; d.angle(1,90);
+    expect(d.sourceView).toEqual({...view,start:view.start+1,end:view.end+1});
+    d.undo(); expect(d.sourceView).toEqual(view);
+    d.redo(); expect(d.sourceView?.end).toBe(text.length+1);
+  });
+  it('does not move a caret before a whole-document GUI replacement', () => {
+    const d = new ModelDocument('Body { Core(color=#ffffff) }\n// tail');
+    d.sourceView = {start:2,end:2,direction:'none',top:0,left:0};
+    d.resetColor(0); expect(d.sourceView.start).toBe(2);
+    d.newModel(); expect(d.sourceView).toBeUndefined();
+    d.undo(); expect(d.sourceView?.start).toBe(2);
+  });
+});

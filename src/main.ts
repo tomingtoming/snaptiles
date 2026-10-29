@@ -165,6 +165,7 @@ sourceEl.addEventListener('keydown', (e) => {
   if (e.key === 'Tab' && !e.shiftKey) {
     // keep Tab in the editor (model files are tab-indented)
     e.preventDefault();
+    if (!sourceEl.dispatchEvent(new InputEvent('beforeinput', {bubbles:true, cancelable:true, inputType:'insertText', data:'\t'}))) return;
     const { selectionStart: a, selectionEnd: b, value } = sourceEl;
     sourceEl.value = value.slice(0, a) + '	' + value.slice(b);
     sourceEl.selectionStart = sourceEl.selectionEnd = a + 1;

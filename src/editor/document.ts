@@ -1,7 +1,11 @@
 import { exprIsConstant } from '../rc/expr';
 import { parseRc, findBlocks, declarationRanges, type ChipNode } from '../rc/parser';
 
-interface DocumentState { text: string; filename?: string }
+export interface SourceViewState {
+  start: number; end: number; direction: 'forward' | 'backward' | 'none';
+  top: number; left: number;
+}
+interface DocumentState { text: string; filename?: string; sourceView?: SourceViewState }
 
 export const OPTION_SETTINGS: Record<string, {label: string; choices: [number, string][]}> = {
   wheel: {label: '半径', choices: [[0, '0.30 m'], [1, '0.45 m'], [2, '0.60 m']]},
@@ -15,6 +19,7 @@ export interface CopiedBranch { text: string; variables: string[]; count: number
 /** Edits use parser offsets: scripts, comments and unrelated attributes remain byte-for-byte. */
 export class ModelDocument {
   text: string;
+  sourceView?: SourceViewState;
   undoStack: DocumentState[] = [];
   redoStack: DocumentState[] = [];
   constructor(text: string, public filename?: string) { this.text = text.replace(/\r\n?/g, '\n'); }
@@ -28,7 +33,16 @@ export class ModelDocument {
     const next = this.text.slice(0, start) + value + this.text.slice(end);
     parseRc(next); // do not commit a malformed edit
     if (next === this.text) return;
-    this.undoStack.push(this.snapshot()); this.redoStack = []; this.text = next;
+    this.undoStack.push(this.snapshot()); this.redoStack = [];
+    if (this.sourceView) {
+      // Find the changed span even for whole-document operations that preserve most text.
+      let first = 0, oldEnd = this.text.length, newEnd = next.length;
+      while (first < oldEnd && first < newEnd && this.text[first] === next[first]) first++;
+      while (oldEnd > first && newEnd > first && this.text[oldEnd - 1] === next[newEnd - 1]) { oldEnd--; newEnd--; }
+      const move = (position: number) => position <= first ? position : position >= oldEnd ? position + newEnd - oldEnd : newEnd;
+      this.sourceView = {...this.sourceView, start: move(this.sourceView.start), end: move(this.sourceView.end)};
+    }
+    this.text = next;
   }
   type(index: number, type: string): void {
     const n = this.nodes()[index];
@@ -117,7 +131,7 @@ export class ModelDocument {
   }
   fixedAngle(index: number): void { this.replace(...this.attributeEdit(index, 'angle', '0')); }
   restore(text: string, filename?: string): void {
-    this.undoStack.push(this.snapshot()); this.redoStack = []; this.text = text.replace(/\r\n?/g, '\n'); this.filename = filename;
+    this.undoStack.push(this.snapshot()); this.redoStack = []; this.text = text.replace(/\r\n?/g, '\n'); this.filename = filename; this.sourceView = undefined;
   }
   /** Direct typing may temporarily be invalid; preserve it and the preceding GUI history. */
   editSource(text: string, coalesce = false): void {
@@ -177,7 +191,7 @@ export class ModelDocument {
     if (!n?.dir) throw new Error('Coreは削除できません');
     this.replace(n.source!.start, n.source!.end, '');
   }
-  private snapshot(): DocumentState { return {text: this.text, filename: this.filename}; }
+  private snapshot(): DocumentState { return {text: this.text, filename: this.filename, sourceView: this.sourceView ? {...this.sourceView} : undefined}; }
   undo(): void { const state = this.undoStack.pop(); if (state) { this.redoStack.push(this.snapshot()); Object.assign(this, state); } }
   redo(): void { const state = this.redoStack.pop(); if (state) { this.undoStack.push(this.snapshot()); Object.assign(this, state); } }
 }

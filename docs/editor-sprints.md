@@ -554,3 +554,34 @@ one reversible document. Preserving a single history fixes the boundary; it
 also requires grouping typing so Undo does not regress to character-by-character
 steps. Next: verify selection/caret position and viewport continuity when
 Undo/Redo crosses source and visual edits.
+
+
+## 2026-10-30 — Restore source editing position with history
+
+Goal: resume editing where an Undo/Redo happened instead of searching the file.
+A 90-line fixture reproduced Undo replacing a backward selection near offset
+6593 with a caret at the document end (14872), also changing horizontal scroll.
+Document history now carries optional source selection direction/range and both
+scroll offsets. Source beforeinput records the pre-edit location; Undo/Redo
+restores it after updating the source and preview. These are transient editor
+metadata, not added to exported models or persisted drafts.
+
+GUI replacements remap offsets before/after their changed span, preserving
+scroll; positions inside the replaced span move to its end. The changed span is
+computed from common prefix/suffix even when the implementation replaces the
+whole document. New documents start at the beginning; Undo restores the prior
+view. Programmatic Tab now emits beforeinput so replacing a selection has the
+same checkpoint as normal typing.
+
+Validation: 93 unit tests, typecheck/build and all 16 browser probes pass.
+The new browser probe checks backward-selection replacement, source
+Undo/Redo, both scroll axes, GUI angle edits before a caret and Tab replacement.
+Unit cases cover view metadata snapshots, GUI offset shifts, whole-document
+replacement with an unchanged prefix, and new-document Undo. A viewport change
+may naturally clamp scroll offsets to the new available range.
+
+Retrospective: reversible text alone is insufficient for comfortable iteration;
+the editing position is part of the operation. Keep this metadata in ephemeral
+history rather than modifying model format or draft storage. Next: verify that
+part selection remains understandable when removing branches and using Undo,
+and when source edits change traversal indices.

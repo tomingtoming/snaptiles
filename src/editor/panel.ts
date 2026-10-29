@@ -100,6 +100,7 @@ export class BuildPanel {
     source.addEventListener('compositionstart', () => { this.sourceComposing = true; this.sourceEditGroup = null; });
     source.addEventListener('compositionend', () => { this.sourceComposing = false; });
     source.addEventListener('beforeinput', event => {
+      this.captureSourceView();
       if (event.inputType === 'historyUndo' || event.inputType === 'historyRedo') {
         event.preventDefault();
         this.edit(() => event.inputType === 'historyUndo' ? this.document.undo() : this.document.redo());
@@ -115,6 +116,7 @@ export class BuildPanel {
       const continuous = ['insertText', 'insertCompositionText', 'deleteContentBackward', 'deleteContentForward'].includes(type);
       const group = this.sourceEditGroup;
       this.document.editSource(source.value, continuous && group?.type === type && (this.sourceComposing || time - group.time < 1000));
+      this.captureSourceView();
       this.sourceEditGroup = continuous ? {type, time, end: source.selectionEnd} : null;
       if (this.active) this.refresh(); this.saveDraft();
     });
@@ -147,9 +149,19 @@ export class BuildPanel {
     this.toggle.setAttribute('aria-pressed', 'false'); document.body.classList.remove('building');
     this.scene.selectTile(null);
   }
+  private captureSourceView(): void {
+    this.document.sourceView = {start: this.source.selectionStart, end: this.source.selectionEnd,
+      direction: this.source.selectionDirection, top: this.source.scrollTop, left: this.source.scrollLeft};
+  }
+  private applySourceView(): void {
+    const view = this.document.sourceView;
+    if (!view) { this.source.setSelectionRange(0, 0); this.source.scrollTop = this.source.scrollLeft = 0; return; }
+    this.source.setSelectionRange(view.start, view.end, view.direction);
+    this.source.scrollTop = view.top; this.source.scrollLeft = view.left;
+  }
   private edit(action: () => void, fit = false): void {
     this.sourceEditGroup = null;
-    try { action(); this.source.value = this.document.text; this.source.dispatchEvent(new Event('modelchange')); if (this.active) this.refresh(fit); this.saveDraft(); }
+    try { this.captureSourceView(); action(); this.source.value = this.document.text; this.source.dispatchEvent(new Event('modelchange')); if (this.active) this.refresh(fit); this.applySourceView(); this.saveDraft(); }
     catch (e) { this.status.textContent = e instanceof Error ? e.message : String(e); }
   }
   private paintDraft(): void {
