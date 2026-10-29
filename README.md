@@ -94,6 +94,11 @@ measured scope. Local checkout behavior may differ from the deployed website.
 Production-build browser regression: `bun run build && bun run test:editor`
 (install Chromium first with `bun x playwright install chromium`). This runs
 in CI with an OS-assigned port and uploads screenshots on failure.
+The separate Firefox creation-loop check is `bun run test:editor:firefox`
+(install its browser with `bun x playwright install firefox`). It covers GUI
+construction, driving, source Undo, named download, share/re-edit and file reopen.
+CI is configured to run it too. Narrow desktop windows do not establish physical
+mobile-device support; Safari/WebKit remains unverified.
 
 Optional external-model edit regression (models stay outside this repository):
 `bun run tools/editor-corpus.ts <model-directory>`. This checks parsing,

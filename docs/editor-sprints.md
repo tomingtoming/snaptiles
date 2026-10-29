@@ -779,3 +779,35 @@ than trajectory and heading. Documentation can also lag implementation and
 wrongly discourage supported workflows. Next: check browser portability of the
 core creation loop; current browser evidence is Chromium-only, distinct from
 physical-device and original-engine calibration.
+
+
+## 2026-10-30 — Verify the creation loop in Firefox
+
+Goal: add another browser engine's evidence to the Chromium-only creation loop.
+Installed the Playwright-pinned Firefox test binary (157.0) and first verified
+WASM/WebGL startup. On this Windows host it uses ANGLE/NVIDIA hardware rendering.
+A new browser probe builds the same seven-part steering car via GUI controls,
+undoes direct source typing, drives/releases throttle, names and downloads the
+exact source, opens a share link in a fresh context, edits at 390px width, checks
+Undo/Redo and reopens the actual downloaded bytes. Travel measured 4.027m and no
+page errors occurred.
+
+Validation: the Firefox flow passes against development and production builds;
+`bun run test:editor:firefox` also passes. The shared production runner's selected-
+script mode passes both the existing Chromium general editor probe and Firefox.
+Independent screenshot review confirms the selected wheel, direction labels,
+shared power 1100 and primary controls are readable without clipping. Narrow
+windows are not evidence of physical mobile touch/keyboard behavior.
+
+Added the Firefox command and a separate CI step, including browser installation.
+The default Chromium suite remains unchanged. Remote Linux CI has not run for
+these local changes, so its WebGL/runtime behavior is still unverified. No
+application implementation change was needed; the prior 98-unit and 20-Chromium
+baseline is not recast as Firefox coverage. This probe covers the core loop,
+not every existing Chromium-only pointer/CDP/IME test.
+
+Retrospective: broad browser claims require executing the full workflow in that
+engine, not checking that the canvas starts. Separate commands make the smaller
+portability scope explicit and repeatable. Next: test the same core loop with
+WebKit where available, while retaining the distinction from Safari on an
+actual Apple device.
