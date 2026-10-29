@@ -1,5 +1,5 @@
 import { KEY_TABLE } from '../input/keys';
-import { exprIsConstant } from '../rc/expr';
+import { evalExpr, exprIsConstant } from '../rc/expr';
 import { parseRc, findBlocks, declarationRanges, type ChipNode } from '../rc/parser';
 
 export interface SourceViewState {
@@ -24,7 +24,7 @@ export const CONTROL_KEYS = {
 export type ControlKeys = keyof typeof CONTROL_KEYS;
 export type ControlPair = ControlKeys | readonly [number, number];
 
-export interface CopiedBranch { text: string; variables: string[]; count: number }
+export interface CopiedBranch { text: string; variables: string[]; partNames: string[]; count: number }
 
 /** Edits use parser offsets: scripts, comments and unrelated attributes remain byte-for-byte. */
 export class ModelDocument {
@@ -267,8 +267,15 @@ export class ModelDocument {
     if (!root?.dir) throw new Error('Core以外の枝を選んでください');
     const nodes = this.nodes().filter(n => n.source!.start >= root.source!.start && n.source!.end <= root.source!.end);
     const text = this.text.slice(root.source!.start, root.source!.end);
-    const words = new Set(text.toUpperCase().match(/[A-Z_][A-Z0-9_]*/g));
-    return {text, count:nodes.length, variables:parseRc(this.text).vals.filter(v=>words.has(v.name.toUpperCase())).map(v=>v.name.toUpperCase())};
+    // Use the actual attribute evaluator: comments, identifiers in names and
+    // hexadecimal literals are not variable reads. Unknown reads already mean 0.
+    const reads = new Set<string>();
+    for (const node of nodes) for (const [attribute,value] of Object.entries(node.attrs)) {
+      if (attribute !== 'name') evalExpr(value, name => { reads.add(name.toUpperCase()); return 0; });
+    }
+    const variables = [...new Set(parseRc(this.text).vals.map(v=>v.name.toUpperCase()).filter(name=>reads.has(name)))];
+    const partNames = [...new Set(this.nodes().map(n=>n.attrs.name?.replace(/\s/g,'').toUpperCase()).filter((name): name is string => !!name && reads.has(name) && !variables.includes(name)))];
+    return {text, count:nodes.length, variables, partNames};
   }
   /** Reflect a branch across its parent's local plane to the opposite attachment edge. */
   mirrorBranch(index: number): number {
@@ -332,7 +339,11 @@ export class ModelDocument {
   }
   pasteBranch(index: number, dir: 'N' | 'S' | 'E' | 'W', branch: CopiedBranch): void {
     const names = new Set(parseRc(this.text).vals.map(v=>v.name.toUpperCase()));
-    if (branch.variables.some(name=>!names.has(name))) throw new Error('貼り付け元の操作変数がありません。元のモデルで貼り付けてください');
+    const missing = branch.variables.filter(name=>!names.has(name));
+    if (missing.length) throw new Error(`貼り付けに必要な変数がありません: ${missing.join('、')}。定義のあるモデルへ貼り付けてください`);
+    const parts = new Set(this.nodes().map(n=>n.attrs.name?.replace(/\s/g,'').toUpperCase()));
+    const missingParts = branch.partNames.filter(name=>!parts.has(name) || names.has(name));
+    if (missingParts.length) throw new Error(`貼り付けに必要な部品名がないか、同名の変数があります: ${missingParts.join('、')}。式は元の部品名を参照したままです`);
     const s = this.nodes()[index].source!;
     const child = `\n  ${dir}${this.freshBranchNames(branch.text).slice(1)}\n`;
     if (s.close !== undefined) this.replace(s.close, s.close, child);

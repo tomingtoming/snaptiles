@@ -258,3 +258,14 @@ to select and focus that part. The full selected result and parent/direction are
 shown below the result list, including when a long option is clipped. Search
 and cancellation preserve source and Undo/Redo history; each opening uses the
 current model, including renamed parts. Invalid source disables the search.
+
+
+When pasting a copied branch into another model, attribute expressions retain
+references to the original variables and part names. The editor checks known
+reads using its attribute evaluator and rejects missing variables, missing part
+names, or a variable shadowing a required part name, listing the affected names.
+Comments, name declarations and hexadecimal literals do not create dependencies.
+Definitions and scripts are not imported. Same-name definitions may still mean
+something different in another model; unknown identifiers already present in
+the source remain unchanged. This check does not establish behavioral equivalence
+or analyze arbitrary Lua/Script programs.

@@ -1935,3 +1935,37 @@ explicit rather than being guessed. Allocation at paste time is essential for
 clipboard reuse. Next: examine paste across models and ensure external reference
 requirements are explained and checked where they can be determined. No push
 or deployment.
+
+
+## 2026-10-30 — Check cross-model paste dependencies (Sprint 64)
+
+Goal: preserve known attribute references when pasting a branch into another
+model. Copy now collects identifier reads through the actual attribute evaluator
+instead of scanning every word in raw branch text. Name declarations, comments
+and hexadecimal literals no longer create false variable dependencies. Known
+Val/Var reads and known part-name reads are recorded separately, respecting the
+runtime's variable-before-part lookup precedence.
+
+Paste rejects absent variables, absent required original part names, and a
+variable shadowing a required part. Errors list the affected names before any
+source/history mutation. Expressions in fresh-named copies still refer to the
+original names, including original names inside the copied subtree; they are not
+silently rebound. The guide and README explain that definitions/scripts are not
+imported. Matching names alone does not prove equal values, key bindings or
+behavior. Pre-existing unknown reads and arbitrary Lua/Script analysis are
+outside this check.
+
+Validation: 176 tests in 25 files and production build pass. Unit cases cover
+false dependencies, missing variables/parts, case-insensitive lookup, shadowing,
+source precedence, internal-name references and unchanged unknown identifiers.
+Chromium production workflow copies across New and several destination sources,
+checks refusal without mutation/history, accepts the destination with P and REF,
+observes the expected runtime power 8, and verifies exact Undo/Redo/export.
+Existing named-copy/mirror and guide flows pass. Default suite now has 39 scripts;
+full suite was not rerun in this sprint. Existing build warnings remain.
+
+Retrospective: raw word matching confused mention with dependency. Reusing the
+actual evaluator narrows checks to supported semantics while making their limits
+explicit. Do not treat reference existence as behavioral equivalence. Next: run
+the accumulated full production editor suite after these interaction changes,
+and measure its duration against the CI time budget. No push or deployment.
