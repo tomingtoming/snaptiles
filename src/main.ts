@@ -110,22 +110,27 @@ function buildKeyCaps(s: Simulation): void {
 }
 
 // ---- samples ----
-let current = 0;
-for (const [i, s] of SAMPLES.entries()) {
+for (const s of SAMPLES) {
   const b = document.createElement('button');
   b.type = 'button';
   b.textContent = s.name;
   b.addEventListener('click', () => {
-    current = i;
     sourceEl.value = s.source;
     refreshSampleButtons();
     void loadAndShare(s.source);
   });
   samplesEl.append(b);
 }
+function currentSample(): number {
+  const source = sourceEl.value.replace(/\r\n?/g, '\n');
+  return SAMPLES.findIndex(sample => sample.source.replace(/\r\n?/g, '\n') === source);
+}
 function refreshSampleButtons(): void {
+  const current = currentSample();
   [...samplesEl.children].forEach((c, i) => c.setAttribute('aria-current', String(i === current)));
 }
+sourceEl.addEventListener('input', refreshSampleButtons);
+sourceEl.addEventListener('modelchange', refreshSampleButtons);
 runBtn.addEventListener('click', () => void loadAndShare(sourceEl.value));
 // ---- view modes (1-4 or the button; those digits carry no key number in the original) ----
 const VIEWS = [
@@ -163,7 +168,7 @@ function saveModel(): void {
     const blob = new Blob([sourceEl.value], { type: 'text/plain' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `${SAMPLES[current]?.name ?? 'model'}.rcd`;
+    a.download = `${SAMPLES[currentSample()]?.name ?? 'model'}.rcd`;
     a.click();
     URL.revokeObjectURL(a.href);
 }
@@ -382,7 +387,6 @@ async function openModelFile(file: File): Promise<void> {
     const text = await readModelFile(file);
     if (request !== loadGeneration) return;
     sourceEl.value = text;
-    current = -1;
     refreshSampleButtons();
     await loadAndShare(text, request);
   } catch (error) {
@@ -473,7 +477,6 @@ async function boot(): Promise<void> {
       const text = await decodeHash(h.slice(2));
       if (request !== loadGeneration) return;
       sourceEl.value = text;
-      current = -1;
       refreshSampleButtons();
       await load(text, request);
       return;
@@ -483,7 +486,6 @@ async function boot(): Promise<void> {
   }
   if (request !== loadGeneration) return;
   const idx = Math.max(0, SAMPLES.findIndex((s) => s.name === h));
-  current = idx;
   sourceEl.value = SAMPLES[idx].source;
   refreshSampleButtons();
   await loadAndShare(SAMPLES[idx].source, request);

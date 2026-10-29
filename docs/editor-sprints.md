@@ -234,3 +234,27 @@ not necessarily the construction being viewed. Capturing the current text at
 an explicit share action resolves that ambiguity while preserving editing.
 Next: audit state and document identity across new/import/edit/save, including
 whether download names misleadingly retain a previous sample name.
+
+## 2026-10-29 — Derive sample identity from current source
+
+Goal: avoid saving new work under an unrelated previously selected sample name.
+Reproduced a Core-only new document downloading as car.rcd with car still marked
+selected. Removed the separately maintained sample index. Selection and download
+name now compare the current source with sample contents (normalizing line
+endings). GUI edits emit a model-change notification without resetting their
+Undo history; direct text input also refreshes selection. Untouched samples
+retain their names; custom content downloads as model.rcd.
+
+Validation: typecheck/build passes. Browser assertions cover new-document
+selection clearing, Undo/Redo restoring/removing sample identity, sample download
+name and custom-file download name. The original reproduction now yields
+model.rcd with no sample selected. This is content identity, not a full document
+naming system: imported filenames and custom user titles are not yet retained.
+
+Retrospective: source text was already authoritative for execution and sharing,
+but naming still depended on the last sample button. Removing that duplicate
+state avoids another synchronization obligation. A local command sequence ran
+browser checks after an initial typecheck failure and therefore used old dist;
+those results were discarded. After fixing the unused loop index, build and
+browser verification ran separately. Next: retain a meaningful filename across
+import/edit/save without letting a new document inherit another model's name.

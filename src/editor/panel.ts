@@ -112,7 +112,7 @@ export class BuildPanel {
     this.scene.selectTile(null);
   }
   private edit(action: () => void, fit = false): void {
-    try { action(); this.source.value = this.document.text; this.refresh(fit); this.saveDraft(); }
+    try { action(); this.source.value = this.document.text; this.source.dispatchEvent(new Event('modelchange')); this.refresh(fit); this.saveDraft(); }
     catch (e) { this.status.textContent = e instanceof Error ? e.message : String(e); }
   }
   private paintDraft(): void {

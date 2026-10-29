@@ -11,6 +11,17 @@ try {
  await page.click('#build');
  const before = await page.inputValue('#source');
  const count = await page.locator('#parts option').count();
+ const sampleName = await page.locator('#samples [aria-current="true"]').textContent();
+ await page.click('#new-model');
+ assert.equal(await page.locator('#samples [aria-current="true"]').count(), 0);
+ await page.click('#edit-undo');
+ assert.equal(await page.locator('#samples [aria-current="true"]').textContent(), sampleName);
+ await page.click('#edit-redo');
+ assert.equal(await page.locator('#samples [aria-current="true"]').count(), 0);
+ await page.click('#edit-undo');
+ const sampleDownload = page.waitForEvent('download'); await page.click('#save-model');
+ assert.equal((await sampleDownload).suggestedFilename(), `${sampleName}.rcd`);
+
  await page.selectOption('#add-type', 'Chip'); await page.click('[data-edge="N"]');
  assert.equal(await page.locator('#parts option').count(), count + 1);
  const target = await page.locator('#parts option').last().getAttribute('value');

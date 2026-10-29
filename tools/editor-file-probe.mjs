@@ -12,7 +12,10 @@ try {
   await page.click('[data-edge="N"]');
   const source = await page.inputValue('#source');
   const download = page.waitForEvent('download'); await page.click('#save-model');
-  const stream = await (await download).createReadStream();
+  const savedFile = await download;
+  assert.equal(savedFile.suggestedFilename(), 'model.rcd');
+  assert.equal(await page.locator('#samples [aria-current="true"]').count(), 0);
+  const stream = await savedFile.createReadStream();
   const chunks = []; for await (const chunk of stream) chunks.push(chunk);
   const buffer = Buffer.concat(chunks);
   assert.equal(buffer.toString(), source);
