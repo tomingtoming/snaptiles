@@ -451,3 +451,27 @@ mistake. A release-capture test initially released a pending request before the
 browser acquired capture; a move plus observed gotpointercapture makes the
 precondition explicit. Test timing alone was not enough. Next: test simultaneous
 keyboard and on-screen control inputs so releasing one does not cancel another.
+
+## 2026-10-30 — Preserve independent control sources
+
+Goal: allow keyboard and screen controls to overlap without one release
+cancelling another hold. Reproduced ArrowUp held at ENGINE=1500, then a screen
+Up click/release causing _KEY(0)=0 and ENGINE to fall. KeyState now tracks physical
+codes and per-control pointer sources separately, exposing their union through
+its existing down/isDown interface. Repeats and duplicate releases are idempotent.
+Alias key-up uses its original physical-code record, and blur clears source maps.
+Starting a model clears old keycap sources before replacing their DOM.
+
+Validation: 88 unit tests and typecheck/build pass. Unit cases cover release
+orders, shared arrow/W aliases, alias-map changes, repeated keydown, duplicate
+pointer release, modifiers and blur. Browser coverage exercises both keyboard/
+screen release orders, two touches on the same keycap, cancellation and reload
+while a screen key remains held. The API assertions wait for a simulation tick
+because _KEY reports the model's frame snapshot, not instantaneous DOM state.
+
+Retrospective: a Set of virtual key numbers erased input provenance. Independent
+sources need independent release ownership, with a union only at consumption.
+The existing simulation API stays unchanged. Gamepad remains its existing
+separate source; physical multi-device behavior beyond these browser cases is
+not claimed. Next: check whether construction direction controls are legible
+from different camera angles and identify a concrete orientation aid if needed.

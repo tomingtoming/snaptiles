@@ -30,7 +30,9 @@ export const KEY_TABLE: KeyDef[] = [
 ];
 
 export class KeyState {
-  down = new Set<number>();
+  readonly down = new Set<number>();
+  private physical = new Map<string, number>();
+  private pressed = new Map<number, Set<string | number>>();
   private byCode = new Map<string, number>();
   /** extra physical keys standing in for a key number (WASD for the arrows when the model leaves 7/8/9/15 unused) */
   private aliases = new Map<string, number>();
@@ -44,20 +46,18 @@ export class KeyState {
     KEY_TABLE.forEach((k, i) => this.byCode.set(k.code, i));
     this.target.addEventListener('keydown', this.onDown as EventListener);
     this.target.addEventListener('keyup', this.onUp as EventListener);
-    if (typeof window !== 'undefined') window.addEventListener('blur', () => this.down.clear());
+    this.target.addEventListener('blur', () => this.clear());
   }
 
   private onDown = (e: KeyboardEvent) => {
     if (isTyping(e) || e.ctrlKey || e.metaKey || e.altKey) return;
-    const n = this.aliases.get(e.code) ?? this.byCode.get(e.code);
+    const n = this.physical.get(e.code) ?? this.aliases.get(e.code) ?? this.byCode.get(e.code);
     if (n === undefined) return;
-    this.down.add(n);
+    this.physical.set(e.code, n); this.refreshDown();
     e.preventDefault();
   };
   private onUp = (e: KeyboardEvent) => {
-    const n = this.aliases.get(e.code) ?? this.byCode.get(e.code);
-    if (n === undefined) return;
-    this.down.delete(n);
+    this.physical.delete(e.code); this.refreshDown();
   };
 
   /** The original's table (measured 2026-10-28): 0..3 are the arrows and W/A/S/D are their own numbers
@@ -94,11 +94,23 @@ export class KeyState {
   }
 
   /** on-screen keycaps (touch / mouse) */
-  press(n: number): void {
-    this.down.add(n);
+  press(n: number, source: string | number = 'manual'): void {
+    const sources = this.pressed.get(n) ?? new Set<string | number>();
+    sources.add(source); this.pressed.set(n, sources); this.refreshDown();
   }
-  release(n: number): void {
-    this.down.delete(n);
+  release(n: number, source: string | number = 'manual'): void {
+    const sources = this.pressed.get(n);
+    sources?.delete(source);
+    if (!sources?.size) this.pressed.delete(n);
+    this.refreshDown();
+  }
+  private refreshDown(): void {
+    this.down.clear();
+    for (const n of this.physical.values()) this.down.add(n);
+    for (const n of this.pressed.keys()) this.down.add(n);
+  }
+  clear(): void {
+    this.physical.clear(); this.pressed.clear(); this.down.clear(); this.pad.clear(); this.axes.fill(0);
   }
 }
 

@@ -45,7 +45,7 @@ async function load(source: string, request: number): Promise<boolean> {
   paused = false;
   statusEl.textContent = '';
   valsEl.textContent = outEl.textContent = '';
-  keysEl.replaceChildren(); keyCaps = [];
+  keys.clear(); keysEl.replaceChildren(); keyCaps = [];
   sfx.update(0, 0);
   const old = sim;
   sim = null;
@@ -101,9 +101,9 @@ function buildKeyCaps(s: Simulation): void {
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       el.setPointerCapture(e.pointerId);
-      keys.press(n);
+      keys.press(n, e.pointerId);
     });
-    const up = () => keys.release(n);
+    const up = (e: PointerEvent) => keys.release(n, e.pointerId);
     el.addEventListener('pointerup', up);
     el.addEventListener('pointercancel', up);
     el.addEventListener('lostpointercapture', up);
