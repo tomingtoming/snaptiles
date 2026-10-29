@@ -9,6 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "preview": "vite preview",
+    "test:editor": "node tools/editor-ci.mjs",
     "probe:corpus": "node tools/corpus.mjs http://127.0.0.1:5173/ ../snaptiles-models/raw/sprishri/x ../snaptiles-models/raw/RCModel1",
     "probe:drive": "node tools/drive-probe.mjs ArrowUp:4000 ../snaptiles-models/raw/sprishri/x/ride/car1.txt ../snaptiles-models/raw/sprishri/x/ride/3wheel.txt ../snaptiles-models/raw/sprishri/x/ride/bike1.rcd ../snaptiles-models/raw/sprishri/x/ride/segway.txt ../snaptiles-models/raw/RCModel1/bike.rcd"
   },

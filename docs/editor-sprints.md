@@ -54,3 +54,19 @@ simulation. A selection highlight also needed an outline because its colour
 could be confused with the Core material. Next: run the production build and
 integration checks, and make these workflows part of CI rather than relying
 on repeated manual probes.
+
+## 2026-10-29 — Production-build regression
+
+Goal: make the creation loop repeatable outside the development server.
+Added `test:editor`: it serves dist on an OS-assigned port, runs editing/recovery
+and blank-vehicle flows, and closes its own server. CI installs Chromium and
+runs the same checks, uploading screenshots on failure.
+
+Validation: both probes pass locally against the production bundle; the GUI-built
+vehicle again travels 7.0 m in 2 seconds. Remote CI has not run for these local
+commits yet. Publishing and production deployment are awaiting scope confirmation.
+
+Retrospective: keeping probe data in generated models avoids shipping third-party
+assets. Use a fresh port and browser context per run, and assert behavior rather
+than relying on a development-only environment. Next: let users adjust the
+strength of GUI-created controls after a test run without returning to source.

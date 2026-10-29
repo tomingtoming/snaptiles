@@ -67,6 +67,10 @@ use **保存** for a file. **全体** fits the model to the view and a yellow ou
 marks the selected tile. Drag and zoom work while editing.
 The editor is independently implemented, without RCD/RCM source or assets.
 
+Production-build browser regression: `bun run build && bun run test:editor`
+(install Chromium first with `bun x playwright install chromium`). This runs
+in CI with an OS-assigned port and uploads screenshots on failure.
+
 Browser regression (against an already running dev server):
 `node tools/editor-probe.mjs http://127.0.0.1:<port>/`.
 
