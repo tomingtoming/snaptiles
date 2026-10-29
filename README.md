@@ -68,7 +68,11 @@ zero or expressions), return to zero on release and avoid existing names.
 Choose （逆） for an opposite-side wheel. Rudder/Trim can use any of the same key
 pairs (±30°, returning to zero on release). Selectors show the keys for recognized
 GUI controls; assigning the same keys to several controls operates them together.
-These are momentary controls, not an incrementally held aircraft throttle. **最大出力（共通）** and **最大角度（共通）**
+Power also offers **を追加（保持）**: the first key increases and the second
+decreases throttle, release holds it, and values are clamped from zero to the
+maximum. Each model frame changes it by 1% of the maximum (100 frames from zero
+to full); changing the maximum scales that increment. Re-running initializes
+throttle to zero. Existing momentary controls retain their release-to-zero behavior. **最大出力（共通）** and **最大角度（共通）**
 change GUI-generated controls for every bound part. Arbitrary expressions or
 manually altered controls remain source-only.
 

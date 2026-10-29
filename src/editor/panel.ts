@@ -79,7 +79,8 @@ export class BuildPanel {
     });
     this.powerControl.onchange = () => this.edit(() => {
       const value = this.powerControl.value;
-      if (value === 'new' || value.startsWith('new:')) this.document.addPowerControl(this.selected, Math.abs(Number(this.power.value)) || 1000, value === 'new' ? 'vertical' : value.slice(4) as ControlKeys);
+      if (value.startsWith('hold:')) this.document.addThrottleControl(this.selected, Math.abs(Number(this.power.value)) || 1000, value.slice(5) as ControlKeys);
+      else if (value === 'new' || value.startsWith('new:')) this.document.addPowerControl(this.selected, Math.abs(Number(this.power.value)) || 1000, value === 'new' ? 'vertical' : value.slice(4) as ControlKeys);
       else this.document.power(this.selected, value === 'constant' ? 0 : value);
     });
     this.angleControl.onchange = () => this.edit(() => {
@@ -295,6 +296,7 @@ export class BuildPanel {
     }
     if (!constant && ![...this.powerControl.options].some(o => o.value === power.toUpperCase())) this.powerControl.add(new Option(power, power.toUpperCase()));
     for (const [key,pair] of Object.entries(CONTROL_KEYS)) this.powerControl.add(new Option(`${pair.label} を追加`, key === 'vertical' ? 'new' : `new:${key}`));
+    for (const [key,pair] of Object.entries(CONTROL_KEYS)) this.powerControl.add(new Option(`${pair.label} を追加（保持）`, `hold:${key}`));
     this.powerControl.value = constant ? 'constant' : power.toUpperCase();
     this.remove.disabled = this.copy.disabled = this.mirror.disabled = !tile.parent;
     this.remove.textContent = tile.children.length ? '枝ごと削除' : '削除';

@@ -1019,3 +1019,43 @@ review confirms Z/X remains readable in the selector even when the variable
 name is truncated, and all eight screen keys fit in two rows with readable
 labels. The full Chromium suite last passed in Sprint 37; this sprint reran
 relevant scenarios rather than relabeling that older full run as current.
+
+## 2026-10-30 — Add held throttle controls
+
+Goal: keep thrust while releasing pitch/roll keys, instead of forcing every
+GUI-generated output to return to zero. Power selectors now offer each key pair
+with **を追加（保持）**. These generate a distinct ST_THROTTLE variable with zero
+initial value, bounds [0, maximum], no automatic return, and equal increase/
+decrease steps of 1% of the maximum per model frame. The first key increases;
+the second decreases. Existing momentary controls and their defaults are
+unchanged. Recognized selectors explicitly display the key pair and 保持.
+
+Changing the shared maximum also scales the key increment while retaining zero
+minimum and no return. Negative bindings remain available for a shared actuator
+with reversed orientation. The generated schema is recognized narrowly; altered
+release/rate definitions stay source-edited. A fresh run/share receiver starts
+at zero; the current runtime throttle is not embedded in saved source.
+
+Six new tests bring the total to 131: all four key-pair declarations and maximum
+edits, source/Undo preservation, collision-safe naming, rejection of altered
+schemas, actual simulation accumulation/hold/upper and lower clamps, partial
+release with independent pitch, and fresh simulation reset. The browser probe
+builds the controls through GUI, changes maximum with Undo/Redo, tests physical
+and screen-key holding, independent pitch, shared-source equality and restart
+zero. It joins the default runner (now 23 Chromium scenarios).
+
+Validation: all 131 tests and build pass. Production Chromium throttle, key-pair,
+help and mirror probes pass. The same throttle scenario passes in development
+Firefox and WebKit. Independent 390px review confirms Z/X and 保持 are fully
+readable beside maximum 2000 with no control overlap; the variable suffix is
+truncated. Part of the test model is outside the current camera framing, so
+this image is UI evidence, not a complete-model framing or flight claim. The
+known Windows WebKit 3D capture limitation remains open.
+
+Retrospective: a control's behavior on release is part of the design, not merely
+an input binding. Holding a value must survive release without leaking into
+other axes, but initialization still comes from the source's defaults. Next:
+use these controls in a complete aircraft construction and measure actual
+motion, separating missing editor operations from flight-model or sample-design
+issues. No claim of airworthiness or original-engine equivalence is made here.
+No push or deployment was performed.

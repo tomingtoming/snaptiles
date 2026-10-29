@@ -113,20 +113,23 @@ export class ModelDocument {
   /** One undoable edit; a fresh variable never overwrites existing controls or scripts. */
   controlStrength(variable: string): number | null {
     const name = variable.replace(/\s/g, '').replace(/^-/, '').toUpperCase();
-    if (!/^ST_(POWER|STEER)_\d+$/.test(name)) return null;
+    if (!/^ST_(POWER|STEER|THROTTLE)_\d+$/.test(name)) return null;
     const model = parseRc(this.text), v = model.vals.find(v => v.name.toUpperCase() === name);
     const keys = model.keys.filter(k => k.var.toUpperCase() === name);
-    if (!v || v.default !== 0 || v.min !== -v.max || v.max <= 0 || v.step !== v.max || keys.length !== 2) return null;
-    const sign = name.startsWith('ST_POWER') ? 1 : -1;
+    const held = name.startsWith('ST_THROTTLE');
+    if (!v || v.default !== 0 || v.min !== (held ? 0 : -v.max) || v.max <= 0 || v.step !== (held ? 0 : v.max) || keys.length !== 2) return null;
+    const sign = name.startsWith('ST_STEER') ? -1 : 1;
+    const increment = held ? v.max / 100 : v.max;
     return Object.values(CONTROL_KEYS).some(pair =>
-      keys.some(k => k.key === pair.keys[0] && k.step === sign * v.max) &&
-      keys.some(k => k.key === pair.keys[1] && k.step === -sign * v.max)) ? v.max : null;
+      keys.some(k => k.key === pair.keys[0] && k.step === sign * increment) &&
+      keys.some(k => k.key === pair.keys[1] && k.step === -sign * increment)) ? v.max : null;
   }
   controlKeyLabel(variable: string): string | null {
     if (this.controlStrength(variable) === null) return null;
     const name = variable.replace(/\s/g, '').replace(/^-/, '').toUpperCase();
     const keys = parseRc(this.text).keys.filter(k=>k.var.toUpperCase()===name).map(k=>k.key);
-    return Object.values(CONTROL_KEYS).find(pair=>pair.keys.every(key=>keys.includes(key)))?.label ?? null;
+    const label = Object.values(CONTROL_KEYS).find(pair=>pair.keys.every(key=>keys.includes(key)))?.label;
+    return label ? label + (name.startsWith('ST_THROTTLE') ? '（保持）' : '') : null;
   }
   setControlStrength(variable: string, magnitude: number): void {
     if (this.controlStrength(variable) === null) throw new Error('変更済みの操作はソースで編集してください');
@@ -135,20 +138,22 @@ export class ModelDocument {
     const model = parseRc(this.text), v = model.vals.find(v => v.name.toUpperCase() === name)!;
     const edits: [number, number, string][] = [];
     const ranges = declarationRanges.get(v)!;
-    for (const [attr, value] of [['min', -magnitude], ['max', magnitude], ['step', magnitude]] as const) {
+    const held = name.startsWith('ST_THROTTLE');
+    for (const [attr, value] of [['min', held ? 0 : -magnitude], ['max', magnitude], ['step', held ? 0 : magnitude]] as const) {
       if (!ranges[attr]) throw new Error('操作の定義が不足しています');
       edits.push([...ranges[attr], String(value)]);
     }
     for (const key of model.keys.filter(k => k.var.toUpperCase() === name)) {
       const range = declarationRanges.get(key)?.step;
       if (!range) throw new Error('キー操作の定義が不足しています');
-      edits.push([...range, String(Math.sign(key.step) * magnitude)]);
+      edits.push([...range, String(Math.sign(key.step) * (held ? magnitude / 100 : magnitude))]);
     }
     let next = this.text;
     for (const [start, end, value] of edits.sort((a,b) => b[0] - a[0])) next = next.slice(0,start) + value + next.slice(end);
     this.replace(0, this.text.length, next);
   }
   addPowerControl(index: number, magnitude: number, pair: ControlKeys = 'vertical'): void { this.addControl(index, 'power', magnitude, pair); }
+  addThrottleControl(index: number, magnitude: number, pair: ControlKeys = 'zx'): void { this.addControl(index, 'power', magnitude, pair, true); }
   addSteeringControl(index: number, magnitude = 30, pair: ControlKeys = 'horizontal'): void { this.addControl(index, 'angle', magnitude, pair); }
   bindAngle(index: number, variable: string): void {
     if (!parseRc(this.text).vals.some(v => v.name.toUpperCase() === variable.toUpperCase())) throw new Error('定義済みの変数を選んでください');
@@ -185,21 +190,21 @@ export class ModelDocument {
     this.undoStack.push(this.snapshot()); this.redoStack = []; this.filename = next;
   }
   newModel(): void { this.restore('Body {\n  Core() {\n  }\n}\n'); }
-  private addControl(index: number, attribute: 'power' | 'angle', magnitude: number, pair: ControlKeys): void {
+  private addControl(index: number, attribute: 'power' | 'angle', magnitude: number, pair: ControlKeys, held = false): void {
     const binding = CONTROL_KEYS[pair];
     if (!binding) throw new Error('操作に使うキーを選んでください');
     const keys = binding.keys;
     if (!Number.isFinite(magnitude) || magnitude <= 0) throw new Error('出力の大きさは正の数で指定してください');
     const names = new Set(this.text.toUpperCase().match(/[A-Z_][A-Z0-9_]*/g));
-    const prefixName = attribute === 'power' ? 'ST_POWER' : 'ST_STEER';
+    const prefixName = held ? 'ST_THROTTLE' : attribute === 'power' ? 'ST_POWER' : 'ST_STEER';
     let suffix = 1; while (names.has(`${prefixName}_${suffix}`)) suffix++;
     const name = `${prefixName}_${suffix}`;
     const edits: [number, number, string][] = [this.attributeEdit(index, attribute, name)];
     const blocks = findBlocks(this.text);
-    const delta = attribute === 'angle' ? -magnitude : magnitude;
+    const delta = held ? magnitude / 100 : attribute === 'angle' ? -magnitude : magnitude;
     let prefix = '';
     for (const [section, content] of [
-      ['Val', `  ${name}(default=0, min=-${magnitude}, max=${magnitude}, step=${magnitude})`],
+      ['Val', `  ${name}(default=0, min=${held ? 0 : -magnitude}, max=${magnitude}, step=${held ? 0 : magnitude})`],
       ['Key', `  ${keys[0]}:${name}(step=${delta})\n  ${keys[1]}:${name}(step=${-delta})`],
     ]) {
       const block = blocks.find(b => b.name.toLowerCase() === section.toLowerCase() || section === 'Val' && b.name.toLowerCase() === 'var');
