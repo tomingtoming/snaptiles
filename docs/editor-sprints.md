@@ -1862,3 +1862,35 @@ on narrow screens. Keep context visible after filtering and rederive it after
 model edits. Next: review the combined naming/search/relocation workflow across
 browser engines and check for stale selections as the structure changes.
 No push or deployment; existing build warnings remain.
+
+
+## 2026-10-30 — Search identity after structure changes (Sprint 62)
+
+Goal: verify the combined naming/search/relocation workflow across engines.
+Extended the search scenario with a Wheel moving from index 3 to 2 beneath an
+earlier sibling. Search results must follow its name and show the new parent/
+edge. After deletion they disappear; Undo restores the exact moved source and
+correct result. An additional real keyboard Undo from the result list changes
+the model while the modal remains open. The former result index now identifies
+another part, so submission must be rejected by the existing stale-source guard.
+Reopening search finds the Wheel at index 3 with its original parent context.
+
+Validation: expanded search and name/file/share flows pass in Chromium against
+the production build and Firefox/WebKit against the dev server. Name probe now
+accepts an engine argument and uses engine-specific screenshots. No product
+change was required. This does not verify Safari on Apple devices or remove the
+previous Windows WebKit screenshot limitations.
+
+One initial Chromium assertion observed native focus restoration to find-part
+before the queued close handler moved it to parts. Changed the immediate focus
+assertion to a bounded 3-second wait for the same required destination. No forced
+focus, skipped assertion or product workaround was introduced. The complete
+rerun passes, including the source/history and identity assertions.
+
+Retrospective: object names are useful only if selection follows the current
+structure. Test a concrete index collision after Undo, not just an unchanged
+result list. Existing stale-source guards prevent acting on that old identity.
+Next: address the usability gap where newly naming a branch prevents copy/mirror,
+assessing fresh names for copies while retaining original references deliberately.
+Default suite remains 37 scripts; no full-suite rerun for this test-only change.
+No push or deployment.
