@@ -51,7 +51,7 @@ N/S/E/W edge to attach a copy. Expressions and controls remain shared. Named
 branches are protected against name collisions, and pasting requires the
 referenced variables to exist. Core cannot be deleted or copied. Adding or removing parts can change numerical
 chip indices; Lua that refers to chip numbers may need corresponding edits. ↶ / ↷ undo and redo edits, including
-after a test run; **保存** downloads the model. **共有リンク** creates a link from the current editor contents without running it. Copy it from the dialog; if clipboard access is unavailable, the URL remains selectable. Press ▶ to test it and update
+after a test run; **保存** downloads the model. Imported filenames survive edits and local draft recovery; New clears the name, and Undo restores it with the contents. Exports use the `.rcd` extension. **共有リンク** creates a link from the current editor contents without running it. Copy it from the dialog; if clipboard access is unavailable, the URL remains selectable. Press ▶ to test it and update
 the shareable URL, then **組む** to return to its construction pose.
 
 Edits patch only the affected source ranges. Other attributes, comments,

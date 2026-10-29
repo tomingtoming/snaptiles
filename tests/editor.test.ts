@@ -1,6 +1,6 @@
 import { DraftStore } from '../src/editor/draft';
 import { describe, it, expect } from 'vitest';
-import { ModelDocument } from '../src/editor/document';
+import { downloadFilename, ModelDocument } from '../src/editor/document';
 import { parseRc } from '../src/rc/parser';
 const source = `// keep header
 Val { A(default=20) }
@@ -125,5 +125,32 @@ describe('branch copy and paste', () => {
     const d = new ModelDocument('Body{Core(){N:Chip(name=ARM)}}'); expect(()=>d.copyBranch(1)).toThrow();
     const original = new ModelDocument(source), branch=original.copyBranch(1); original.newModel();
     expect(()=>original.pasteBranch(0,'S',branch)).toThrow();
+  });
+});
+
+
+describe('document filenames', () => {
+  it('keeps imported names through edits and restores them with Undo after New', () => {
+    const d = new ModelDocument('Body { Core() }', '探査車.txt');
+    d.add(0, 'N', 'Chip'); expect(d.filename).toBe('探査車.txt');
+    const edited = d.text;
+    d.newModel(); expect(d.filename).toBeUndefined();
+    d.undo(); expect(d.text).toBe(edited); expect(d.filename).toBe('探査車.txt');
+    d.redo(); expect(d.filename).toBeUndefined();
+    d.restore('Body { Core() }', 'other.rcd'); expect(d.filename).toBe('other.rcd');
+    d.undo(); expect(d.filename).toBeUndefined();
+  });
+  it('round-trips names in drafts and accepts older unnamed drafts', () => {
+    let value = '';
+    const drafts = new DraftStore({getItem:()=>value,setItem:(_, v)=>{value=v;}});
+    drafts.save('Body { Core() }', 'rover.rcd'); expect(drafts.read()?.filename).toBe('rover.rcd');
+    value = JSON.stringify({version:1,text:'old',savedAt:1}); expect(drafts.read()?.filename).toBeUndefined();
+    value = JSON.stringify({version:1,text:'old',savedAt:1,filename:{bad:true}}); expect(drafts.read()?.filename).toBeUndefined();
+  });
+  it('exports portable .rcd names without path components', () => {
+    expect(downloadFilename('探査車.TXT')).toBe('探査車.rcd');
+    expect(downloadFilename('../folder/rover.rc')).toBe('rover.rcd');
+    expect(downloadFilename('NUL.rcd')).toBe('_NUL.rcd');
+    expect(downloadFilename('')).toBe('model.rcd');
   });
 });

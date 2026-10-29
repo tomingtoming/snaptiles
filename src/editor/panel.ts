@@ -32,7 +32,7 @@ export class BuildPanel {
     this.document = new ModelDocument(source.value);
     this.type.add(new Option('Core', 'Core'));
     for (const type of TYPES) { this.type.add(new Option(type, type)); this.addType.add(new Option(type, type)); }
-    this.restoreButton.onclick = () => { const draft = this.drafts.read(); if (draft) this.edit(() => { this.document.restore(draft.text); this.selected = 0; }, true); };
+    this.restoreButton.onclick = () => { const draft = this.drafts.read(); if (draft) this.edit(() => { this.document.restore(draft.text, draft.filename); this.selected = 0; }, true); };
     document.getElementById('focus-part')!.onclick = () => { if (this.assembly) this.scene.focusTile(this.selected); };
     window.addEventListener('keydown', event => {
       const target = event.target as HTMLElement | null;
@@ -86,7 +86,7 @@ export class BuildPanel {
         this.selected = next;
       });
     });
-    source.addEventListener('input', () => { if (this.active) { this.document = new ModelDocument(source.value); this.refresh(); } this.saveDraft(); });
+    source.addEventListener('input', () => { this.document = new ModelDocument(source.value, this.document.filename); if (this.active) this.refresh(); this.saveDraft(); });
     const canvas = document.getElementById('view')!;
     let down: { x: number; y: number; id: number } | null = null;
     canvas.addEventListener('pointerdown', e => { down = e.isPrimary && e.button === 0 ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null; });
@@ -98,6 +98,10 @@ export class BuildPanel {
       }
       down = null;
     });
+  }
+  loadSource(text: string, filename?: string): void {
+    this.source.value = text; this.document = new ModelDocument(this.source.value, filename);
+    this.source.dispatchEvent(new Event('modelchange'));
   }
   open(): void {
     if (this.document.text !== this.source.value.replace(/\r\n?/g, '\n')) this.document = new ModelDocument(this.source.value);
@@ -117,10 +121,10 @@ export class BuildPanel {
   }
   private paintDraft(): void {
     const draft = this.drafts.read();
-    this.restoreButton.hidden = !draft || draft.text === this.source.value;
+    this.restoreButton.hidden = !draft || (draft.text === this.source.value && draft.filename === this.document.filename);
   }
   private saveDraft(): void {
-    if (!this.drafts.save(this.source.value)) this.status.textContent ||= '下書きを保存できません。保存ボタンでファイルに残してください。';
+    if (!this.drafts.save(this.source.value, this.document.filename)) this.status.textContent ||= '下書きを保存できません。保存ボタンでファイルに残してください。';
     this.paintDraft();
   }
   private refresh(fit = false): void {

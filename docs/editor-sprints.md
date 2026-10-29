@@ -258,3 +258,26 @@ browser checks after an initial typecheck failure and therefore used old dist;
 those results were discarded. After fixing the unused loop index, build and
 browser verification ran separately. Next: retain a meaningful filename across
 import/edit/save without letting a new document inherit another model's name.
+
+## 2026-10-29 — Retain imported document names through editing and recovery
+
+Goal: preserve a useful imported filename without giving new work another
+model's identity. Document history now snapshots text and optional filename
+together. Import assigns a name, edits keep it, New clears it, and Undo/Redo
+restores both fields. Local drafts store the optional name; existing version-1
+unnamed drafts still work. Sample/URL loading resets imported identity through
+a single source-loading entry point. Downloads normalize the extension to .rcd
+and strip path components and filename characters reserved by Windows.
+
+Validation: 64 unit tests and typecheck/build pass. Production file probe
+imports saved.rcd, edits it, checks the downloaded name, creates a new model,
+checks model.rcd, undoes and checks saved.rcd, then reloads/restores the draft
+and checks saved.rcd again. All five browser probes pass. Tests also cover old
+unnamed drafts, malformed name metadata and Japanese filenames.
+
+Retrospective: keeping a second filename variable in the UI would have repeated
+the stale-selection defect. Filename belongs to the same history snapshot as
+content. Share links still contain model text only, so receiving a link does not
+restore its sender's local filename; no custom-title UI has been introduced.
+Next: assess construction parameters already supported by the runtime but not
+yet editable in the GUI, especially wheel options and ballast weight.

@@ -1,13 +1,15 @@
 import { parseRc, findBlocks, declarationRanges, type ChipNode } from '../rc/parser';
 
+interface DocumentState { text: string; filename?: string }
+
 export interface CopiedBranch { text: string; variables: string[]; count: number }
 
 /** Edits use parser offsets: scripts, comments and unrelated attributes remain byte-for-byte. */
 export class ModelDocument {
   text: string;
-  undoStack: string[] = [];
-  redoStack: string[] = [];
-  constructor(text: string) { this.text = text.replace(/\r\n?/g, '\n'); }
+  undoStack: DocumentState[] = [];
+  redoStack: DocumentState[] = [];
+  constructor(text: string, public filename?: string) { this.text = text.replace(/\r\n?/g, '\n'); }
   nodes(): ChipNode[] {
     const out: ChipNode[] = [];
     const visit = (n: ChipNode) => { out.push(n); n.children.forEach(visit); };
@@ -18,7 +20,7 @@ export class ModelDocument {
     const next = this.text.slice(0, start) + value + this.text.slice(end);
     parseRc(next); // do not commit a malformed edit
     if (next === this.text) return;
-    this.undoStack.push(this.text); this.redoStack = []; this.text = next;
+    this.undoStack.push(this.snapshot()); this.redoStack = []; this.text = next;
   }
   type(index: number, type: string): void {
     const n = this.nodes()[index];
@@ -81,10 +83,10 @@ export class ModelDocument {
     this.replace(...this.attributeEdit(index, 'angle', variable));
   }
   fixedAngle(index: number): void { this.replace(...this.attributeEdit(index, 'angle', '0')); }
-  restore(text: string): void {
-    this.undoStack.push(this.text); this.redoStack = []; this.text = text.replace(/\r\n?/g, '\n');
+  restore(text: string, filename?: string): void {
+    this.undoStack.push(this.snapshot()); this.redoStack = []; this.text = text.replace(/\r\n?/g, '\n'); this.filename = filename;
   }
-  newModel(): void { this.replace(0, this.text.length, 'Body {\n  Core() {\n  }\n}\n'); }
+  newModel(): void { this.restore('Body {\n  Core() {\n  }\n}\n'); }
   private addControl(index: number, attribute: 'power' | 'angle', magnitude: number, keys: [number, number]): void {
     if (!Number.isFinite(magnitude) || magnitude <= 0) throw new Error('出力の大きさは正の数で指定してください');
     const names = new Set(this.text.toUpperCase().match(/[A-Z_][A-Z0-9_]*/g));
@@ -135,6 +137,16 @@ export class ModelDocument {
     if (!n?.dir) throw new Error('Coreは削除できません');
     this.replace(n.source!.start, n.source!.end, '');
   }
-  undo(): void { const text = this.undoStack.pop(); if (text !== undefined) { this.redoStack.push(this.text); this.text = text; } }
-  redo(): void { const text = this.redoStack.pop(); if (text !== undefined) { this.undoStack.push(this.text); this.text = text; } }
+  private snapshot(): DocumentState { return {text: this.text, filename: this.filename}; }
+  undo(): void { const state = this.undoStack.pop(); if (state) { this.redoStack.push(this.snapshot()); Object.assign(this, state); } }
+  redo(): void { const state = this.redoStack.pop(); if (state) { this.undoStack.push(this.snapshot()); Object.assign(this, state); } }
+}
+
+/** Keep imported names portable while always exporting UTF-8 .rcd files. */
+export function downloadFilename(filename: string): string {
+  let stem = filename.replace(/\\/g, '/').split('/').pop()!.replace(/\.(rcd?|txt)$/i, '');
+  stem = stem.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/g, '').trim().slice(0, 160);
+  if (!stem) stem = 'model';
+  if (/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i.test(stem)) stem = `_${stem}`;
+  return `${stem}.rcd`;
 }

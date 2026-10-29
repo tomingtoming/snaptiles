@@ -31,6 +31,18 @@ try {
   await choose(buffer); // Same file can be selected again.
   await page.waitForFunction(() => window.__sim?.assembly?.tiles.length === 2 && !document.body.classList.contains('building'));
   assert.equal(await page.inputValue('#source'), source);
+  const expectName = async name => {
+    const download = page.waitForEvent('download'); await page.click('#save-model');
+    assert.equal((await download).suggestedFilename(), name);
+  };
+  await page.click('#build'); await page.click('[data-edge="E"]');
+  await expectName('saved.rcd');
+  await page.click('#new-model'); await expectName('model.rcd');
+  await page.click('#edit-undo'); await expectName('saved.rcd');
+  // A reload must restore the filename together with the edited draft.
+  await page.reload(); await page.waitForFunction(() => window.__sim);
+  await page.click('#build'); await page.click('#restore-draft');
+  await expectName('saved.rcd');
   // Legacy Shift-JIS comment: Japanese 'test' plus an ASCII model.
   const legacy = Buffer.concat([Buffer.from([47,47,32,0x83,0x65,0x83,0x58,0x83,0x67,10]),buffer]);
   await choose(legacy);

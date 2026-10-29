@@ -1,3 +1,4 @@
+import { downloadFilename } from './editor/document';
 import { parseRc } from './rc/parser';
 import { BuildPanel } from './editor/panel';
 import { initRapier } from './physics/world';
@@ -115,7 +116,7 @@ for (const s of SAMPLES) {
   b.type = 'button';
   b.textContent = s.name;
   b.addEventListener('click', () => {
-    sourceEl.value = s.source;
+    builder.loadSource(s.source);
     refreshSampleButtons();
     void loadAndShare(s.source);
   });
@@ -168,7 +169,8 @@ function saveModel(): void {
     const blob = new Blob([sourceEl.value], { type: 'text/plain' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `${SAMPLES[currentSample()]?.name ?? 'model'}.rcd`;
+    const importedName = builder.document.text === sourceEl.value.replace(/\r\n?/g, '\n') ? builder.document.filename : undefined;
+    a.download = downloadFilename(importedName ?? SAMPLES[currentSample()]?.name ?? 'model');
     a.click();
     URL.revokeObjectURL(a.href);
 }
@@ -386,7 +388,7 @@ async function openModelFile(file: File): Promise<void> {
   try {
     const text = await readModelFile(file);
     if (request !== loadGeneration) return;
-    sourceEl.value = text;
+    builder.loadSource(text, file.name);
     refreshSampleButtons();
     await loadAndShare(text, request);
   } catch (error) {
@@ -476,7 +478,7 @@ async function boot(): Promise<void> {
     try {
       const text = await decodeHash(h.slice(2));
       if (request !== loadGeneration) return;
-      sourceEl.value = text;
+      builder.loadSource(text);
       refreshSampleButtons();
       await load(text, request);
       return;
@@ -486,7 +488,7 @@ async function boot(): Promise<void> {
   }
   if (request !== loadGeneration) return;
   const idx = Math.max(0, SAMPLES.findIndex((s) => s.name === h));
-  sourceEl.value = SAMPLES[idx].source;
+  builder.loadSource(SAMPLES[idx].source);
   refreshSampleButtons();
   await loadAndShare(SAMPLES[idx].source, request);
 }
