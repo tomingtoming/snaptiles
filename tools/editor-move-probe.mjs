@@ -11,5 +11,26 @@ const b=await ({chromium,firefox,webkit}[engine]).launch(engine==='chromium'?{ar
  await p.click('#edit-undo');assert.equal(await p.inputValue('#source'),source);assert.equal(await p.inputValue('#parts'),'1');await p.click('#edit-redo');assert.equal(await p.inputValue('#source'),moved);assert.equal(await p.inputValue('#parts'),'2');
  await p.click('#run');await p.waitForFunction(()=>window.__sim?.assembly?.tiles[2]?.name==='BRANCH');assert.equal(await p.evaluate(()=>window.__sim.assembly.tiles[2].parent.name),'TARGET');assert.equal(await p.evaluate(()=>window.__sim.assembly.tiles[3].name),'TYRE');
  await p.click('#build');const event=p.waitForEvent('download');await p.click('#save-model');let bytes='';for await(const c of await(await event).createReadStream())bytes+=c;assert.equal(bytes,moved);
+ // Independent right-angle oracle: N-folded TARGET is at (0,-.3,-.3),
+ // rotated -90 degrees about X. Local north/south therefore point down/up.
+ const folded='Body {Core(){N:Frame(angle=90,name=TARGET) W:Frame(angle=0,name=BRANCH){S:Wheel(angle=90,name=TYRE)}}}';
+ const expected={N:[0,-.9,-.3],S:[0,.3,-.3],E:[.6,-.3,-.3],W:[-.6,-.3,-.3]};
+ const near=(actual,wanted,label)=>actual.forEach((v,i)=>assert.ok(Math.abs(v-wanted[i])<1e-6,`${label}[${i}]: ${v} != ${wanted[i]}`));
+ const poses=()=>p.evaluate(()=>{
+  const views=[...window.__scene.views.values()],core=views.find(v=>v.tile.type==='core').mesh.position;
+  return Object.fromEntries(views.filter(v=>v.tile.name).map(v=>[v.tile.name,{p:v.mesh.position.clone().sub(core).toArray(),q:v.mesh.quaternion.toArray()}]));
+ });
+ for(const [dir,position] of Object.entries(expected)){
+  await p.fill('#source',folded);await p.locator('#source').press('Shift+Tab');await p.selectOption('#parts','2');
+  const before=await poses();await p.locator('#placement').evaluate(e=>e.open=true);await p.click('#move-branch');await p.selectOption('#move-parent','1');await p.selectOption('#move-direction',dir);await p.locator('#move-branch-form button[type=submit]').click();
+  const after=await poses();near(after.TARGET.p,[0,-.3,-.3],'parent');near(after.BRANCH.p,position,dir+' branch');near(after.BRANCH.q,[-Math.SQRT1_2,0,0,Math.SQRT1_2],'branch rotation');
+  near(after.TYRE.p,[position[0],position[1]+.3,position[2]+.3],dir+' wheel');near(after.TYRE.q,[0,0,0,1],'wheel rotation');assert.notDeepEqual(after.BRANCH.p,before.BRANCH.p);
+  const relocated=await p.inputValue('#source');await p.click('#edit-undo');assert.equal(await p.inputValue('#source'),folded);assert.deepEqual(await poses(),before);await p.click('#edit-redo');assert.equal(await p.inputValue('#source'),relocated);assert.deepEqual(await poses(),after);assert.match(await p.locator('#parts option:checked').textContent(),/BRANCH/);
+  await p.click('#run');await p.waitForFunction(d=>window.__sim?.assembly.tiles.find(t=>t.name==='BRANCH')?.dir===d&&window.__sim.assembly.tiles.find(t=>t.name==='BRANCH')?.parent?.name==='TARGET',dir);
+  const rest=await p.evaluate(()=>Object.fromEntries(window.__sim.assembly.tiles.filter(t=>t.name).map(t=>[t.name,{p:t.position.toArray(),q:t.quaternion.toArray()}])));
+  for(const name of ['TARGET','BRANCH','TYRE']){near(rest[name].p,after[name].p,name+' runtime rest');near(rest[name].q,after[name].q,name+' runtime orientation')}
+  await p.click('#build');
+ }
+ console.log('Transformed relocation: four edges match independent coordinates, child rotation, preview/runtime rest poses and exact Undo/Redo');
  console.log('Move: named subtree, eligible parents, occupied-edge rejection, cancel/focus, selection, Undo/Redo, runtime parent and exact export pass');
 }finally{await b.close()}

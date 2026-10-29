@@ -1763,3 +1763,32 @@ suite; their prior evidence remains dated to its own sprint.
 Next: check relocation beneath transformed parents, comparing the intended
 local attachment and preview/runtime geometry rather than assuming unchanged
 world-space pose. All changes remain local; no push or deployment.
+
+
+## 2026-10-30 — Relocation under a folded parent (Sprint 59)
+
+Goal: check the geometry of relocating a branch beneath a transformed parent.
+Extended the existing move browser scenario with four directions under a Frame
+folded 90 degrees north. Expected coordinates are independently stated: parent
+center (0,-0.3,-0.3), local north/south pointing down/up, and a nested south-facing
+90-degree wheel whose rotation cancels the parent's fold. Assertions compare
+positions relative to Core to remove the preview's ground-clearance translation.
+
+Validation: Chromium production-preview move scenario passes for all four
+edges. The moved branch and nested wheel positions/quaternions match the
+independent coordinate oracle within 1e-6; runtime assembly rest poses match
+the preview. Exact source and preview poses return on Undo/Redo, and selection
+stays on BRANCH. This checks construction/rest geometry, not moving joints under
+load or preservation of previous world pose. No product defect was observed.
+
+The first test attempt used Tab to leave the source, accidentally inserting a
+tab through its intentional indentation handler. The exact-source Undo assertion
+caught this. Shift+Tab uses the documented exit gesture; the rerun passes.
+
+Retrospective: comparing preview and runtime alone can miss a shared geometry
+error. A hand-calculated right-angle fixture supplies an independent reference,
+while source history assertions also catch unintended test interactions. No
+application code changed, so the Sprint 58 build/unit/full-suite evidence remains
+applicable; only the extended move scenario was rerun. No push/deployment.
+Next: improve identification of parts while building larger models, evaluating
+how to assign names without silently breaking existing script references.
