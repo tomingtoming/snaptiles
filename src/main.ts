@@ -199,7 +199,7 @@ canvas.addEventListener('pointermove', (e) => {
   if (touches.size >= 2) {
     const [a, b] = [...touches.values()];
     const d = Math.hypot(a.x - b.x, a.y - b.y);
-    if (pinchDist > 0) scene.camDist = Math.max(3, Math.min(60, scene.camDist * (pinchDist / Math.max(1, d))));
+    if (pinchDist > 0) scene.camDist = Math.max(builder?.active ? 0.5 : 3, Math.min(60, scene.camDist * (pinchDist / Math.max(1, d))));
     pinchDist = d;
     return;
   }
@@ -219,7 +219,7 @@ canvas.addEventListener('pointercancel', endPointer);
 (window as unknown as { __scene: SceneView }).__scene = scene; // probe hook
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
-  scene.camDist = Math.max(3, Math.min(60, scene.camDist * Math.exp(e.deltaY * 0.001)));
+  scene.camDist = Math.max(builder?.active ? 0.5 : 3, Math.min(60, scene.camDist * Math.exp(e.deltaY * 0.001)));
 }, { passive: false });
 canvas.tabIndex = 0;
 

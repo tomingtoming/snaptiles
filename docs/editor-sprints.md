@@ -123,3 +123,25 @@ not enough to preserve numerical chip references when structure changes;
 that limitation is now explicit. Next: inspect large imported models in the
 browser and resolve concrete editing/accessibility defects before adding more
 features. Public push/deployment still awaits the requested scope confirmation.
+
+## 2026-10-29 — Navigate large models
+
+Goal: reach and recognize small parts in a complex imported model.
+A 294-part model rendered without page errors; importing into the editor took
+18–31 ms across these runs on this machine. Fit-to-model kept every mesh bound inside the
+mobile viewport. Added focus-on-selection and visual Undo/Redo keyboard
+shortcuts. The list now marks the selected row and scrolls it into view;
+indentation is bounded so deep trees do not hide all labels.
+
+Validation: production browser verifies selected-part centering and keyboard
+Undo/Redo alongside prior workflows. Independent screenshot review confirms
+whole-model and focused views, with toolbar/control access on mobile.
+
+Retrospective: a visible whole model is not sufficient for editing its small
+parts. Selection needs both a spatial cue and a list cue. The performance
+measurement is one imported model on one machine, not a general mobile FPS
+claim. A follow-up measurement found the selected row just below the list after a
+desktop-to-mobile resize. Resize-aware row-bound scrolling fixes this; the
+probe now checks the row rectangle is inside the list. Imported model assets
+and screenshots remain local. Next: audit remaining editing limitations and
+turn the highest-value one into the next bounded sprint.

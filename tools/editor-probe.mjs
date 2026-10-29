@@ -98,10 +98,16 @@ try {
  assert.equal(await page.inputValue('#add-type'),'clipboard');
  await page.selectOption('#parts','0'); await page.click('[data-edge="W"]');
  assert.equal(await page.locator('#parts option').count(),5); assert.equal(await page.inputValue('#parts'),'3');
+ await page.click('#focus-part'); await page.waitForTimeout(100);
+ const selectedCenter = await page.evaluate(()=>{const s=window.__scene,id=Number(document.querySelector('#parts').value),m=s.views.get(id).mesh;const p=m.position.clone().project(s.camera);return [p.x,p.y];});
+ assert.ok(Math.hypot(...selectedCenter)<.05,'focus centers the selected part');
+ assert.equal(await page.locator('#parts').evaluate(el=>{const r=el.selectedOptions[0].getBoundingClientRect(),b=el.getBoundingClientRect();return r.top>=b.top && r.bottom<=b.bottom;}),true,'selected row stays visible');
  await page.screenshot({path:`${out}/editor-copy-mobile.png`});
  await page.click('#part-delete'); assert.equal(await page.locator('#parts option').count(),3);
  await page.click('#edit-undo'); assert.equal(await page.locator('#parts option').count(),5);
- await page.click('#edit-undo'); assert.equal(await page.inputValue('#source'),branchSource);
+ await page.focus('#view'); await page.keyboard.press('Control+z'); assert.equal(await page.inputValue('#source'),branchSource);
+ await page.keyboard.press('Control+Shift+z'); assert.equal(await page.locator('#parts option').count(),5);
+ await page.keyboard.press('Control+z'); assert.equal(await page.inputValue('#source'),branchSource);
  assert.deepEqual(errors, []);
  console.log(JSON.stringify({ result: 'pass', count, checks: ['add', 'angle', 'undo-redo', '3D pick', 'save contents', 'run', 'history after run', 'URL reload', 'mobile overflow', 'invalid source recovery', 'motor keys and release', 'orbit and zoom', 'draft reload and undo', 'branch copy/paste/delete/undo'], errors }));
 } finally { await browser.close(); }

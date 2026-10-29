@@ -33,8 +33,17 @@ export class BuildPanel {
     this.type.add(new Option('Core', 'Core'));
     for (const type of TYPES) { this.type.add(new Option(type, type)); this.addType.add(new Option(type, type)); }
     this.restoreButton.onclick = () => { const draft = this.drafts.read(); if (draft) this.edit(() => { this.document.restore(draft.text); this.selected = 0; }, true); };
+    document.getElementById('focus-part')!.onclick = () => { if (this.assembly) this.scene.focusTile(this.selected); };
+    window.addEventListener('keydown', event => {
+      const target = event.target as HTMLElement | null;
+      if (!this.active || target?.matches('input, textarea, select') || target?.isContentEditable || event.repeat) return;
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+        event.preventDefault(); this.edit(() => event.shiftKey ? this.document.redo() : this.document.undo());
+      }
+    });
     document.getElementById('frame-model')!.onclick = () => this.scene.frameModel();
     this.toggle.onclick = () => this.open();
+    new ResizeObserver(() => this.revealSelection()).observe(this.tree);
     this.tree.onchange = () => { this.selected = Number(this.tree.value); this.paintSelection(); };
     this.type.onchange = () => this.edit(() => this.document.type(this.selected, this.type.value));
     this.angle.onchange = () => this.edit(() => { if (!this.angle.value.trim()) throw new Error('角度には数値を入力してください'); const expression = this.document.nodes()[this.selected].attrs.angle ?? '0'; if (this.document.controlStrength(expression) !== null) this.document.setControlStrength(expression, Number(this.angle.value)); else this.document.angle(this.selected, Number(this.angle.value)); });
@@ -126,7 +135,9 @@ export class BuildPanel {
       this.tree.replaceChildren();
       for (const t of assembly.tiles) {
         let depth = 0, parent = t.parent; while (parent) { depth++; parent = parent.parent; }
-        this.tree.add(new Option(`${'　'.repeat(depth)}${t.dir ? t.dir + ': ' : ''}${t.node.type}${t.name ? ' · ' + t.name : ''}`, String(t.id)));
+        const option = new Option(`${'　'.repeat(Math.min(depth, 4))}${depth > 4 ? '… ' : ''}${t.dir ? t.dir + ': ' : ''}${t.node.type}${t.name ? ' · ' + t.name : ''}`, String(t.id));
+        option.dataset.label = option.text;
+        this.tree.add(option);
       }
       this.selected = Math.min(this.selected, assembly.tiles.length - 1);
       if (fit) this.scene.frameModel();
@@ -141,9 +152,19 @@ export class BuildPanel {
     }
     this.undo.disabled = !this.document.undoStack.length; this.redo.disabled = !this.document.redoStack.length;
   }
+  private revealSelection(): void {
+    const option = this.tree.selectedOptions[0];
+    if (!this.active || !option) return;
+    const row = option.getBoundingClientRect(), box = this.tree.getBoundingClientRect();
+    if (row.bottom > box.bottom - 4) this.tree.scrollTop += row.bottom - box.bottom + 4;
+    else if (row.top < box.top + 4) this.tree.scrollTop -= box.top + 4 - row.top;
+  }
   private paintSelection(): void {
     const tile = this.assembly?.tiles[this.selected]; if (!tile) return;
-    this.tree.value = String(this.selected); this.scene.selectTile(tile.id);
+    this.tree.value = String(this.selected);
+    for (const option of this.tree.options) option.text = `${option.selected ? '● ' : ''}${option.dataset.label ?? option.text}`;
+    this.revealSelection();
+    this.scene.selectTile(tile.id);
     this.type.value = TYPES.find(t => t.toLowerCase() === tile.type) ?? 'Core';
     this.type.disabled = !tile.parent;
     const angle = tile.node.attrs.angle ?? '0';

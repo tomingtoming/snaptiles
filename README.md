@@ -71,7 +71,9 @@ Edits are also saved as the latest draft in this browser. After reloading,
 open **組む** and use **下書きを復元** to recover unpublished or unfinished text.
 Restoration is undoable. This is one browser-local draft, not a cloud backup;
 use **保存** for a file. **全体** fits the model to the view and a yellow outline
-marks the selected tile. Drag and zoom work while editing.
+marks the selected tile. **選択へ** zooms to it; the list marks it with ● and
+scrolls it into view. Drag and zoom work while editing. Ctrl/Cmd+Z and
+Ctrl/Cmd+Shift+Z undo/redo visual edits when focus is outside text controls.
 The editor is independently implemented, without RCD/RCM source or assets.
 
 Production-build browser regression: `bun run build && bun run test:editor`

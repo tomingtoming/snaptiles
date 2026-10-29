@@ -272,6 +272,16 @@ export class SceneView {
     this.snap(center);
   }
 
+  focusTile(id: number): void {
+    const view = this.views.get(id); if (!view) return;
+    this.group.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(view.mesh);
+    const radius = bounds.getSize(new THREE.Vector3()).length() / 2;
+    const halfFov = Math.atan(Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) * Math.min(1, this.camera.aspect));
+    this.camDist = Math.max(1, radius / Math.sin(halfFov) * 1.4);
+    this.snap(bounds.getCenter(new THREE.Vector3()));
+  }
+
   updateEditorCamera(): void { this.follow(this.camTarget, 1); }
 
   selectTile(id: number | null): void {
