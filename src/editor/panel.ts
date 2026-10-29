@@ -27,6 +27,7 @@ export class BuildPanel {
   private clipboard: CopiedBranch | null = null;
   private copy = document.getElementById('copy-branch') as HTMLButtonElement;
   private mirror = document.getElementById('mirror-branch') as HTMLButtonElement;
+  private findPart = document.getElementById('find-part') as HTMLButtonElement;
   private namePart = document.getElementById('name-part') as HTMLButtonElement;
   private move = document.getElementById('move-branch') as HTMLButtonElement;
   assembly: Assembly | null = null;
@@ -101,6 +102,7 @@ export class BuildPanel {
       else this.document.bindAngle(this.selected, value);
     });
     document.getElementById('new-model')!.onclick = () => this.edit(() => { this.document.newModel(); this.selected = 0; }, true);
+    this.findPart.onclick = () => this.openPartSearch();
     this.namePart.onclick = () => this.openPartName();
     this.move.onclick = () => this.openMoveBranch();
     this.mirror.onclick = () => this.edit(() => { this.selected = this.document.mirrorBranch(this.selected); });
@@ -240,7 +242,7 @@ export class BuildPanel {
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = false);
     } catch (e) {
       this.assembly = null; this.tree.replaceChildren(); this.scene.clearModel();
-      this.type.disabled = this.angle.disabled = this.remove.disabled = this.copy.disabled = this.mirror.disabled = this.move.disabled = this.namePart.disabled = true;
+      this.type.disabled = this.angle.disabled = this.remove.disabled = this.copy.disabled = this.mirror.disabled = this.move.disabled = this.namePart.disabled = this.findPart.disabled = true;
       this.sourceHelp.hidden = true; this.sourceHelp.replaceChildren();
       this.powerRow.hidden = this.angleRow.hidden = true; this.angleSettings.disabled = true; this.angleSettings.setAttribute('aria-expanded','false');
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = true);
@@ -254,6 +256,44 @@ export class BuildPanel {
     const row = option.getBoundingClientRect(), box = this.tree.getBoundingClientRect();
     if (row.bottom > box.bottom - 4) this.tree.scrollTop += row.bottom - box.bottom + 4;
     else if (row.top < box.top + 4) this.tree.scrollTop -= box.top + 4 - row.top;
+  }
+  private openPartSearch(): void {
+    if (!this.assembly) return;
+    const dialog = document.getElementById('part-search-dialog') as HTMLDialogElement;
+    const input = document.getElementById('part-search-input') as HTMLInputElement;
+    const results = document.getElementById('part-search-results') as HTMLSelectElement;
+    const submit = document.getElementById('part-search-select') as HTMLButtonElement;
+    const status = document.getElementById('part-search-status')!;
+    const tiles = this.assembly.tiles, original = this.document.text;
+    let chosen = false;
+    const detail = () => { document.getElementById('part-search-detail')!.textContent = results.selectedOptions[0]?.text ?? ''; };
+    results.onchange = detail;
+    const filter = () => {
+      const previous = results.value, query = input.value.trim().toUpperCase();
+      results.replaceChildren();
+      for (const tile of tiles) {
+        if (query && !`${tile.node.type} ${tile.name ?? ''}`.toUpperCase().includes(query)) continue;
+        const parent = tile.parent;
+        const context = parent ? `（親: ${parent.name ?? parent.node.type} / ${tile.dir}）` : '（根）';
+        results.add(new Option(`${tile.node.type}${tile.name ? ' · ' + tile.name : ''} ${context}`,String(tile.id)));
+      }
+      const retained = [...results.options].find(o => o.value === previous);
+      results.value = retained?.value ?? results.options[0]?.value ?? '';
+      detail(); submit.disabled = results.selectedIndex < 0;
+      status.textContent = results.options.length ? `${results.options.length}件。選んで「選択へ」を押すと、その部品を表示します。` : '該当する部品がありません';
+    };
+    input.value = ''; results.replaceChildren(); filter(); results.value = String(this.selected); detail();
+    input.oninput = filter;
+    document.getElementById('part-search-cancel')!.onclick = () => dialog.close();
+    dialog.onclose = () => { if (chosen) this.tree.focus(); else this.findPart.focus(); };
+    (document.getElementById('part-search-form') as HTMLFormElement).onsubmit = event => {
+      event.preventDefault();
+      if (this.document.text !== original) { status.textContent = 'モデルが変更されました。閉じて探し直してください。'; return; }
+      if (results.selectedIndex < 0) return;
+      this.selected = Number(results.value); this.paintSelection(); this.scene.focusTile(this.selected);
+      chosen = true; dialog.close();
+    };
+    dialog.showModal(); input.focus();
   }
   private openPartName(): void {
     const dialog = document.getElementById('part-name-dialog') as HTMLDialogElement;
@@ -340,7 +380,7 @@ export class BuildPanel {
     this.scene.selectTile(tile.id);
     this.type.value = TYPES.find(t => t.toLowerCase() === tile.type) ?? 'Core';
     this.type.disabled = !tile.parent;
-    this.namePart.disabled = false;
+    this.namePart.disabled = this.findPart.disabled = false;
     this.color.value = this.scene.tileColorHex(tile.id);
     this.color.disabled = !!tile.node.attrs.color && !exprIsConstant(tile.node.attrs.color);
     this.resetColor.disabled = this.color.disabled || !tile.node.attrs.color;

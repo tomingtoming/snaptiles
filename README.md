@@ -250,3 +250,11 @@ Scripts are not rewritten on rename/removal; inspect references in the source.
 This is a script identifier, not a free-form display label. Existing named-branch
 copy/mirror restrictions still apply. Script-defined globals are not analyzed
 for collisions by this dialog.
+
+
+**探す…** beside the part list searches names and types by case-insensitive
+substring. Select a result and press **選択へ** (or Enter from the search input)
+to select and focus that part. The full selected result and parent/direction are
+shown below the result list, including when a long option is clipped. Search
+and cancellation preserve source and Undo/Redo history; each opening uses the
+current model, including renamed parts. Invalid source disables the search.

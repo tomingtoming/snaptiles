@@ -26,7 +26,7 @@
           <button id="restore-draft" type="button" aria-describedby="draft-description">下書きを復元</button>
         </div>
         <div id="editor-toolbar" class="edit-row"><button id="new-model">新規</button><button id="frame-model">全体</button><button id="focus-part">選択へ</button><button id="save-model">保存</button><button id="share-model">共有リンク</button><button id="copy-branch">コピー</button><button id="mirror-branch" type="button" title="親部品の反対側へ枝を反転して複製">反対側へ</button><button id="rename-model" type="button">保存名</button><button id="edit-undo" aria-label="取り消し">↶</button><button id="edit-redo" aria-label="やり直し">↷</button></div>
-        <label>部品<select id="parts" size="5"></select></label>
+        <div class="parts-heading"><label for="parts">部品</label><button id="find-part" type="button">探す…</button></div><select id="parts" size="5"></select>
         <div class="edit-row"><label>種類<select id="part-type"></select></label><label><span class="angle-heading"><span id="angle-label">角度</span><button id="angle-settings" type="button" aria-label="角度の操作設定" aria-controls="angle-control-row" aria-expanded="false" title="角度の操作設定を開閉">操作</button></span><input id="part-angle" type="text" inputmode="decimal" /></label><label id="option-field" hidden><span id="option-label">設定</span><select id="part-option"></select></label><button id="part-delete">削除</button></div>
         <div id="angle-control-row" class="edit-row" hidden><label>角度の操作<select id="angle-control"></select></label></div>
         <div id="power-row" class="edit-row" hidden><label><span id="power-label">出力</span><input id="part-power" type="text" inputmode="decimal" /></label><label>操作<select id="power-control"></select></label></div>
@@ -61,6 +61,16 @@
         <p id="filename-preview" role="status"></p>
         <p>このブラウザでの保存名です。共有リンクには含まれません。</p>
         <div class="share-actions"><button id="filename-cancel" type="button">キャンセル</button><button type="submit">名前を設定</button></div>
+      </form>
+    </dialog>
+    <dialog id="part-search-dialog" aria-labelledby="part-search-title">
+      <form id="part-search-form">
+        <h2 id="part-search-title">部品を探す</h2>
+        <label>名前・種類<input id="part-search-input" type="search" autocomplete="off" spellcheck="false" /></label>
+        <label>検索結果<select id="part-search-results" size="5" aria-describedby="part-search-detail"></select></label>
+        <p id="part-search-detail" aria-live="polite"></p>
+        <p id="part-search-status" role="status"></p>
+        <div class="share-actions"><button id="part-search-cancel" type="button">キャンセル</button><button id="part-search-select" type="submit">選択へ</button></div>
       </form>
     </dialog>
     <dialog id="part-name-dialog" aria-labelledby="part-name-title">
@@ -105,6 +115,7 @@
         <li><strong>▶ 実行</strong>で試運転。表示されたキーで操縦し、<strong>組む</strong>で編集へ戻ります。</li>
         <li><strong>保存名</strong>で名前を付け、<strong>保存</strong>でファイルへ、<strong>開く</strong>で読込。<strong>共有リンク</strong>は今の編集内容を渡せます。下書きはこのブラウザに最新の1件が保存され、復元後はUndoで戻せます。</li>
       </ol>
+      <p><strong>部品を探す：</strong>部品一覧の「探す…」から、名前・種類を部分一致で検索できます。結果を選んで「選択へ」を押すと部品を選択し、画面もその部品へ移動します。検索はモデルやUndo履歴を変更しません。</p>
       <p><strong>部品名：</strong>「名前・接続先」の「部品名…」で設定・解除できます。名前は大文字で保存され、一覧とスクリプトで使えます。変更・解除してもソース内の参照は書き換えません。名前付きの枝はコピー・反転できません。</p>
       <p><strong>枝の移動：</strong>部品を選び「名前・接続先」を開いて「枝を移動…」を押すと、子ごと別の親・方向へ移せます。名前は保たれますが、部品番号や姿勢が変わる場合があります。スクリプトの番号参照は自動では直しません。</p>
       <p id="shared-control-help"><strong>強さの共有：</strong>「最大角度（共通）」「最大出力（共通）」を変えると、同じ操作変数を使う部品がまとめて変わります。1つの部品だけ変えるには、その操作の一覧で「この部品用に分ける」を選んでから強さを調整します。キー・逆向き・保持設定は引き継がれ、分けた後も同じキーで動きます。別のキーで動かしたい場合は、そのキーの操作を追加してください。</p>

@@ -1827,3 +1827,38 @@ namespace. Explicit scope, collision guards and reversible narrow edits matter
 more than silently rewriting arbitrary program text. Next: make named parts
 easier to locate in a large construction, using the existing part list. No push
 or deployment.
+
+
+## 2026-10-30 — Find parts in larger models (Sprint 61)
+
+Goal: locate and edit named parts without scrolling through a large construction.
+Added 探す… beside the part list. The modal searches current type/name strings
+by case-insensitive substring, shows parent/direction context and an explicit
+empty state, and selects/focuses the chosen part on submit. Enter from the
+query submits; cancel returns focus to the trigger. Selection returns focus to
+the original part list. Search does not mutate source or add history entries.
+Every opening derives results from the current assembly; invalid source disables
+the trigger, and submitting against changed source is rejected.
+
+Validation: fresh production build and Chromium search/guide workflows pass.
+A 101-part fixture covers type/name matching, no results, cancel, keyboard
+submission, selected 3D identity, source/history preservation, actual angle
+editing, rename refresh and invalid-source recovery. The short-height and
+keyboard workflows also pass after adding the trigger. Firefox passes the same
+search workflow on the dev server. Default Chromium runner now has 37 scripts;
+this was targeted validation, not another full-suite run. No document-model
+logic changed, so no additional unit tests were added for this UI operation.
+
+Visual check at 320x568 initially exposed clipped parent context in native
+select options. Added a wrapping full-text selected-result description beneath
+the list. The new screenshot shows the complete selected name, parent and edge,
+query, result count and both buttons. Native options can still clip long text;
+the separate description is the readable path. Physical mobile keyboards remain
+outside the validation scope.
+
+Retrospective: filtering must help find identity without disrupting editing
+history, and a native result list alone does not provide readable long labels
+on narrow screens. Keep context visible after filtering and rederive it after
+model edits. Next: review the combined naming/search/relocation workflow across
+browser engines and check for stale selections as the structure changes.
+No push or deployment; existing build warnings remain.
