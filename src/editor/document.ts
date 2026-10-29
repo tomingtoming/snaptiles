@@ -266,14 +266,13 @@ export class ModelDocument {
     const root = this.nodes()[index];
     if (!root?.dir) throw new Error('Core以外の枝を選んでください');
     const nodes = this.nodes().filter(n => n.source!.start >= root.source!.start && n.source!.end <= root.source!.end);
-    if (nodes.some(n => n.attrs.name)) throw new Error('名前付きの枝は、識別名を調整してソースで複製してください');
     const text = this.text.slice(root.source!.start, root.source!.end);
     const words = new Set(text.toUpperCase().match(/[A-Z_][A-Z0-9_]*/g));
     return {text, count:nodes.length, variables:parseRc(this.text).vals.filter(v=>words.has(v.name.toUpperCase())).map(v=>v.name.toUpperCase())};
   }
   /** Reflect a branch across its parent's local plane to the opposite attachment edge. */
   mirrorBranch(index: number): number {
-    const branch = this.copyBranch(index); // Retain the copy guard against duplicate names.
+    const branch = this.copyBranch(index);
     const nodes = this.nodes(), root = nodes[index];
     const parentIndex = nodes.findIndex(n => n.children.includes(root));
     if (parentIndex < 0 || !root.dir) throw new Error('Core以外の枝を選んでください');
@@ -312,11 +311,30 @@ export class ModelDocument {
     this.pasteBranch(parentIndex, mirrored[0] as 'N'|'S'|'E'|'W', {...branch,text:mirrored});
     return next;
   }
+  /** Allocate at paste time so repeated pastes and later destination edits cannot collide. */
+  private freshBranchNames(text: string): string {
+    const prefix = 'Body {Core(){';
+    const branch = new ModelDocument(prefix + text + '}}');
+    const occupied = new Set((this.text + '\n' + text).toUpperCase().match(/[A-Z_][A-Z0-9_]*/g));
+    const edits: [number,number,string][] = [];
+    for (const node of branch.nodes().slice(1)) {
+      if (!node.attrs.name) continue;
+      const original = node.attrs.name.replace(/\s/g,'').toUpperCase();
+      const base = /^[A-Z][A-Z0-9_]*$/.test(original) ? original : 'PART';
+      let number = 1, name: string;
+      do { name = `${base}_COPY_${number++}`; } while (occupied.has(name));
+      occupied.add(name);
+      const [start,end] = node.source!.attributes.name;
+      edits.push([start-prefix.length,end-prefix.length,name]);
+    }
+    for (const [start,end,name] of edits.sort((a,b)=>b[0]-a[0])) text = text.slice(0,start)+name+text.slice(end);
+    return text;
+  }
   pasteBranch(index: number, dir: 'N' | 'S' | 'E' | 'W', branch: CopiedBranch): void {
     const names = new Set(parseRc(this.text).vals.map(v=>v.name.toUpperCase()));
     if (branch.variables.some(name=>!names.has(name))) throw new Error('貼り付け元の操作変数がありません。元のモデルで貼り付けてください');
     const s = this.nodes()[index].source!;
-    const child = `\n  ${dir}${branch.text.slice(1)}\n`;
+    const child = `\n  ${dir}${this.freshBranchNames(branch.text).slice(1)}\n`;
     if (s.close !== undefined) this.replace(s.close, s.close, child);
     else this.replace(s.headerEnd, s.headerEnd, ` {${child}}`);
   }

@@ -49,8 +49,8 @@ with one Core; Undo restores the previous model. Select a part in the 3D view
 or list. Add parts at N/S/E/W, change their type or angle, or delete a branch.
 Yellow letters and endpoint dots show the selected part's actual attachment
 edges. **コピー** copies a branch to another selected parent/edge; its expressions
-and controls remain shared. Named branches are rejected to avoid duplicate
-identities, and referenced variables must already exist. Core cannot be deleted
+and controls remain shared. Named parts receive fresh `_COPY_n` names at paste time; expressions and
+script references retain their original targets. Referenced variables must already exist. Core cannot be deleted
 or copied. Adding/removing parts changes numerical chip indices; Lua that uses
 those numbers may need manual updates.
 
@@ -59,7 +59,7 @@ one undoable operation, selecting the new branch. It mirrors nested attachment
 directions, reverses Rudder/Trim angles and Wheel/RLW power, and swaps triangular
 Cowl shapes. Ordinary fold angles and Jet/Arm power stay unchanged. Variables
 remain shared; scripts and numerical part references are not rewritten. An
-occupied opposite edge, named branch or expression-controlled Cowl shape is
+occupied opposite edge or expression-controlled Cowl shape is
 rejected instead of silently overlapping or guessing.
 
 Wheel/RLW/Jet/Arm power can be constant, bound to an existing Val, or assigned
@@ -119,7 +119,7 @@ surface geometry and isolated airborne axis responses. These checks do not
 establish trimmed cruise or original-engine flight fidelity.
 
 `bun run test:editor:scale` checks 101 named parts with 100 generated controls,
-strength/history changes, named-branch guards and a Lua model colour edit with
+strength/history changes, named-branch duplication and a Lua model colour edit with
 exact-byte export/reopening. It reports selection timings without a machine-
 dependent timing threshold. Control metadata is cached only for unchanged source;
 altered or duplicate declarations stay source-edited.
@@ -247,8 +247,8 @@ stored in uppercase. Other part names and Val/Var names cannot collide. The
 part list updates immediately; changes support Undo/Redo and survive file/share
 round trips. Empty input removes all name attributes while preserving comments.
 Scripts are not rewritten on rename/removal; inspect references in the source.
-This is a script identifier, not a free-form display label. Existing named-branch
-copy/mirror restrictions still apply. Script-defined globals are not analyzed
+This is a script identifier, not a free-form display label. Copies and mirrors allocate fresh part names while leaving existing expression
+and script references intact. Script-defined globals are not analyzed
 for collisions by this dialog.
 
 

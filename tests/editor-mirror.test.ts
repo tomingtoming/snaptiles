@@ -48,7 +48,6 @@ Body { Core(){ N:Chip(angle=31){ ${edge}:Rudder(angle=A){
  });
  for(const source of [
   'Body { Core(){E:Chip() W:Chip()} }',
-  'Body { Core(){E:Chip(name=LEFT)} }',
   'Val { SHAPE(default=3) } Body { Core(){E:Cowl(option=SHAPE)} }'
  ]) it('rejects ambiguous duplication without changing history or source',()=>{
   const d=new ModelDocument(source);expect(()=>d.mirrorBranch(1)).toThrow();expect(d.text).toBe(source);expect(d.undoStack).toHaveLength(0);

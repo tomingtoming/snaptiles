@@ -1894,3 +1894,44 @@ Next: address the usability gap where newly naming a branch prevents copy/mirror
 assessing fresh names for copies while retaining original references deliberately.
 Default suite remains 37 scripts; no full-suite rerun for this test-only change.
 No push or deployment.
+
+
+## 2026-10-30 — Duplicate named branches with fresh identities (Sprint 63)
+
+Goal: remove the usability conflict between naming parts and copying/mirroring
+them. Named branches are now accepted. At each paste, effective name attribute
+values in the copied subtree receive unique NAME_COPY_n identifiers; allocation
+checks case-insensitive identifier tokens in both destination source and copied
+text, including variables, Lua, and comments. Allocation happens at paste time,
+so repeated pastes and destination changes do not reuse names. Imported names
+outside the GUI identifier syntax use PART as the generated base. Original
+source, expressions, controls and script references retain their targets.
+
+Mirror continues its existing direction/angle/wheel-power/Cowl transformations,
+then uses the same name allocation. Copy does not create history; each paste or
+mirror is one reversible edit. The occupied-opposite-edge, dynamic Cowl shape,
+Core and missing-variable guards remain. Removed the old named-branch refusal
+from tests, guide and README; naming guidance now describes the fresh-name rule.
+This is not script cloning or automatic rebinding of expressions to new parts.
+
+Validation: 171 tests in 24 files pass; production build passes with existing
+warnings. New unit cases cover nested names, variables/Lua occupying candidate
+names, repeated paste, destination collisions, original-reference preservation,
+imported duplicate identifiers, mirror sign and exact Undo/Redo. Two initial
+test assertions incorrectly included script line metadata and parser-inserted
+expression spacing; corrected them to compare preserved script source and the
+normalized power expression. Original-text assertions remain exact.
+
+Chromium production flows pass for named duplication, existing mirror geometry,
+101-part scale and guide. The new flow checks two fresh copied name sets,
+original Lua, actual Z input giving original/copy power +1000 and reflected power
+-1000, release, name search, exact download and fresh shared identities. The
+scale flow now verifies named subtree reflection and exact Undo instead of the
+retired refusal. Default suite has 38 scripts; no full-suite rerun this sprint.
+
+Retrospective: adding names should not remove basic construction operations.
+Fresh identities resolve the collision, but shared program references must remain
+explicit rather than being guessed. Allocation at paste time is essential for
+clipboard reuse. Next: examine paste across models and ensure external reference
+requirements are explained and checked where they can be determined. No push
+or deployment.

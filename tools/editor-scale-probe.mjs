@@ -12,8 +12,8 @@ try{
  assert.equal(await page.inputValue('#parts'),'80');assert.match(await page.locator('#angle-control option:checked').textContent(),/← \/ →/);
  await page.fill('#part-angle','45');await page.locator('#part-angle').press('Tab');assert.equal(await page.inputValue('#part-angle'),'45');
  const changed=await page.inputValue('#source');assert.ok(changed.includes('name=PART_80'));await page.click('#edit-undo');assert.equal(await page.inputValue('#source'),source);assert.equal(await page.inputValue('#part-angle'),'30');await page.click('#edit-redo');assert.equal(await page.inputValue('#source'),changed);assert.equal(await page.inputValue('#part-angle'),'45');
- await page.click('#copy-branch');assert.match(await page.locator('#status').textContent(),/名前付き/);assert.equal(await page.inputValue('#source'),changed);
- await page.click('#mirror-branch');assert.match(await page.locator('#status').textContent(),/名前付き/);assert.equal(await page.inputValue('#source'),changed);
+ await page.click('#copy-branch');assert.equal(await page.locator('#status').textContent(),'');assert.equal(await page.inputValue('#source'),changed);
+ await page.click('#mirror-branch');assert.match(await page.locator('#parts option:checked').textContent(),/PART_80_COPY_1/);assert.equal(await page.locator('#parts option').count(),122);await page.click('#edit-undo');assert.equal(await page.inputValue('#source'),changed);
  // Existing Lua-driven model: edit one colour token, export, reopen and compare every byte.
  await page.goto(url+'#walker');await page.waitForFunction(()=>window.__sim?.model?.vals.some(v=>v.name==='FL_H'));const original=await page.inputValue('#source');
  const range=await page.evaluate(()=>window.__sim.assembly.tiles[2].node.source.attributes.color);
@@ -22,5 +22,5 @@ try{
  const expected=original.slice(0,range[0])+'#abcdef'+original.slice(range[1]);assert.equal(await page.inputValue('#source'),expected);
  const event=page.waitForEvent('download');await page.click('#save-model');const download=await event,stream=await download.createReadStream(),chunks=[];for await(const c of stream)chunks.push(c);const bytes=Buffer.concat(chunks);assert.equal(bytes.toString(),expected);
  await page.setInputFiles('#model-file',{name:download.suggestedFilename(),mimeType:'text/plain',buffer:bytes});await page.waitForFunction(()=>window.__sim&& !document.body.classList.contains('building'));assert.equal(await page.inputValue('#source'),expected);assert.equal(await page.evaluate(()=>window.__sim.scriptError),null);
- assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'scale and scripted import pass',parts:101,controls:100,selectionMs:times,medianMs:[...times].sort((a,b)=>a-b)[2],checks:['control labels','strength/Undo/Redo','named-copy/mirror guard','Lua exact-byte colour edit/export/reopen']}));
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'scale and scripted import pass',parts:101,controls:100,selectionMs:times,medianMs:[...times].sort((a,b)=>a-b)[2],checks:['control labels','strength/Undo/Redo','named-copy/mirror with fresh names and Undo','Lua exact-byte colour edit/export/reopen']}));
 }finally{await browser.close()}
