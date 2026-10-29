@@ -302,10 +302,6 @@ export class SceneView {
       this.selectionBox.renderOrder = 10;
       this.scene.add(this.selectionBox);
     }
-    for (const [key, v] of this.views) {
-      v.material.emissive.setHex(key === id ? 0xffb000 : 0x000000);
-      v.material.emissiveIntensity = key === id ? 0.65 : 0;
-    }
   }
 
   pickTile(x: number, y: number): number | null {
@@ -321,6 +317,8 @@ export class SceneView {
     }
     return null;
   }
+
+  tileColorHex(id: number): string { return `#${this.views.get(id)?.material.color.getHexString() ?? 'cccccc'}`; }
 
   private applyColor(v: TileView, env: ValEnv): void {
     const t = v.tile;

@@ -1,3 +1,4 @@
+import { exprIsConstant } from '../rc/expr';
 import { parseRc, findBlocks, declarationRanges, type ChipNode } from '../rc/parser';
 
 interface DocumentState { text: string; filename?: string }
@@ -46,6 +47,12 @@ export class ModelDocument {
     if (n.attrs.angle && !Number.isFinite(Number(n.attrs.angle.replace(/\s/g, ''))))
       throw new Error('変数で制御する角度はソースで編集してください');
     this.replace(...this.attributeEdit(index, 'angle', String(value)));
+  }
+  color(index: number, value: string): void {
+    if (!/^#[0-9a-f]{6}$/i.test(value)) throw new Error('色は6桁のRGB値で指定してください');
+    const node = this.nodes()[index];
+    if (node.attrs.color && !exprIsConstant(node.attrs.color)) throw new Error('変数で制御する色はソースで編集してください');
+    this.replace(...this.attributeEdit(index, 'color', value.toLowerCase()));
   }
   option(index: number, value: number): void {
     const node = this.nodes()[index], settings = OPTION_SETTINGS[node.type.toLowerCase()];

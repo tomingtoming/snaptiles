@@ -131,3 +131,5 @@ node tools/shot.mjs http://127.0.0.1:5173/ .shots/x ArrowUp:2000   # screenshots
 AGPL-3.0-or-later.
 
 Wheel/RLW parts expose three radius choices (0.30/0.45/0.60 m); Weight parts expose mass multipliers up to 8. These edit `option` and support Undo/Redo. Existing option expressions remain source-only. Larger wheels are lifted clear of the ground in the construction preview; simulation spawn behavior is unchanged.
+
+Expand **色** to set a selected part’s fixed RGB color, including Core. Undo restores the previous color. Variable-driven colors remain source-only; Lua can still override color during simulation.

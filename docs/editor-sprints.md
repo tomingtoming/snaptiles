@@ -308,3 +308,26 @@ assertion treated Weight as a separate body; fixed parts share one body, so the
 correct probe sums unique bodies and includes Core. These checks establish this
 editor/runtime path, not new original-executable calibration. Next: assess
 appearance controls so builders can distinguish and personalize their parts.
+
+## 2026-10-29 — Paint parts without changing dynamic color expressions
+
+Goal: distinguish and personalize parts from the construction UI. A collapsed
+Color section exposes the selected part's current rendered RGB as a native
+color input. Core and other parts support fixed-color edits with source-range
+replacement and Undo/Redo. Variable/expression-driven colors are read-only in
+this UI with a source-edit hint. Lua may still override a literal color at run
+time; this editor does not attempt to rewrite or analyze those scripts.
+
+Validation: 68 unit tests and typecheck/build pass. Browser checks compare
+material RGB for Core and Chip, Undo/Redo, runtime colors, and an exact-source
+share-link round trip in a second page. A variable-driven color disables the
+picker. Native platform picker appearance is not tested by these scripted
+color input events. Independent mobile image review confirms the color section
+is readable and the two colored parts remain fully visible.
+
+Retrospective: material RGB assertions initially passed while the selected blue
+Core looked purple in the screenshot. Selection added yellow emissive light.
+Removed that tint and retained the yellow outline/list marker; a new no-tint
+assertion and re-review confirm the blue face remains blue while selected.
+Next: check how builders return from a custom color to the type's default,
+without undoing later unrelated construction edits.

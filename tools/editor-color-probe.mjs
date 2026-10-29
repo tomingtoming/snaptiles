@@ -1,0 +1,33 @@
+import {chromium} from 'playwright';
+import assert from 'node:assert/strict';
+import {fileURLToPath} from 'node:url';
+const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+try {
+ const page=await browser.newPage({viewport:{width:390,height:844}});
+ await page.goto(process.argv[2]??'http://127.0.0.1:5175/'); await page.waitForFunction(()=>window.__sim);
+ await page.click('#build'); await page.click('#new-model'); await page.click('[data-edge="N"]');
+ await page.click('#appearance summary');
+ const original=await page.inputValue('#part-color');
+ await page.fill('#part-color','#ff2255'); await page.locator('#part-color').dispatchEvent('change');
+ assert.equal(await page.evaluate(()=>window.__scene.tileColorHex(1)),'#ff2255');
+ await page.click('#edit-undo'); assert.equal(await page.inputValue('#part-color'),original);
+ await page.click('#edit-redo'); assert.equal(await page.inputValue('#part-color'),'#ff2255');
+ await page.selectOption('#parts','0'); await page.fill('#part-color','#2255ff'); await page.locator('#part-color').dispatchEvent('change');
+ assert.equal(await page.evaluate(()=>window.__scene.tileColorHex(0)),'#2255ff');
+ assert.equal(await page.evaluate(()=>window.__scene.views.get(0).material.emissive.getHex()),0);
+ await page.locator('#part-color').scrollIntoViewIfNeeded();
+ await page.screenshot({path:fileURLToPath(new URL('../.shots/editor-color-mobile.png',import.meta.url))});
+ const source=await page.inputValue('#source');
+ await page.click('#run'); await page.waitForFunction(()=>window.__sim?.assembly?.tiles[0]?.color===0x2255ff);
+ assert.equal(await page.evaluate(()=>window.__scene.tileColorHex(1)),'#ff2255');
+ await page.click('#build');
+ await page.click('#share-model'); await page.waitForFunction(()=>document.querySelector('#share-url').value);
+ const link=await page.inputValue('#share-url'); const receiver=await browser.newPage();
+ await receiver.goto(link); await receiver.waitForFunction(()=>window.__sim?.assembly?.tiles[0]?.color===0x2255ff);
+ assert.equal(await receiver.inputValue('#source'),source); assert.equal(await receiver.evaluate(()=>window.__scene.tileColorHex(1)),'#ff2255'); await receiver.close();
+ await page.keyboard.press('Escape');
+ await page.fill('#source','Val { C(default=255) } Body { Core(color=C) }');
+ assert.equal(await page.locator('#part-color').isDisabled(),true);
+ assert.ok((await page.locator('#color-note').textContent()).includes('C'));
+ console.log('Colors: rendered RGB, undo/redo, Core, runtime, share round-trip and variable protection pass');
+} finally {await browser.close();}

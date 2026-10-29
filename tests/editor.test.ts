@@ -174,3 +174,21 @@ describe('wheel and ballast options', () => {
     expect(d.text).toBe(before);
   });
 });
+
+
+describe('part colors', () => {
+  it('sets Core and part colors without changing other attributes or Lua', () => {
+    const text = 'Body { Core() { N:Chip(color=#aabbcc, angle=25) } }\nLua { -- keep\n }';
+    const d = new ModelDocument(text);
+    d.color(1, '#12AB34'); expect(d.text).toBe(text.replace('#aabbcc','#12ab34'));
+    d.undo(); expect(d.text).toBe(text);
+    d.color(0,'#0044ff'); expect(d.nodes()[0].attrs.color).toBe('#0044ff');
+    d.undo(); expect(d.text).toBe(text);
+  });
+  it('protects variable colors and rejects invalid hex input', () => {
+    const d = new ModelDocument('Val { C(default=255) } Body { Core(color=C) }');
+    const before=d.text;
+    expect(()=>d.color(0,'#00ff00')).toThrow(); expect(()=>d.color(0,'red')).toThrow();
+    expect(d.text).toBe(before);
+  });
+});
