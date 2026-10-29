@@ -145,3 +145,25 @@ desktop-to-mobile resize. Resize-aware row-bound scrolling fixes this; the
 probe now checks the row rectangle is inside the list. Imported model assets
 and screenshots remain local. Next: audit remaining editing limitations and
 turn the highest-value one into the next bounded sprint.
+
+## 2026-10-29 — Cancel obsolete loads and release simulation resources
+
+Goal: keep rapid run/edit switches consistent with the latest user request.
+A controlled delayed start reproduced an older TAG=1 model replacing TAG=2
+while the source still showed TAG=2. The previous world was never freed.
+Load generations now guard model installation, file reads, URL decoding and
+share-hash publication. Entering the builder cancels pending installation.
+Simulation disposal closes Lua and frees Rapier once, including failed and
+obsolete candidates. Failed runs do not replace the last successful share URL.
+
+Validation: 61 unit tests pass, typecheck/build pass, and all three production
+browser probes pass. The new probe holds and releases starts explicitly to
+check latest-request selection, cancellation into editing, failed-start cleanup
+and subsequent recovery. A unit test checks world release even when Lua cleanup
+throws. Existing GUI-built car still travels 7.005 m in the two-second drive.
+
+Retrospective: single successful runs missed both ordering and lifetime bugs.
+A reproducible reversed completion order is stronger evidence than repeated
+fast clicks. Cleanup call counts establish ownership, not a claim of constant
+browser memory usage. Next: audit reopening saved work and file-import failure
+paths. Public push/deployment remains pending the requested scope decision.

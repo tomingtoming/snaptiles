@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { initRapier } from '../src/physics/world';
 import { Simulation } from '../src/sim/simulation';
 import { KeyState } from '../src/input/keys';
@@ -216,4 +216,21 @@ it('balances symmetric airborne folds without rolling the core or translating th
     expect(Math.abs(q.z)).toBeLessThan(1e-6);
     centre().forEach((v,i)=>expect(Math.abs(v-before[i])).toBeLessThan(1e-6));
   } finally {await sim.lua.dispose();sim.physics.world.free();}
+});
+
+describe('simulation resource ownership', () => {
+  it('frees the physics world once even if Lua cleanup fails', async () => {
+    const sim = new Simulation(await initRapier(), CAR, fakeKeys());
+    await sim.start();
+    const original = sim.lua.dispose.bind(sim.lua);
+    const lua = vi.spyOn(sim.lua, 'dispose').mockImplementation(async () => {
+      await original();
+      throw new Error('cleanup failed');
+    });
+    const free = vi.spyOn(sim.physics.world, 'free');
+    await expect(sim.dispose()).rejects.toThrow('cleanup failed');
+    await sim.dispose();
+    expect(lua).toHaveBeenCalledTimes(1);
+    expect(free).toHaveBeenCalledTimes(1);
+  });
 });

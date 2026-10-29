@@ -89,6 +89,14 @@ export class Simulation {
     return c;
   };
 
+  private disposed = false;
+  async dispose(): Promise<void> {
+    if (this.disposed) return;
+    this.disposed = true;
+    try { await this.lua.dispose(); }
+    finally { this.physics.world.free(); }
+  }
+
   async start(): Promise<void> {
     this.assembly = assemble(this.model, this.env);
     if (!this.assembly) throw new Error('Body section is missing');

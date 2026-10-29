@@ -30,35 +30,53 @@ let lastCoreVel: { x: number; y: number; z: number } | null = null;
 const crateVel: ({ x: number; y: number; z: number } | null)[] = [];
 const scene = new SceneView(canvas);
 let sim: Simulation | null = null;
+let loadGeneration = 0;
 let builder: BuildPanel;
 let keyCaps: { el: HTMLElement; n: number }[] = [];
 
 const R = await initRapier();
 
-async function load(source: string): Promise<void> {
+async function load(source: string, request: number): Promise<boolean> {
+  if (request !== loadGeneration) return false;
   builder?.close();
   paused = false;
   statusEl.textContent = '';
+  valsEl.textContent = outEl.textContent = '';
+  keysEl.replaceChildren(); keyCaps = [];
+  sfx.update(0, 0);
   const old = sim;
   sim = null;
-  if (old) await old.lua.dispose();
+  (window as unknown as { __sim: Simulation | null }).__sim = null;
+  let next: Simulation | null = null;
   try {
+    if (old) await old.dispose();
+    if (request !== loadGeneration) return false;
     const t0 = performance.now();
-    const next = new Simulation(R, source, keys);
+    next = new Simulation(R, source, keys);
     const t1 = performance.now();
     await next.start();
+    if (request !== loadGeneration) { await next.dispose(); return false; }
     const t2 = performance.now();
     sim = next;
-    (window as unknown as { __sim: Simulation }).__sim = next; // probe hook for tools/
+    (window as unknown as { __sim: Simulation }).__sim = next;
     scene.rebuild(next.assembly!.tiles, next.env);
+    scene.setLines3d([]);
     const t3 = performance.now();
-    (window as unknown as { __loadTimes: number[] }).__loadTimes = [t1 - t0, t2 - t1, t3 - t2].map((v) => Math.round(v)); // parse, physics+script, meshes
+    (window as unknown as { __loadTimes: number[] }).__loadTimes = [t1 - t0, t2 - t1, t3 - t2].map(v => Math.round(v));
     scene.camYaw = 0.7;
     scene.snap(next.corePosition());
+    acc = 0; last = performance.now(); lastCoreVel = null; lastShells = 0; crateVel.length = 0;
     buildKeyCaps(next);
     if (next.scriptError) statusEl.textContent = next.scriptError;
+    return true;
   } catch (e) {
-    statusEl.textContent = e instanceof Error ? e.message : String(e);
+    if (next) await next.dispose();
+    if (request === loadGeneration) {
+      sim = null;
+      (window as unknown as { __sim: Simulation | null }).__sim = null;
+      statusEl.textContent = e instanceof Error ? e.message : String(e);
+    }
+    return false;
   }
 }
 
@@ -349,11 +367,13 @@ sourceEl.addEventListener('drop', async (e) => {
   e.preventDefault();
   const f = e.dataTransfer?.files?.[0];
   if (!f) return;
+  const request = ++loadGeneration;
   const text = await readModelFile(f);
+  if (request !== loadGeneration) return;
   sourceEl.value = text;
   current = -1;
   refreshSampleButtons();
-  void loadAndShare(text);
+  void loadAndShare(text, request);
 });
 async function readModelFile(f: File): Promise<string> {
   const buf = await f.arrayBuffer();
@@ -385,38 +405,39 @@ async function decodeHash(h: string): Promise<string> {
   void w.close();
   return new TextDecoder().decode(await new Response(ds.readable).arrayBuffer());
 }
-async function publishHash(text: string): Promise<void> {
+async function publishHash(text: string, request: number): Promise<void> {
   const sample = SAMPLES.find((s) => s.source === text);
   const h = sample ? `#${sample.name}` : `#m=${await encodeHash(text)}`;
-  if (location.hash !== h) history.replaceState(null, '', h);
+  if (request === loadGeneration && location.hash !== h) history.replaceState(null, '', h);
 }
 
-const origLoad = load;
-const loadAndShare = async (text: string) => {
-  await origLoad(text);
-  await publishHash(text);
+const loadAndShare = async (text: string, request = ++loadGeneration) => {
+  if (await load(text, request)) await publishHash(text, request);
 };
 
 async function boot(): Promise<void> {
+  const request = ++loadGeneration;
   const h = location.hash.slice(1);
   if (h.startsWith('m=')) {
     try {
       const text = await decodeHash(h.slice(2));
+      if (request !== loadGeneration) return;
       sourceEl.value = text;
       current = -1;
       refreshSampleButtons();
-      await origLoad(text);
+      await load(text, request);
       return;
     } catch {
       /* fall through to the sample */
     }
   }
+  if (request !== loadGeneration) return;
   const idx = Math.max(0, SAMPLES.findIndex((s) => s.name === h));
   current = idx;
   sourceEl.value = SAMPLES[idx].source;
   refreshSampleButtons();
-  await loadAndShare(SAMPLES[idx].source);
+  await loadAndShare(SAMPLES[idx].source, request);
 }
-builder = new BuildPanel(sourceEl, scene, statusEl, () => { paused = true; sfx.update(0, 0); });
+builder = new BuildPanel(sourceEl, scene, statusEl, () => { ++loadGeneration; paused = true; sfx.update(0, 0); });
 void boot();
 window.addEventListener('hashchange', () => void boot()); // #car / #plane / #m=... links switch models
