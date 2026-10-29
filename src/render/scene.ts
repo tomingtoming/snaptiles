@@ -236,7 +236,10 @@ export class SceneView {
     this.camera.updateProjectionMatrix();
   }
 
+  clearModel(): void { this.rebuild([], () => 0); }
+
   rebuild(tiles: TileInstance[], env: ValEnv): void {
+    this.setLines3d([]); this.syncProjectiles([]);
     this.selectTile(null);
     for (const v of this.views.values()) v.material.dispose();
     this.group.clear();

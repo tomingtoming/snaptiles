@@ -227,7 +227,7 @@ export class BuildPanel {
       this.status.textContent = ''; this.paintSelection();
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = false);
     } catch (e) {
-      this.assembly = null; this.tree.replaceChildren(); this.scene.selectTile(null);
+      this.assembly = null; this.tree.replaceChildren(); this.scene.clearModel();
       this.type.disabled = this.angle.disabled = this.remove.disabled = this.copy.disabled = this.mirror.disabled = true;
       this.sourceHelp.hidden = true; this.sourceHelp.replaceChildren();
       this.powerRow.hidden = this.angleRow.hidden = true; this.angleSettings.disabled = true; this.angleSettings.setAttribute('aria-expanded','false');

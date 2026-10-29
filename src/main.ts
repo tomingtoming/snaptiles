@@ -56,6 +56,8 @@ async function load(source: string, request: number): Promise<boolean> {
   const old = sim;
   sim = null;
   (window as unknown as { __sim: Simulation | null }).__sim = null;
+  scene.clearModel();
+  hudCtx.clearRect(0, 0, hud.width, hud.height);
   let next: Simulation | null = null;
   try {
     if (old) await old.dispose();
@@ -85,6 +87,7 @@ async function load(source: string, request: number): Promise<boolean> {
     if (request === loadGeneration) {
       sim = null;
       (window as unknown as { __sim: Simulation | null }).__sim = null;
+      scene.clearModel();
       statusEl.textContent = e instanceof Error ? e.message : String(e);
     }
     return false;

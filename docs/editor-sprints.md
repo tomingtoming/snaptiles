@@ -1377,3 +1377,38 @@ Retain source for repair, but do not invent a supported part for an unknown name
 This is one bounded compatibility diagnostic, not proof of full compatibility.
 Next: inspect the stale visual state left after failed assembly so users do not
 mistake the previous model for the rejected one. No push or deployment.
+
+
+## 2026-10-30 — Remove stale model visuals after failure (Sprint 48)
+
+Goal: check whether a failed model is visually confused with the previous one.
+After running a source containing Unknown(), simulation was null and the error
+was visible, but all 19 previous vehicle meshes remained. This was a display
+lifecycle defect, not evidence that the unsupported part had assembled.
+
+Add SceneView.clearModel using existing rebuild/disposal behavior. Starting a
+load clears the prior model and HUD; a current failed load also clears any
+partial rebuild. Rebuilds clear transient 3D lines/projectiles, and an invalid
+editor refresh clears the old preview instead of retaining it. Environment
+geometry remains. Valid source or Undo reconstructs the preview normally.
+
+A browser scenario reproduces real unsupported-part failure and checks zero
+model meshes, hidden transient lines/projectiles and cleared HUD. Transient
+drawings are seeded through scene hooks to isolate cleanup; this is not an
+end-to-end cannon firing test. It also checks invalid-source Undo recovery and
+a delayed older start rejection after the user returns to editing: disposal
+completes without clearing the newer preview or replacing its status.
+Production build, new failure-view, load lifecycle, unsupported-part repair and
+source-history scenarios pass. Added the scenario to the default suite (29).
+Independent 390px image review confirms no old vehicle, readable source/error
+and controls within the viewport; environment objects are still present.
+
+Retrospective: an error message cannot by itself disambiguate stale visual
+content. Reset model visuals with the request lifecycle, while guarding late
+callbacks so they cannot erase the user's newer work. Next: review unsupported
+sections/attributes with concrete examples and decide whether they require an
+explicit warning or implementation. No push or deployment.
+
+Final targeted general-editor and reflected-geometry browser checks also pass.
+The full default suite and unit baseline were not rerun for this scene-lifecycle
+change; validation is the build and listed browser scenarios.
