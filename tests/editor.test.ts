@@ -111,3 +111,19 @@ describe('shared control strength', () => {
     expect(d.controlStrength('ST_STEER_1')).toBeNull();
   });
 });
+
+describe('branch copy and paste', () => {
+  it('keeps expressions, comments and nested structure while changing only the root edge', () => {
+    const d = new ModelDocument(source), original = d.text, branch = d.copyBranch(1);
+    d.pasteBranch(0,'W',branch);
+    expect(d.nodes().map(n=>n.type)).toEqual(['Core','Chip','Wheel','Frame','Chip','Wheel']);
+    expect(d.nodes()[4].dir).toBe('W'); expect(d.nodes()[5].attrs.angle).toBe('A');
+    expect(parseRc(d.text).script?.source).toBe(parseRc(source).script?.source);
+    d.undo(); expect(d.text).toBe(original);
+  });
+  it('protects named branches and missing variables in a new document', () => {
+    const d = new ModelDocument('Body{Core(){N:Chip(name=ARM)}}'); expect(()=>d.copyBranch(1)).toThrow();
+    const original = new ModelDocument(source), branch=original.copyBranch(1); original.newModel();
+    expect(()=>original.pasteBranch(0,'S',branch)).toThrow();
+  });
+});

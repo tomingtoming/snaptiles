@@ -1,5 +1,5 @@
 import { DraftStore } from './draft';
-import { ModelDocument } from './document';
+import { ModelDocument, type CopiedBranch } from './document';
 import { parseRc } from '../rc/parser';
 import { assemble, type Assembly } from '../model/assemble';
 import type { SceneView } from '../render/scene';
@@ -11,6 +11,8 @@ export class BuildPanel {
   private restoreButton = document.getElementById('restore-draft') as HTMLButtonElement;
   document: ModelDocument;
   selected = 0;
+  private clipboard: CopiedBranch | null = null;
+  private copy = document.getElementById('copy-branch') as HTMLButtonElement;
   assembly: Assembly | null = null;
   private panel = document.getElementById('builder')!;
   private toggle = document.getElementById('build') as HTMLButtonElement;
@@ -54,6 +56,14 @@ export class BuildPanel {
       else this.document.bindAngle(this.selected, value);
     });
     document.getElementById('new-model')!.onclick = () => this.edit(() => { this.document.newModel(); this.selected = 0; }, true);
+    this.copy.onclick = () => {
+      try {
+        this.clipboard = this.document.copyBranch(this.selected);
+        this.addType.querySelector('option[value="clipboard"]')?.remove();
+        this.addType.add(new Option(`コピーした枝（${this.clipboard.count}部品）`, 'clipboard'));
+        this.addType.value = 'clipboard'; this.status.textContent = '';
+      } catch (e) { this.status.textContent = e instanceof Error ? e.message : String(e); }
+    };
     this.remove.onclick = () => this.edit(() => { this.document.remove(this.selected); this.selected = 0; });
     this.undo.onclick = () => this.edit(() => this.document.undo());
     this.redo.onclick = () => this.edit(() => this.document.redo());
@@ -61,7 +71,9 @@ export class BuildPanel {
       button.onclick = () => this.edit(() => {
         const parent = this.document.nodes()[this.selected];
         const next = this.selected + this.document.nodes().filter(n => n.source!.start >= parent.source!.start && n.source!.end <= parent.source!.end).length;
-        this.document.add(this.selected, button.dataset.edge as 'N' | 'S' | 'E' | 'W', this.addType.value);
+        const dir = button.dataset.edge as 'N' | 'S' | 'E' | 'W';
+        if (this.addType.value === 'clipboard' && this.clipboard) this.document.pasteBranch(this.selected, dir, this.clipboard);
+        else this.document.add(this.selected, dir, this.addType.value);
         this.selected = next;
       });
     });
@@ -122,7 +134,7 @@ export class BuildPanel {
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = false);
     } catch (e) {
       this.assembly = null; this.tree.replaceChildren(); this.scene.selectTile(null);
-      this.type.disabled = this.angle.disabled = this.remove.disabled = true;
+      this.type.disabled = this.angle.disabled = this.remove.disabled = this.copy.disabled = true;
       this.powerRow.hidden = this.angleRow.hidden = true;
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = true);
       this.status.textContent = e instanceof Error ? e.message : String(e);
@@ -163,7 +175,7 @@ export class BuildPanel {
     if (!constant && ![...this.powerControl.options].some(o => o.value === power.toUpperCase())) this.powerControl.add(new Option(power, power.toUpperCase()));
     this.powerControl.add(new Option('↑ / ↓ を追加', 'new'));
     this.powerControl.value = constant ? 'constant' : power.toUpperCase();
-    this.remove.disabled = !tile.parent;
+    this.remove.disabled = this.copy.disabled = !tile.parent;
     this.remove.textContent = tile.children.length ? '枝ごと削除' : '削除';
   }
 }

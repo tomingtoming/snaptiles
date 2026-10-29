@@ -86,3 +86,20 @@ Retrospective: showing a variable name alone was enough to prove binding but
 not enough for the next user action, tuning. A shared value must be labelled
 as shared, and its associated rates must change together. Next: simplify
 repeated structure creation while preserving the existing source and controls.
+
+## 2026-10-29 — Reuse a branch
+
+Goal: reuse repeated structures without rebuilding every tile.
+Copy keeps a branch's original text and expressions; choosing a parent and an
+edge pastes it with only the root attachment direction changed. Pasted parts
+share their existing controls. Core and named branches cannot be copied;
+missing referenced variables block cross-document pastes.
+
+Validation: 60 tests; production browser copies a nested branch, pastes it on
+another edge, deletes it, and undoes both operations to the exact original.
+The previous creation/recovery/drive checks also pass.
+
+Retrospective: copying shape alone can silently break control bindings or
+name-based scripts. Preserve expressions and explicitly reject unresolved
+references instead of producing a plausible-looking broken model. Next: test
+source-preserving edits against the existing external model corpus.

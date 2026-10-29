@@ -46,7 +46,10 @@ Press **組む** to pause simulation and edit the assembled model. **新規** st
 with a single Core; Undo restores the previous model. Click a tile
 in the 3D view or select it in the part list. Choose a part type and N/S/E/W
 to attach it, change the selected tile's type or numeric angle, or delete
-its branch. Core cannot be deleted. ↶ / ↷ undo and redo edits, including
+its branch. **コピー** keeps the selected branch; select its new parent and an
+N/S/E/W edge to attach a copy. Expressions and controls remain shared. Named
+branches are protected against name collisions, and pasting requires the
+referenced variables to exist. Core cannot be deleted or copied. ↶ / ↷ undo and redo edits, including
 after a test run; **保存** downloads the model. Press ▶ to test it and update
 the shareable URL, then **組む** to return to its construction pose.
 

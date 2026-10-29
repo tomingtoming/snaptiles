@@ -92,6 +92,16 @@ try {
  await page.setViewportSize({width:1280,height:800}); await page.selectOption('#parts','1');
  await page.screenshot({path:`${out}/editor-recovery-desktop.png`});
  await page.setViewportSize({width:390,height:844}); await page.screenshot({path:`${out}/editor-recovery-mobile.png`});
+ // Copy a nested branch, attach it elsewhere, delete it and undo both operations.
+ const branchSource='Body { Core(){ N:Chip(angle=0){ E:Wheel(angle=90) } } }';
+ await page.fill('#source',branchSource); await page.selectOption('#parts','1'); await page.click('#copy-branch');
+ assert.equal(await page.inputValue('#add-type'),'clipboard');
+ await page.selectOption('#parts','0'); await page.click('[data-edge="W"]');
+ assert.equal(await page.locator('#parts option').count(),5); assert.equal(await page.inputValue('#parts'),'3');
+ await page.screenshot({path:`${out}/editor-copy-mobile.png`});
+ await page.click('#part-delete'); assert.equal(await page.locator('#parts option').count(),3);
+ await page.click('#edit-undo'); assert.equal(await page.locator('#parts option').count(),5);
+ await page.click('#edit-undo'); assert.equal(await page.inputValue('#source'),branchSource);
  assert.deepEqual(errors, []);
- console.log(JSON.stringify({ result: 'pass', count, checks: ['add', 'angle', 'undo-redo', '3D pick', 'save contents', 'run', 'history after run', 'URL reload', 'mobile overflow', 'invalid source recovery', 'motor keys and release', 'orbit and zoom', 'draft reload and undo'], errors }));
+ console.log(JSON.stringify({ result: 'pass', count, checks: ['add', 'angle', 'undo-redo', '3D pick', 'save contents', 'run', 'history after run', 'URL reload', 'mobile overflow', 'invalid source recovery', 'motor keys and release', 'orbit and zoom', 'draft reload and undo', 'branch copy/paste/delete/undo'], errors }));
 } finally { await browser.close(); }
