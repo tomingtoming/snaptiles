@@ -65,8 +65,10 @@ rejected instead of silently overlapping or guessing.
 Wheel/RLW/Jet/Arm power can be constant, bound to an existing Val, or assigned
 new controls using ↑/↓, ←/→, Z/X or A/D. New power controls use the current positive magnitude (1000 for
 zero or expressions), return to zero on release and avoid existing names.
-Choose （逆） for an opposite-side wheel. Rudder/Trim can use any of the same key
-pairs (±30°, returning to zero on release). Selectors show the keys for recognized
+Choose （逆） for an opposite-side wheel. Any non-Core part can bind its angle using the same key
+pairs (±30°, returning to zero on release). For a fixed hinge, open **操作** beside its angle. Angle bindings also offer
+**（逆）** for opposite motion; Rudder/Trim controls open by default.
+Selectors show the keys for recognized
 GUI controls; assigning the same keys to several controls operates them together.
 Power also offers **を追加（保持）**: the first key increases and the second
 decreases throttle, release holds it, and values are clamped from zero to the
@@ -109,7 +111,9 @@ Production-build browser regression: `bun run build && bun run test:editor`
 (install Chromium first with `bun x playwright install chromium`). This runs
 in CI with an OS-assigned port and uploads screenshots on failure.
 `bun run test:plane` separately checks the plane sample in Chromium: takeoff
-under throttle/pull-up input and exact source export. Unit tests verify control
+under throttle/pull-up input and exact source export. A second flow reconstructs
+the 30-part aircraft through GUI operations, compares its construction poses,
+flies it, exports named bytes and re-edits the shared result. Unit tests verify control
 surface geometry and isolated airborne axis responses. These checks do not
 establish trimmed cruise or original-engine flight fidelity.
 

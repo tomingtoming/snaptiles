@@ -156,8 +156,9 @@ export class ModelDocument {
   addThrottleControl(index: number, magnitude: number, pair: ControlKeys = 'zx'): void { this.addControl(index, 'power', magnitude, pair, true); }
   addSteeringControl(index: number, magnitude = 30, pair: ControlKeys = 'horizontal'): void { this.addControl(index, 'angle', magnitude, pair); }
   bindAngle(index: number, variable: string): void {
-    if (!parseRc(this.text).vals.some(v => v.name.toUpperCase() === variable.toUpperCase())) throw new Error('定義済みの変数を選んでください');
-    this.replace(...this.attributeEdit(index, 'angle', variable));
+    const expression = variable.replace(/\s/g, '').toUpperCase();
+    if (!parseRc(this.text).vals.some(v => v.name.toUpperCase() === expression.replace(/^-/, ''))) throw new Error('定義済みの変数を選んでください');
+    this.replace(...this.attributeEdit(index, 'angle', expression));
   }
   fixedAngle(index: number): void { this.replace(...this.attributeEdit(index, 'angle', '0')); }
   restore(text: string, filename?: string): void {

@@ -27,7 +27,7 @@
         </div>
         <div id="editor-toolbar" class="edit-row"><button id="new-model">新規</button><button id="frame-model">全体</button><button id="focus-part">選択へ</button><button id="save-model">保存</button><button id="share-model">共有リンク</button><button id="copy-branch">コピー</button><button id="mirror-branch" type="button" title="親部品の反対側へ枝を反転して複製">反対側へ</button><button id="rename-model" type="button">保存名</button><button id="edit-undo" aria-label="取り消し">↶</button><button id="edit-redo" aria-label="やり直し">↷</button></div>
         <label>部品<select id="parts" size="5"></select></label>
-        <div class="edit-row"><label>種類<select id="part-type"></select></label><label><span id="angle-label">角度</span><input id="part-angle" type="text" inputmode="decimal" /></label><label id="option-field" hidden><span id="option-label">設定</span><select id="part-option"></select></label><button id="part-delete">削除</button></div>
+        <div class="edit-row"><label>種類<select id="part-type"></select></label><label><span class="angle-heading"><span id="angle-label">角度</span><button id="angle-settings" type="button" aria-label="角度の操作設定" aria-controls="angle-control-row" aria-expanded="false" title="角度の操作設定を開閉">操作</button></span><input id="part-angle" type="text" inputmode="decimal" /></label><label id="option-field" hidden><span id="option-label">設定</span><select id="part-option"></select></label><button id="part-delete">削除</button></div>
         <div id="angle-control-row" class="edit-row" hidden><label>角度の操作<select id="angle-control"></select></label></div>
         <div id="power-row" class="edit-row" hidden><label><span id="power-label">出力</span><input id="part-power" type="text" inputmode="decimal" /></label><label>操作<select id="power-control"></select></label></div>
         <div class="edit-row"><label>追加する部品<select id="add-type"></select></label><div class="edges" aria-label="接続方向"><button data-edge="N">N ＋</button><button data-edge="W">W ＋</button><button data-edge="E">E ＋</button><button data-edge="S">S ＋</button></div></div>
@@ -66,7 +66,7 @@
       <ol>
         <li><strong>組む → 新規</strong>でCoreから作成。サンプルを選んで改造することもできます。</li>
         <li>画面の部品か一覧を選び、種類・角度を調整。<strong>N / W / E / S ＋</strong>で選んだ部品の辺に追加します。画面の黄色いN/W/E/Sと丸印が、その部品の接続方向と接続点です。「全体」「選択へ」で見やすい距離へ移動できます。</li>
-        <li>WheelやJetの<strong>操作</strong>、RudderやTrimの<strong>角度の操作</strong>から、↑ / ↓、← / →、Z / X、A / Dを選んで追加できます。離すとゼロへ戻ります。同じキーを複数の操作に割り当てると同時に動きます。車輪が互いに逆向きに回る場合は、片側の操作を「（逆）」へ切り替えます。</li>
+        <li>WheelやJetの<strong>操作</strong>、部品の<strong>角度の操作</strong>から、↑ / ↓、← / →、Z / X、A / Dを選んで追加できます。離すとゼロへ戻ります。同じキーを複数の操作に割り当てると同時に動きます。角度の操作が隠れているときは、角度欄の「操作」で開きます。角度も出力も「（逆）」で逆向きに連動できます。</li>
         <li><strong>▶ 実行</strong>で試運転。表示されたキーで操縦し、<strong>組む</strong>で編集へ戻ります。</li>
         <li><strong>保存名</strong>で名前を付け、<strong>保存</strong>でファイルへ、<strong>開く</strong>で読込。<strong>共有リンク</strong>は今の編集内容を渡せます。下書きはこのブラウザに最新の1件が保存され、復元後はUndoで戻せます。</li>
       </ol>

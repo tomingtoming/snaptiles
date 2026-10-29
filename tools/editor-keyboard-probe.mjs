@@ -31,6 +31,9 @@ try {
  assert.equal(await page.locator('#parts option').count(),2);
  await tabTo('#parts',true); await page.keyboard.press('Control+z'); assert.equal(await page.locator('#parts option').count(),1);
  await page.keyboard.press('Control+Shift+z'); assert.equal(await page.locator('#parts option').count(),2);
+ await tabTo('#angle-settings');assert.equal(await page.locator('#angle-control-row').isVisible(),false);
+ await page.keyboard.press('Enter');assert.equal(await page.locator('#angle-control-row').isVisible(),true);assert.equal(await page.locator('#angle-settings').getAttribute('aria-expanded'),'true');
+ await page.keyboard.press('Enter');assert.equal(await page.locator('#angle-control-row').isVisible(),false);
  // A delayed run must not steal focus from a field the user moved to meanwhile.
  await page.evaluate(()=>{
    const proto=Object.getPrototypeOf(window.__sim),start=proto.start;

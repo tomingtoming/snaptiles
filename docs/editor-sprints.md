@@ -1103,3 +1103,58 @@ Next: expose those operations, then reconstruct this corrected aircraft through
 editor operations and verify the full build/control/fly/save loop. This sprint
 repairs the reference sample; it does not claim that the complete aircraft was
 already built through the GUI. No push or deployment was performed.
+
+## 2026-10-30 — Build and fly the aircraft through editor controls
+
+Goal: close the editor gaps exposed by the corrected plane sample. All non-Core
+parts can now bind angle controls, including Chip hinges. Angle selectors offer
+both normal and reversed bindings, preserving shared strength editing and Undo.
+Three tests verify reversed bindings/history, the Chip rudder's actual vertical
+axis after a Trim mount, and rejection of missing/arbitrary expressions. Total:
+138 unit/integration tests pass.
+
+Initially showing angle controls for every part pushed the add-part row outside
+the narrow panel; the existing general-editor probe caught this. Fixed-angle
+parts now reveal the row through **操作** beside their angle. Rudder/Trim and
+parts already using an expression show the setting by default on selection.
+The disclosure is keyboard-operable and exposes aria-controls/expanded state.
+An independent review found the initial button too small: measured height was
+16.4px. Expanded it to 44x28px; measured 32px height would clip the existing add
+row at 390x844. The final size keeps that row inside the panel. This is a local
+layout improvement, not a blanket touch-accessibility certification.
+
+A new browser scenario reads the corrected plane as a construction blueprint,
+then starts from a blank Core and uses only GUI part/angle/colour/control
+operations to recreate all 30 parts. It compares every neutral preview position
+and quaternion with the reference. Generated controls use the new independent
+key pairs and held throttle; the source is never pasted into the editor to bypass
+construction. The sample's Lua HUD is not copied, and generated momentary control
+rates differ from the sample's gradual rates, so this is geometry/workflow
+reconstruction rather than byte-for-byte model reproduction.
+
+The constructed aircraft takes off (measured core position about
+[-50.61,3.57,-118.71]), exports exact 1,218-byte source as GUI飛行機.rcd, opens that
+source in a fresh shared-link context and edits the Chip rudder's strength there.
+`test:plane` now runs both the sample and GUI-construction scenarios. The earlier
+sample test remains distinct from proof of constructing a model through the UI.
+Independent desktop/narrow image review confirms selected tail, A/D binding and
+settings readability; small model details still require zooming.
+
+Retrospective: exposing a capability and making it reachable without displacing
+common actions are separate requirements. The old overflow assertion identified
+a real regression and was retained. A complete construction-to-flight scenario
+also closes more gaps than testing each selector alone. Next: assess editability
+of more complex imported models and the remaining source-only boundaries, using
+actual round trips rather than extrapolating cars and this one aircraft to all
+models. No stable-cruise or original-engine fidelity claim is added. No push or
+deployment was performed.
+
+Final validation: full 23-scenario Chromium suite passed before the final button
+size adjustment. After that adjustment, rebuilt and passed general-editor
+(including the original no-scroll add-row bounds), keyboard disclosure, GUI
+plane construction/flight, Firefox and WebKit core flows. Independent re-review
+of the final 390px image found no new overlap/clipping around the enlarged
+button, numeric input, A/D selector or direction controls. The 138-unit baseline
+covers the unchanged document operations; the final UI behavior is covered by
+the browser checks. Windows WebKit 3D screenshot limits remain as previously
+recorded; its state assertions do not replace visual acceptance.

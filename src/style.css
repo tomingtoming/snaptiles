@@ -114,3 +114,6 @@ button:disabled { opacity: .4; cursor: default !important; }
 #draft-filename, #draft-saved { display: block; overflow-wrap: anywhere; }
 #draft-saved { color: var(--dim); }
 #builder #restore-draft { min-height: 44px; }
+
+.angle-heading { display:flex; align-items:center; justify-content:space-between; gap:4px; }
+#builder #angle-settings { min-width:44px; min-height:28px; padding:0 4px; font:inherit; line-height:1.2; }

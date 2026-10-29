@@ -34,6 +34,8 @@ export class BuildPanel {
   private angle = document.getElementById('part-angle') as HTMLInputElement;
   private angleControl = document.getElementById('angle-control') as HTMLSelectElement;
   private angleRow = document.getElementById('angle-control-row')!;
+  private angleSettings = document.getElementById('angle-settings') as HTMLButtonElement;
+  private angleControlFor = '';
   private resetColor = document.getElementById('reset-color') as HTMLButtonElement;
   private color = document.getElementById('part-color') as HTMLInputElement;
   private option = document.getElementById('part-option') as HTMLSelectElement;
@@ -64,6 +66,7 @@ export class BuildPanel {
     });
     document.getElementById('frame-model')!.onclick = () => this.scene.frameModel();
     this.toggle.onclick = () => this.open();
+    this.angleSettings.onclick = event => { event.preventDefault(); this.angleRow.hidden = !this.angleRow.hidden; this.angleSettings.setAttribute('aria-expanded', String(!this.angleRow.hidden)); };
     new ResizeObserver(() => this.revealSelection()).observe(this.tree);
     this.tree.onchange = () => { this.selected = Number(this.tree.value); this.paintSelection(); };
     this.type.onchange = () => this.edit(() => this.document.type(this.selected, this.type.value));
@@ -225,7 +228,7 @@ export class BuildPanel {
     } catch (e) {
       this.assembly = null; this.tree.replaceChildren(); this.scene.selectTile(null);
       this.type.disabled = this.angle.disabled = this.remove.disabled = this.copy.disabled = this.mirror.disabled = true;
-      this.powerRow.hidden = this.angleRow.hidden = true;
+      this.powerRow.hidden = this.angleRow.hidden = true; this.angleSettings.disabled = true; this.angleSettings.setAttribute('aria-expanded','false');
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = true);
       this.status.textContent = e instanceof Error ? e.message : String(e);
     }
@@ -270,11 +273,20 @@ export class BuildPanel {
     document.getElementById('angle-label')!.textContent = angleStrength === null ? '角度' : '最大角度（共通）';
     this.angle.disabled = !tile.parent || angleStrength === null && !Number.isFinite(Number(angle.replace(/\s/g, '')));
     this.angle.title = this.angle.disabled && tile.parent ? `ソースで編集: ${angle}` : '';
-    this.angleRow.hidden = !tile.parent || !['rudder', 'rudderf', 'trim', 'trimf'].includes(tile.type);
+    const angleControlFor = `${tile.id}:${tile.type}`;
+    if (this.angleControlFor !== angleControlFor) {
+      this.angleRow.hidden = !tile.parent || !['rudder','rudderf','trim','trimf'].includes(tile.type) && Number.isFinite(Number(angle.replace(/\s/g,'')));
+      this.angleControlFor = angleControlFor;
+    }
+    if (!tile.parent) this.angleRow.hidden = true;
+    this.angleSettings.disabled = !tile.parent;
+    this.angleSettings.setAttribute('aria-expanded', String(!this.angleRow.hidden));
     this.angleControl.replaceChildren(new Option('固定', 'constant'));
     for (const v of parseRc(this.document.text).vals) {
       const keys = this.document.controlKeyLabel(v.name);
-      this.angleControl.add(new Option(keys ? `${keys} · ${v.name}` : v.name, v.name.toUpperCase()));
+      const label = keys ? `${keys} · ${v.name}` : v.name;
+      this.angleControl.add(new Option(label, v.name.toUpperCase()));
+      this.angleControl.add(new Option(`${label}（逆）`, `-${v.name.toUpperCase()}`));
     }
     const angleExpression = angle.replace(/\s/g, '').toUpperCase();
     const fixedAngle = Number.isFinite(Number(angleExpression));
