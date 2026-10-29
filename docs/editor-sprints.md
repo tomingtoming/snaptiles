@@ -70,3 +70,19 @@ Retrospective: keeping probe data in generated models avoids shipping third-part
 assets. Use a fresh port and browser context per run, and assert behavior rather
 than relying on a development-only environment. Next: let users adjust the
 strength of GUI-created controls after a test run without returning to source.
+
+## 2026-10-29 — Tune shared controls after driving
+
+Goal: change motor strength and steering range without going back to code.
+Added magnitude editing for intact GUI-generated controls. Each atomic edit
+updates min/max, release step and both key steps; reverse-connected wheels
+keep their sign. Custom or manually altered control definitions are protected.
+
+Validation: 58 tests and production build; production-browser probes change
+power 1200→1800, undo/redo, then verify actual ±1800/release-zero input. Steering
+30→45→undo is also tested before the same blank-vehicle drive.
+
+Retrospective: showing a variable name alone was enough to prove binding but
+not enough for the next user action, tuning. A shared value must be labelled
+as shared, and its associated rates must change together. Next: simplify
+repeated structure creation while preserving the existing source and controls.

@@ -54,12 +54,15 @@ try {
  await page.fill('#part-power', '1200'); await page.locator('#part-power').press('Tab');
  await page.selectOption('#power-control', 'new');
  assert.equal(await page.inputValue('#power-control'), 'ST_POWER_1');
+ await page.fill('#part-power','1800'); await page.locator('#part-power').press('Tab');
+ await page.click('#edit-undo'); assert.equal(await page.inputValue('#part-power'),'1200');
+ await page.click('#edit-redo'); assert.equal(await page.inputValue('#part-power'),'1800');
  await page.click('#run');
  await page.waitForFunction(() => window.__sim?.model.vals.some(v => v.name === 'ST_POWER_1'));
  await page.focus('#view'); await page.keyboard.down('ArrowUp');
- await page.waitForFunction(() => window.__sim.env('ST_POWER_1') === 1200);
+ await page.waitForFunction(() => window.__sim.env('ST_POWER_1') === 1800);
  await page.keyboard.up('ArrowUp'); await page.waitForFunction(() => window.__sim.env('ST_POWER_1') === 0);
- await page.keyboard.down('ArrowDown'); await page.waitForFunction(() => window.__sim.env('ST_POWER_1') === -1200); await page.keyboard.up('ArrowDown');
+ await page.keyboard.down('ArrowDown'); await page.waitForFunction(() => window.__sim.env('ST_POWER_1') === -1800); await page.keyboard.up('ArrowDown');
  await page.click('#build'); await page.selectOption('#parts', '1');
  await page.setViewportSize({width: 390, height: 844});
  await page.screenshot({path: `${out}/editor-power-mobile.png`});

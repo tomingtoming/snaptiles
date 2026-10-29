@@ -58,7 +58,10 @@ source edits reset visual undo history. Wheel/Jet/Arm power can be fixed, linked
 magnitude (1000 when it is zero or an expression), return to zero on release,
 and never overwrite existing variables. Select a variable marked （逆） to reverse
 a wheel on the opposite side. Rudder/Trim parts can also receive a new ←/→
-control (±30°, returning to zero on release). Colours, other key mappings and Lua
+control (±30°, returning to zero on release). GUI-generated controls expose
+**最大出力（共通）** / **最大角度（共通）**: changing the magnitude updates its
+bounds, both keys and release together for every connected part. Manually
+altered or arbitrary controls remain source-only. Colours, other key mappings and Lua
 still use the text editor; mirroring and multi-selection are not implemented.
 Edits are also saved as the latest draft in this browser. After reloading,
 open **組む** and use **下書きを復元** to recover unpublished or unfinished text.

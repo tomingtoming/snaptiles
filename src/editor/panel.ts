@@ -35,10 +35,12 @@ export class BuildPanel {
     this.toggle.onclick = () => this.open();
     this.tree.onchange = () => { this.selected = Number(this.tree.value); this.paintSelection(); };
     this.type.onchange = () => this.edit(() => this.document.type(this.selected, this.type.value));
-    this.angle.onchange = () => this.edit(() => { if (!this.angle.value.trim()) throw new Error('角度には数値を入力してください'); this.document.angle(this.selected, Number(this.angle.value)); });
+    this.angle.onchange = () => this.edit(() => { if (!this.angle.value.trim()) throw new Error('角度には数値を入力してください'); const expression = this.document.nodes()[this.selected].attrs.angle ?? '0'; if (this.document.controlStrength(expression) !== null) this.document.setControlStrength(expression, Number(this.angle.value)); else this.document.angle(this.selected, Number(this.angle.value)); });
     this.power.onchange = () => this.edit(() => {
       if (!this.power.value.trim()) throw new Error('出力には数値を入力してください');
-      this.document.power(this.selected, Number(this.power.value));
+      const expression = this.document.nodes()[this.selected].attrs.power ?? '0';
+      if (this.document.controlStrength(expression) !== null) this.document.setControlStrength(expression, Number(this.power.value));
+      else this.document.power(this.selected, Number(this.power.value));
     });
     this.powerControl.onchange = () => this.edit(() => {
       const value = this.powerControl.value;
@@ -133,8 +135,10 @@ export class BuildPanel {
     this.type.value = TYPES.find(t => t.toLowerCase() === tile.type) ?? 'Core';
     this.type.disabled = !tile.parent;
     const angle = tile.node.attrs.angle ?? '0';
-    this.angle.value = angle.replace(/\s/g, '');
-    this.angle.disabled = !tile.parent || !Number.isFinite(Number(angle.replace(/\s/g, '')));
+    const angleStrength = this.document.controlStrength(angle);
+    this.angle.value = angleStrength === null ? angle.replace(/\s/g, '') : String(angleStrength);
+    document.getElementById('angle-label')!.textContent = angleStrength === null ? '角度' : '最大角度（共通）';
+    this.angle.disabled = !tile.parent || angleStrength === null && !Number.isFinite(Number(angle.replace(/\s/g, '')));
     this.angle.title = this.angle.disabled && tile.parent ? `ソースで編集: ${angle}` : '';
     this.angleRow.hidden = !tile.parent || !['rudder', 'rudderf', 'trim', 'trimf'].includes(tile.type);
     this.angleControl.replaceChildren(new Option('固定', 'constant'));
@@ -147,7 +151,10 @@ export class BuildPanel {
     this.powerRow.hidden = !['wheel', 'rlw', 'jet', 'arm'].includes(tile.type);
     const power = (tile.node.attrs.power ?? '0').replace(/\s/g, '');
     const constant = Number.isFinite(Number(power));
-    this.power.value = power; this.power.disabled = !constant;
+    const powerStrength = this.document.controlStrength(power);
+    this.power.value = powerStrength === null ? power : String(powerStrength);
+    this.power.disabled = !constant && powerStrength === null;
+    document.getElementById('power-label')!.textContent = powerStrength === null ? '出力' : '最大出力（共通）';
     this.powerControl.replaceChildren(new Option('固定', 'constant'));
     for (const v of parseRc(this.document.text).vals) {
       this.powerControl.add(new Option(v.name, v.name.toUpperCase()));

@@ -1,4 +1,4 @@
-import { parseRc, findBlocks, type ChipNode } from '../rc/parser';
+import { parseRc, findBlocks, declarationRanges, type ChipNode } from '../rc/parser';
 
 /** Edits use parser offsets: scripts, comments and unrelated attributes remain byte-for-byte. */
 export class ModelDocument {
@@ -43,6 +43,35 @@ export class ModelDocument {
     this.replace(...this.attributeEdit(index, 'power', String(value)));
   }
   /** One undoable edit; a fresh variable never overwrites existing controls or scripts. */
+  controlStrength(variable: string): number | null {
+    const name = variable.replace(/\s/g, '').replace(/^-/, '').toUpperCase();
+    if (!/^ST_(POWER|STEER)_\d+$/.test(name)) return null;
+    const model = parseRc(this.text), v = model.vals.find(v => v.name.toUpperCase() === name);
+    const keys = model.keys.filter(k => k.var.toUpperCase() === name);
+    if (!v || v.default !== 0 || v.min !== -v.max || v.max <= 0 || v.step !== v.max || keys.length !== 2) return null;
+    const expected = name.startsWith('ST_POWER') ? [0, 1] : [3, 2];
+    return keys.some(k => k.key === expected[0] && k.step === v.max) && keys.some(k => k.key === expected[1] && k.step === -v.max) ? v.max : null;
+  }
+  setControlStrength(variable: string, magnitude: number): void {
+    if (this.controlStrength(variable) === null) throw new Error('変更済みの操作はソースで編集してください');
+    if (!Number.isFinite(magnitude) || magnitude <= 0) throw new Error('大きさは正の数で指定してください');
+    const name = variable.replace(/\s/g, '').replace(/^-/, '').toUpperCase();
+    const model = parseRc(this.text), v = model.vals.find(v => v.name.toUpperCase() === name)!;
+    const edits: [number, number, string][] = [];
+    const ranges = declarationRanges.get(v)!;
+    for (const [attr, value] of [['min', -magnitude], ['max', magnitude], ['step', magnitude]] as const) {
+      if (!ranges[attr]) throw new Error('操作の定義が不足しています');
+      edits.push([...ranges[attr], String(value)]);
+    }
+    for (const key of model.keys.filter(k => k.var.toUpperCase() === name)) {
+      const range = declarationRanges.get(key)?.step;
+      if (!range) throw new Error('キー操作の定義が不足しています');
+      edits.push([...range, String(Math.sign(key.step) * magnitude)]);
+    }
+    let next = this.text;
+    for (const [start, end, value] of edits.sort((a,b) => b[0] - a[0])) next = next.slice(0,start) + value + next.slice(end);
+    this.replace(0, this.text.length, next);
+  }
   addPowerControl(index: number, magnitude: number): void { this.addControl(index, 'power', magnitude, [0, 1]); }
   addSteeringControl(index: number, magnitude = 30): void { this.addControl(index, 'angle', magnitude, [2, 3]); }
   bindAngle(index: number, variable: string): void {

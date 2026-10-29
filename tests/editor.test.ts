@@ -93,3 +93,21 @@ describe('draft recovery', () => {
     expect(new DraftStore({getItem:()=>'{bad',setItem:()=>{}}).read()).toBeNull();
   });
 });
+
+describe('shared control strength', () => {
+  it('changes the bounds, release and both keys together and undoes exactly', () => {
+    const d = new ModelDocument('Body{Core(){E:Wheel() W:Wheel()}}');
+    d.addPowerControl(1, 800); d.power(2, '-ST_POWER_1'); const before=d.text;
+    d.setControlStrength('-ST_POWER_1', 1600);
+    expect(d.controlStrength('ST_POWER_1')).toBe(1600);
+    expect(parseRc(d.text).keys.map(k=>k.step)).toEqual([1600,-1600]);
+    expect(d.nodes()[2].attrs.power).toBe('- ST_POWER_1');
+    d.undo(); expect(d.text).toBe(before);
+  });
+  it('protects non-generated and manually altered controls', () => {
+    const d = new ModelDocument(source); expect(d.controlStrength('A')).toBeNull();
+    expect(()=>d.setControlStrength('A',10)).toThrow();
+    d.addSteeringControl(1); d.text=d.text.replace('step=30','step=3');
+    expect(d.controlStrength('ST_STEER_1')).toBeNull();
+  });
+});

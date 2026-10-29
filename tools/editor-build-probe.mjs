@@ -20,6 +20,8 @@ try {
  }
  await wheel(0,'E',true); await wheel(0,'W');
  const steer=await add(0,'N','Rudder'); await page.selectOption('#angle-control','new');
+ await page.fill('#part-angle','45'); await page.locator('#part-angle').press('Tab');
+ assert.equal(await page.inputValue('#part-angle'),'45'); await page.click('#edit-undo'); assert.equal(await page.inputValue('#part-angle'),'30');
  const axle=await add(steer,'N','Chip'); await wheel(axle,'E'); await wheel(axle,'W');
  await page.selectOption('#parts',String(steer));
  for (const selector of ['#angle-control', '#add-type', '[data-edge="S"]']) {

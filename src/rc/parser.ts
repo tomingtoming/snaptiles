@@ -23,6 +23,8 @@ export interface KeyBinding {
   step: number;
 }
 
+export const declarationRanges = new WeakMap<ValDecl | KeyBinding, Record<string, [number, number]>>();
+
 export interface ChipNode {
   type: string; // Core, Chip, Frame, Rudder, RudderF, Trim, TrimF, Wheel, Jet, Weight, Cowl, Arm ...
   dir: 'N' | 'S' | 'E' | 'W' | null;
@@ -242,27 +244,32 @@ function num(s: string | undefined, d: number): number {
   return Number.isFinite(v) ? v : d;
 }
 
-function parseVal(inner: string, baseLine: number): ValDecl[] {
+function parseVal(inner: string, baseLine: number, offset: number): ValDecl[] {
   const p = new P(tokenize(inner), baseLine);
+  p.offset = offset;
   const out: ValDecl[] = [];
   while (p.peek()) {
     if (p.accept(',') || p.accept(';')) continue;
     const name = p.ident();
-    const a = p.peek()?.v === '(' ? p.args() : {};
-    out.push({
+    const hasArgs = p.peek()?.v === '(';
+    const a = hasArgs ? p.args() : {};
+    const declaration: ValDecl = {
       name,
       default: num(a.default, 0),
       min: num(a.min, 0),
       max: num(a.max, 3.4e38),
       step: num(a.step, 0),
       disp: a.disp !== undefined ? num(a.disp, 0) : undefined,
-    });
+    };
+    declarationRanges.set(declaration, hasArgs ? { ...p.ranges } : {});
+    out.push(declaration);
   }
   return out;
 }
 
-function parseKey(inner: string, baseLine: number): KeyBinding[] {
+function parseKey(inner: string, baseLine: number, offset: number): KeyBinding[] {
   const p = new P(tokenize(inner), baseLine);
+  p.offset = offset;
   const out: KeyBinding[] = [];
   let key = -1;
   while (p.peek()) {
@@ -274,9 +281,12 @@ function parseKey(inner: string, baseLine: number): KeyBinding[] {
       continue;
     }
     const name = p.ident();
-    const a = p.peek()?.v === '(' ? p.args() : {};
+    const hasArgs = p.peek()?.v === '(';
+    const a = hasArgs ? p.args() : {};
     if (key < 0) throw new RcParseError(`key binding '${name}' before any key number`, p.line());
-    out.push({ key, var: name, step: num(a.step, 1) });
+    const binding: KeyBinding = { key, var: name, step: num(a.step, 1) };
+    declarationRanges.set(binding, hasArgs ? { ...p.ranges } : {});
+    out.push(binding);
   }
   return out;
 }
@@ -339,8 +349,8 @@ export function parseRc(source: string): RcModel {
       continue;
     }
     const inner = stripComments(b.inner);
-    if (name === 'val' || name === 'var') model.vals.push(...parseVal(inner, b.line));
-    else if (name === 'key') model.keys.push(...parseKey(inner, b.line));
+    if (name === 'val' || name === 'var') model.vals.push(...parseVal(inner, b.line, b.offset));
+    else if (name === 'key') model.keys.push(...parseKey(inner, b.line, b.offset));
     else if (name === 'body') {
       const roots = parseBody(inner, b.line, b.offset);
       model.bodies.push(...roots);
