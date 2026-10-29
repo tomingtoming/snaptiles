@@ -17,8 +17,8 @@ try {
   if(first){await page.fill('#part-power','800');await page.locator('#part-power').press('Tab');}
   await page.selectOption('#power-control',first?'new':dir==='W'?'-ST_POWER_1':'ST_POWER_1');
  };
- await wheel(0,'E',true);await wheel(0,'W');const steering=await add(0,'N','Rudder');await page.selectOption('#angle-control','new');
- const axle=await add(steering,'N','Chip');await wheel(axle,'E');await wheel(axle,'W');
+ await wheel(0,'E',true);await page.click('#mirror-branch');const steering=await add(0,'N','Rudder');await page.selectOption('#angle-control','new');
+ const axle=await add(steering,'N','Chip');await wheel(axle,'E');await page.click('#mirror-branch');
  const built=await page.inputValue('#source');assert.equal(await page.locator('#parts option').count(),7);
  await page.locator('#source').focus();await page.keyboard.press('Control+End');await page.keyboard.type(`// ${engine}`);
  await page.keyboard.press('Control+z');assert.equal(await page.inputValue('#source'),built,'source Undo');

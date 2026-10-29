@@ -54,6 +54,14 @@ identities, and referenced variables must already exist. Core cannot be deleted
 or copied. Adding/removing parts changes numerical chip indices; Lua that uses
 those numbers may need manual updates.
 
+**反対側へ** reflects the selected branch to the opposite edge of its parent in
+one undoable operation, selecting the new branch. It mirrors nested attachment
+directions, reverses Rudder/Trim angles and Wheel/RLW power, and swaps triangular
+Cowl shapes. Ordinary fold angles and Jet/Arm power stay unchanged. Variables
+remain shared; scripts and numerical part references are not rewritten. An
+occupied opposite edge, named branch or expression-controlled Cowl shape is
+rejected instead of silently overlapping or guessing.
+
 Wheel/RLW/Jet/Arm power can be constant, bound to an existing Val, or assigned
 new ↑/↓ controls. New controls use the current positive magnitude (1000 for
 zero or expressions), return to zero on release and avoid existing names.

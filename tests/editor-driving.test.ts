@@ -5,22 +5,22 @@ import {Simulation} from '../src/sim/simulation';
 import {KeyState} from '../src/input/keys';
 
 // Use the same document operations as the blank-car GUI workflow, not a hand-written final model.
-function buildCar(): string {
+function buildCar(mirror = false): string {
   const d = new ModelDocument('Body { Core(){} }');
   const wheel = (parent: number, dir: 'E' | 'W', index: number, first = false) => {
     d.add(parent, dir, 'Wheel'); d.angle(index, 90);
     if (first) d.addPowerControl(index, 800);
     else d.power(index, dir === 'W' ? '-ST_POWER_1' : 'ST_POWER_1');
   };
-  wheel(0, 'E', 1, true); wheel(0, 'W', 2);
+  wheel(0, 'E', 1, true); if (mirror) d.mirrorBranch(1); else wheel(0, 'W', 2);
   d.add(0, 'N', 'Rudder'); d.addSteeringControl(3); d.add(3, 'N', 'Chip');
-  wheel(4, 'E', 5); wheel(4, 'W', 6);
+  wheel(4, 'E', 5); if (mirror) d.mirrorBranch(5); else wheel(4, 'W', 6);
   return d.text;
 }
 
 describe('constructed vehicle driving outcomes', () => {
-  it('travels straight and physically turns in opposite directions under generated controls', async () => {
-    const R = await initRapier(), source = buildCar();
+  it.each([false,true])('travels straight and turns with generated controls (mirrored wheels: %s)', async mirror => {
+    const R = await initRapier(), source = buildCar(mirror);
     const results: {dx:number; dz:number; yaw:number}[] = [];
     for (const steering of [null, 2, 3]) {
       const keys = new KeyState(new EventTarget()), sim = new Simulation(R, source, keys);

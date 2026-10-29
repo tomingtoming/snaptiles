@@ -934,3 +934,48 @@ focus. Next: move from recovery hardening back to construction effort; inspect
 how existing branch-copy operations can reduce repeated left/right vehicle
 assembly, with geometry and control signs verified before offering symmetry.
 No push or deployment was performed.
+
+## 2026-10-30 — Duplicate a branch on the opposite side
+
+Goal: reduce repeated setup of symmetric vehicle parts. Added **反対側へ**:
+select a branch and duplicate its reflection across the parent-local plane to
+the opposite attachment edge, selecting the new branch. This is a single Undo
+step. It swaps E/W or N/S throughout the branch, reverses Rudder/Trim angle
+expressions and Wheel/RLW power, and swaps triangular Cowl options 3/4. Ordinary
+fold angles and Jet/Arm power stay unchanged. Shared variables remain shared;
+the original branch, scripts and unrelated text are preserved.
+
+The operation rejects an occupied opposite edge, a named branch (existing copy
+identity guard) and expression-controlled Cowl shapes. It does not rewrite Lua
+numerical part references, invent new control variables or claim full RCD/RCM
+editing parity. Help and README describe these boundaries.
+
+Nine new document tests independently compare reflected position and orientation
+for all four attachment directions, nested Rudder/Trim/Wheel/Jet/Cowl parts and
+a folded parent. They also verify expression meaning/comments, control signs,
+source/history preservation on rejected edits and Undo/Redo. A second driving
+fixture makes both left wheels using this operation; the same physical straight,
+left/right turn and release assertions pass as for individually constructed
+wheels. Total: 115 tests pass; typecheck/build pass.
+
+A new browser probe checks actual triangular Cowl mesh vertices under reflection,
+selected duplicate, occupied-edge rejection, one-step Undo/Redo and runtime
+wheel powers. Firefox/WebKit core-loop probes now build the opposite wheels
+with the new UI, then drive, name/download, share and re-edit successfully.
+Independent desktop/mobile image review confirms the new button and wrapped
+controls are readable, the duplicate is selected, and the model fits. A partly
+scrolled-off Core row does not hide the selected branch. WebKit 3D capture
+limitations from Sprint 35 remain separate from its workflow assertions.
+
+Retrospective: ordinary copying preserves control expressions, which makes an
+opposite-side wheel drive the wrong way unless the user changes its sign. A
+geometry-aware operation can remove both repeated construction and that manual
+correction, but must be checked with physical trajectories and actual mesh
+vertices as well as parsed text. Next: exercise a non-car creation example to
+find gaps in assigning controls and testing a model, rather than extrapolating
+one steering car to every kind of construction. No push/deployment performed.
+
+Final regression: all 21 Chromium browser scenarios pass against the production
+build, in addition to the Firefox/WebKit mirrored-car loops and 115 unit/
+integration tests. No regression was observed in the covered save/share, input,
+source history, camera, naming and recovery flows.

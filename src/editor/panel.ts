@@ -25,6 +25,7 @@ export class BuildPanel {
   }
   private clipboard: CopiedBranch | null = null;
   private copy = document.getElementById('copy-branch') as HTMLButtonElement;
+  private mirror = document.getElementById('mirror-branch') as HTMLButtonElement;
   assembly: Assembly | null = null;
   private panel = document.getElementById('builder')!;
   private toggle = document.getElementById('build') as HTMLButtonElement;
@@ -88,6 +89,7 @@ export class BuildPanel {
       else this.document.bindAngle(this.selected, value);
     });
     document.getElementById('new-model')!.onclick = () => this.edit(() => { this.document.newModel(); this.selected = 0; }, true);
+    this.mirror.onclick = () => this.edit(() => { this.selected = this.document.mirrorBranch(this.selected); });
     this.copy.onclick = () => {
       try {
         this.clipboard = this.document.copyBranch(this.selected);
@@ -221,7 +223,7 @@ export class BuildPanel {
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = false);
     } catch (e) {
       this.assembly = null; this.tree.replaceChildren(); this.scene.selectTile(null);
-      this.type.disabled = this.angle.disabled = this.remove.disabled = this.copy.disabled = true;
+      this.type.disabled = this.angle.disabled = this.remove.disabled = this.copy.disabled = this.mirror.disabled = true;
       this.powerRow.hidden = this.angleRow.hidden = true;
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = true);
       this.status.textContent = e instanceof Error ? e.message : String(e);
@@ -290,7 +292,7 @@ export class BuildPanel {
     if (!constant && ![...this.powerControl.options].some(o => o.value === power.toUpperCase())) this.powerControl.add(new Option(power, power.toUpperCase()));
     this.powerControl.add(new Option('↑ / ↓ を追加', 'new'));
     this.powerControl.value = constant ? 'constant' : power.toUpperCase();
-    this.remove.disabled = this.copy.disabled = !tile.parent;
+    this.remove.disabled = this.copy.disabled = this.mirror.disabled = !tile.parent;
     this.remove.textContent = tile.children.length ? '枝ごと削除' : '削除';
   }
 }

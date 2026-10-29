@@ -206,6 +206,47 @@ export class ModelDocument {
     const words = new Set(text.toUpperCase().match(/[A-Z_][A-Z0-9_]*/g));
     return {text, count:nodes.length, variables:parseRc(this.text).vals.filter(v=>words.has(v.name.toUpperCase())).map(v=>v.name.toUpperCase())};
   }
+  /** Reflect a branch across its parent's local plane to the opposite attachment edge. */
+  mirrorBranch(index: number): number {
+    const branch = this.copyBranch(index); // Retain the copy guard against duplicate names.
+    const nodes = this.nodes(), root = nodes[index];
+    const parentIndex = nodes.findIndex(n => n.children.includes(root));
+    if (parentIndex < 0 || !root.dir) throw new Error('Core以外の枝を選んでください');
+    const pair = root.dir === 'E' || root.dir === 'W' ? {E:'W', W:'E'} : {N:'S', S:'N'};
+    const opposite = pair[root.dir as keyof typeof pair];
+    if (nodes[parentIndex].children.some(n=>n.dir===opposite)) throw new Error('反対側には既に部品があります');
+    const edits: [number, number, string][] = [];
+    const start = root.source!.start;
+    const negate = (raw: string) => {
+      const compact = raw.replace(/\s/g, '');
+      if (/^-?[A-Za-z_][A-Za-z0-9_]*$/.test(compact)) return compact.startsWith('-') ? compact.slice(1) : `-${compact}`;
+      if (compact && Number.isFinite(Number(compact))) return String(-Number(compact));
+      return `-(${raw})`;
+    };
+    for (const node of nodes.slice(index, index + branch.count)) {
+      const range = node.source!, type = node.type.toLowerCase();
+      const direction = pair[node.dir as keyof typeof pair];
+      if (direction) edits.push([range.start - start, range.start - start + 1, direction]);
+      const flip = (name: string) => {
+        const r = range.attributes[name];
+        if (r) edits.push([r[0] - start, r[1] - start, negate(this.text.slice(...r))]);
+      };
+      if (['rudder','rudderf','trim','trimf'].includes(type)) flip('angle');
+      if (['wheel','rlw'].includes(type)) flip('power');
+      if (type === 'cowl' && node.attrs.option !== undefined) {
+        const option = Number(node.attrs.option.replace(/\s/g, ''));
+        if (!Number.isFinite(option)) throw new Error('形状を式で指定したCowlはソースで反転してください');
+        const r = range.attributes.option;
+        if (option === 3 || option === 4) edits.push([r[0] - start, r[1] - start, String(7 - option)]);
+      }
+    }
+    let mirrored = branch.text;
+    for (const [from,to,value] of edits.sort((a,b)=>b[0]-a[0])) mirrored = mirrored.slice(0,from)+value+mirrored.slice(to);
+    const parent = nodes[parentIndex];
+    const next = parentIndex + nodes.filter(n=>n.source!.start>=parent.source!.start && n.source!.end<=parent.source!.end).length;
+    this.pasteBranch(parentIndex, mirrored[0] as 'N'|'S'|'E'|'W', {...branch,text:mirrored});
+    return next;
+  }
   pasteBranch(index: number, dir: 'N' | 'S' | 'E' | 'W', branch: CopiedBranch): void {
     const names = new Set(parseRc(this.text).vals.map(v=>v.name.toUpperCase()));
     if (branch.variables.some(name=>!names.has(name))) throw new Error('貼り付け元の操作変数がありません。元のモデルで貼り付けてください');

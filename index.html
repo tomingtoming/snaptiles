@@ -25,7 +25,7 @@
           <div id="draft-description"><strong id="draft-filename"></strong><span id="draft-saved"></span></div>
           <button id="restore-draft" type="button" aria-describedby="draft-description">下書きを復元</button>
         </div>
-        <div id="editor-toolbar" class="edit-row"><button id="new-model">新規</button><button id="frame-model">全体</button><button id="focus-part">選択へ</button><button id="save-model">保存</button><button id="share-model">共有リンク</button><button id="copy-branch">コピー</button><button id="rename-model" type="button">保存名</button><button id="edit-undo" aria-label="取り消し">↶</button><button id="edit-redo" aria-label="やり直し">↷</button></div>
+        <div id="editor-toolbar" class="edit-row"><button id="new-model">新規</button><button id="frame-model">全体</button><button id="focus-part">選択へ</button><button id="save-model">保存</button><button id="share-model">共有リンク</button><button id="copy-branch">コピー</button><button id="mirror-branch" type="button" title="親部品の反対側へ枝を反転して複製">反対側へ</button><button id="rename-model" type="button">保存名</button><button id="edit-undo" aria-label="取り消し">↶</button><button id="edit-redo" aria-label="やり直し">↷</button></div>
         <label>部品<select id="parts" size="5"></select></label>
         <div class="edit-row"><label>種類<select id="part-type"></select></label><label><span id="angle-label">角度</span><input id="part-angle" type="text" inputmode="decimal" /></label><label id="option-field" hidden><span id="option-label">設定</span><select id="part-option"></select></label><button id="part-delete">削除</button></div>
         <div id="angle-control-row" class="edit-row" hidden><label>角度の操作<select id="angle-control"></select></label></div>
@@ -71,6 +71,7 @@
         <li><strong>保存名</strong>で名前を付け、<strong>保存</strong>でファイルへ、<strong>開く</strong>で読込。<strong>共有リンク</strong>は今の編集内容を渡せます。下書きはこのブラウザに最新の1件が保存され、復元後はUndoで戻せます。</li>
       </ol>
       <p><strong>枝のコピー：</strong>部品を選んで「コピー」、接続先の部品を選び、N / W / E / S ＋で貼り付けます。</p>
+      <p><strong>反対側へ：</strong>枝を選ぶと、親部品の反対側へ反転して複製できます。車輪の駆動とRudder / Trimの角度も反転します。名前付きの枝、式で形状を変えるCowl、既に部品がある反対側は対象外です。</p>
       <p><strong>画面操作：</strong>ドラッグで回転、ホイールで拡大縮小。タッチでは1本指で回転、2本指で拡大縮小。視点ボタンで追従・周回・上空・車載を切り替えます。</p>
       <p><strong>キーボード：</strong>Ctrl / ⌘ + ZでUndo、Shiftを加えるとRedo。ソース欄と組み立て操作は同じ履歴で戻せます。数値など他の入力欄では、その欄のUndoになります。ソース欄はCtrl / ⌘ + Enterで実行、Tabで字下げ、Shift + Tabで前の操作へ移動します。</p>
       <div class="share-actions"><form method="dialog"><button>閉じる</button></form></div>
