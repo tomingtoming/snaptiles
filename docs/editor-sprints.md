@@ -616,3 +616,34 @@ Selection metadata belongs alongside history, while arbitrary source replacement
 requires a conservative fallback. Next: run another complete construction-to-
 share workflow and prioritize failures that interrupt that loop over isolated
 control polish.
+
+
+## 2026-10-30 — Verify the complete build-to-share loop
+
+Goal: test one evolving vehicle across construction, controls, driving, revision,
+save, sharing and resumed editing, rather than treating each feature in isolation.
+Extended the existing GUI-built four-wheel steering-car probe. After its first
+drive, change shared power from 800 to 1000, download the exact source, generate
+a share URL, and open it in an independent mobile/touch browser context. The
+receiver drives more than one metre using screen controls, holds throttle and
+steering together, releases both, then reopens the actual downloaded bytes.
+Change power to 1200, save under the imported filename and run again. Source
+round trips are exact and no page errors occur.
+Validation: the extended probe passes against both the development server and
+the current production build. Production run: initial drive7.005m, shared
+touch drive4.784m, saved source463bytes. Unit/app code is unchanged; the prior
+96-unit/17-browser baseline was not unnecessarily repeated.
+
+Independent visual review confirms the reopened Wheel target, angle90, radius
+0.30m, shared power1200 and major controls are readable. Its initial simultaneous-
+press screenshot showed only one highlighted key: the capture occurred during
+the 60ms CSS color transition. The probe now waits for both held states and
+completed computed colors; the repeated review confirms both highlights. No
+application change was needed for this observation.
+
+Retrospective: crossing separate browser/file boundaries provides evidence that
+isolated feature probes miss. Visual evidence also needs a defined settled
+state; an immediate simulation-value assertion does not settle a CSS transition.
+The receiver's default chase view makes this small vehicle hard to inspect.
+Next: evaluate initial camera framing against model size on first shared-link
+load, while preserving intentional manual zoom during ordinary driving.
