@@ -106,5 +106,5 @@ function isTyping(e: KeyboardEvent): boolean {
   const t = e.target as HTMLElement | null;
   if (!t) return false;
   const tag = t.tagName;
-  return tag === 'TEXTAREA' || tag === 'INPUT' || t.isContentEditable;
+  return tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT' || tag === 'BUTTON' || t.isContentEditable;
 }

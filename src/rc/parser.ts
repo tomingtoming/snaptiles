@@ -29,6 +29,7 @@ export interface ChipNode {
   attrs: Record<string, string>; // raw expressions
   children: ChipNode[];
   line: number;
+  source?: { start: number; end: number; typeStart: number; typeEnd: number; headerEnd: number; close?: number; argsEnd?: number; attributes: Record<string, [number, number]> };
 }
 
 export interface RcModel {
@@ -47,7 +48,7 @@ export class RcParseError extends Error {
   }
 }
 
-type Tok = { t: 'id' | 'num' | 'sym' | 'str'; v: string; line: number };
+type Tok = { t: 'id' | 'num' | 'sym' | 'str'; v: string; line: number; start: number; end: number };
 
 function stripComments(src: string): string {
   let out = '';
@@ -57,14 +58,14 @@ function stripComments(src: string): string {
     const n = src[i + 1];
     if ((c === '/' && n === '/') || (c === '-' && n === '-')) {
       // `//` comments; some community files also use Lua-style `--` outside the Lua block
-      while (i < src.length && src[i] !== '\n') i++;
+      while (i < src.length && src[i] !== '\n') { out += ' '; i++; }
     } else if (c === '/' && n === '*') {
-      i += 2;
+      out += '  '; i += 2;
       while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) {
-        if (src[i] === '\n') out += '\n';
+        out += src[i] === '\n' ? '\n' : ' ';
         i++;
       }
-      i += 2;
+      out += '  '; i += 2;
     } else {
       out += c;
       i++;
@@ -84,7 +85,7 @@ function tokenize(src: string): Tok[] {
     if (/[A-Za-z_]/.test(c)) {
       let j = i;
       while (j < src.length && /[A-Za-z0-9_]/.test(src[j])) j++;
-      toks.push({ t: 'id', v: src.slice(i, j), line });
+      toks.push({ t: 'id', v: src.slice(i, j), line, start: i, end: j });
       i = j;
       continue;
     }
@@ -95,14 +96,14 @@ function tokenize(src: string): Tok[] {
         j++;
         while (j < src.length && /[0-9]/.test(src[j])) j++;
       }
-      toks.push({ t: 'num', v: src.slice(i, j), line });
+      toks.push({ t: 'num', v: src.slice(i, j), line, start: i, end: j });
       i = j;
       continue;
     }
     if (c === '"' || c === "'") {
       let j = i + 1;
       while (j < src.length && src[j] !== c) j++;
-      toks.push({ t: 'str', v: src.slice(i + 1, j), line });
+      toks.push({ t: 'str', v: src.slice(i + 1, j), line, start: i, end: j + 1 });
       i = j + 1;
       continue;
     }
@@ -110,19 +111,19 @@ function tokenize(src: string): Tok[] {
       // #RRGGBB colour literal: keep it as one token so no space is inserted after '#'
       let j = i + 1;
       while (j < src.length && /[0-9a-fA-F]/.test(src[j])) j++;
-      toks.push({ t: 'num', v: src.slice(i, j), line });
+      toks.push({ t: 'num', v: src.slice(i, j), line, start: i, end: j });
       i = j;
       continue;
     }
-    toks.push({ t: 'sym', v: c, line });
+    toks.push({ t: 'sym', v: c, line, start: i, end: i + 1 });
     i++;
   }
   return toks;
 }
 
 /** Find top-level `Name { ... }` blocks, returning raw inner text (brace-balanced). */
-function findBlocks(src: string): { name: string; inner: string; line: number }[] {
-  const blocks: { name: string; inner: string; line: number }[] = [];
+function findBlocks(src: string): { name: string; inner: string; line: number; offset: number }[] {
+  const blocks: { name: string; inner: string; line: number; offset: number }[] = [];
   const re = /(^|[\s}])([A-Za-z_][A-Za-z0-9_]*)\s*\{/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(src))) {
@@ -144,7 +145,7 @@ function findBlocks(src: string): { name: string; inner: string; line: number }[
       }
     }
     const line = src.slice(0, m.index).split('\n').length;
-    blocks.push({ name, inner: src.slice(open + 1, i), line });
+    blocks.push({ name, inner: src.slice(open + 1, i), line, offset: open + 1 });
     re.lastIndex = i + 1;
   }
   return blocks;
@@ -152,7 +153,8 @@ function findBlocks(src: string): { name: string; inner: string; line: number }[
 
 class P {
   i = 0;
-  constructor(public toks: Tok[], public baseLine: number) {}
+  ranges: Record<string, [number, number]> = {};
+  constructor(public toks: Tok[], public baseLine: number, public offset = 0) {}
   peek(o = 0): Tok | undefined { return this.toks[this.i + o]; }
   next(): Tok {
     const t = this.toks[this.i++];
@@ -193,6 +195,7 @@ class P {
   /** parses `( a=expr, b=expr )`; bare values are stored positionally as `_0`, `_1`... */
   args(): Record<string, string> {
     const out: Record<string, string> = {};
+    this.ranges = {};
     this.expect('(');
     let pos = 0;
     while (!this.accept(')')) {
@@ -200,7 +203,9 @@ class P {
       const t1 = this.peek(1);
       if (t0?.t === 'id' && t1?.t === 'sym' && t1.v === '=') {
         this.i += 2;
+        const start = this.peek()!.start + this.offset;
         out[t0.v.toLowerCase()] = this.expr();
+        this.ranges[t0.v.toLowerCase()] = [start, this.toks[this.i - 1].end + this.offset];
       } else {
         out[`_${pos++}`] = this.expr();
       }
@@ -262,27 +267,35 @@ const DIRS = new Set(['N', 'S', 'E', 'W']);
 
 function parseNode(p: P): ChipNode {
   const line = p.line();
+  const start = p.peek()!.start + p.offset;
+  let typeToken = p.peek()!;
   let dir: ChipNode['dir'] = null;
   let name = p.ident();
   if (DIRS.has(name.toUpperCase()) && p.peek()?.v === ':') {
     p.accept(':');
     dir = name.toUpperCase() as ChipNode['dir'];
+    typeToken = p.peek()!;
     name = p.ident();
   }
+  const hasArgs = p.peek()?.v === '(';
   const attrs = p.peek()?.v === '(' ? p.args() : {};
-  const node: ChipNode = { type: name, dir, attrs, children: [], line };
+  const headerEnd = p.toks[p.i - 1].end + p.offset;
+  const node: ChipNode = { type: name, dir, attrs, children: [], line, source: { start, end: headerEnd, headerEnd, typeStart: typeToken.start + p.offset, typeEnd: typeToken.end + p.offset, argsEnd: hasArgs ? headerEnd - 1 : undefined, attributes: hasArgs ? { ...p.ranges } : {} } };
   if (p.accept('{')) {
     while (!p.accept('}')) {
       if (p.accept(',') || p.accept(';')) continue;
       node.children.push(parseNode(p));
     }
   }
+  if (p.toks[p.i - 1].v === '}') node.source!.close = p.toks[p.i - 1].start + p.offset;
+  node.source!.end = p.toks[p.i - 1].end + p.offset;
   return node;
 }
 
 /** A Body may hold several Cores (each its own vehicle / "bit"). */
-function parseBody(inner: string, baseLine: number): ChipNode[] {
+function parseBody(inner: string, baseLine: number, offset: number): ChipNode[] {
   const p = new P(tokenize(inner), baseLine);
+  p.offset = offset;
   const roots: ChipNode[] = [];
   while (p.peek()) {
     // stray separators / an extra closing brace (seen in community files) are ignored
@@ -311,7 +324,7 @@ export function parseRc(source: string): RcModel {
     if (name === 'val' || name === 'var') model.vals.push(...parseVal(inner, b.line));
     else if (name === 'key') model.keys.push(...parseKey(inner, b.line));
     else if (name === 'body') {
-      const roots = parseBody(inner, b.line);
+      const roots = parseBody(inner, b.line, b.offset);
       model.bodies.push(...roots);
       model.body = model.bodies[0] ?? null;
     }

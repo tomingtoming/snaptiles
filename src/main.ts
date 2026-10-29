@@ -1,3 +1,4 @@
+import { BuildPanel } from './editor/panel';
 import { initRapier } from './physics/world';
 import { SceneView } from './render/scene';
 import { KeyState, KEY_TABLE } from './input/keys';
@@ -29,11 +30,14 @@ let lastCoreVel: { x: number; y: number; z: number } | null = null;
 const crateVel: ({ x: number; y: number; z: number } | null)[] = [];
 const scene = new SceneView(canvas);
 let sim: Simulation | null = null;
+let builder: BuildPanel;
 let keyCaps: { el: HTMLElement; n: number }[] = [];
 
 const R = await initRapier();
 
 async function load(source: string): Promise<void> {
+  builder?.close();
+  paused = false;
   statusEl.textContent = '';
   const old = sim;
   sim = null;
@@ -135,20 +139,24 @@ sourceEl.addEventListener('keydown', (e) => {
     sourceEl.selectionStart = sourceEl.selectionEnd = a + 1;
   }
 });
-window.addEventListener('keydown', (e) => {
-  const typing = e.target instanceof HTMLTextAreaElement;
-  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-    // save the editor contents as a model file
-    e.preventDefault();
+function saveModel(): void {
     const blob = new Blob([sourceEl.value], { type: 'text/plain' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `${SAMPLES[current]?.name ?? 'model'}.rcd`;
     a.click();
     URL.revokeObjectURL(a.href);
+}
+$('save-model').addEventListener('click', saveModel);
+window.addEventListener('keydown', (e) => {
+  const typing = e.target instanceof HTMLElement && (['TEXTAREA', 'INPUT', 'SELECT', 'BUTTON'].includes(e.target.tagName) || e.target.isContentEditable);
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    // save the editor contents as a model file
+    e.preventDefault();
+    saveModel();
     return;
   }
-  if (typing) return;
+  if (typing || builder?.active) return;
   if (e.code === 'Space') { e.preventDefault(); paused = !paused; } // Space carries no key number in the original
   // the original's default scenario: H drops a ball (r 0.6, specific gravity 0.3) 6 m up at x = 2, J cycles the wind
   if (e.code === 'KeyH' && sim) { const n = sim.physics.balls.length; sim.physics.addBall(0.6, 2, 6 + n, n / 10, 0.3); }
@@ -221,7 +229,7 @@ function frame(now: number): void {
   requestAnimationFrame(frame);
   acc += Math.min(0.1, (now - last) / 1000);
   last = now;
-  if (sim) {
+  if (sim && !builder?.active) {
     keys.pollGamepad();
     const FIXED = sim.frameDt();
     let n = 0;
@@ -243,6 +251,7 @@ function frame(now: number): void {
     updateOverlay(sim);
     updateSound(sim);
   }
+  if (builder?.active) acc = 0;
   scene.render();
 }
 function updateSound(s: Simulation): void {
@@ -407,5 +416,6 @@ async function boot(): Promise<void> {
   refreshSampleButtons();
   await loadAndShare(SAMPLES[idx].source);
 }
+builder = new BuildPanel(sourceEl, scene, statusEl, () => { paused = true; sfx.update(0, 0); });
 void boot();
 window.addEventListener('hashchange', () => void boot()); // #car / #plane / #m=... links switch models

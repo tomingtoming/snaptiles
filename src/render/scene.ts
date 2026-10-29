@@ -246,6 +246,39 @@ export class SceneView {
     }
   }
 
+  preview(tiles: TileInstance[], env: ValEnv): void {
+    this.rebuild(tiles, env);
+    const lift = 0.4 - Math.min(...tiles.map(t => t.position.y));
+    for (const t of tiles) {
+      const v = this.views.get(t.id)!;
+      v.mesh.position.copy(t.position);
+      v.mesh.position.y += lift;
+      v.mesh.quaternion.copy(t.quaternion);
+    }
+    this.group.updateMatrixWorld(true);
+  }
+
+  selectTile(id: number | null): void {
+    for (const [key, v] of this.views) {
+      v.material.emissive.setHex(key === id ? 0xffb000 : 0x000000);
+      v.material.emissiveIntensity = key === id ? 0.65 : 0;
+    }
+  }
+
+  pickTile(x: number, y: number): number | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2((x - rect.left) / rect.width * 2 - 1, 1 - (y - rect.top) / rect.height * 2), this.camera);
+    const hit = ray.intersectObjects([...this.views.values()].map(v => v.mesh), true)[0];
+    if (!hit) return null;
+    let object: THREE.Object3D | null = hit.object;
+    while (object) {
+      for (const [id, v] of this.views) if (v.mesh === object) return id;
+      object = object.parent;
+    }
+    return null;
+  }
+
   private applyColor(v: TileView, env: ValEnv): void {
     const t = v.tile;
     let c = t.colorExpr ? evalExpr(t.colorExpr, env) : NaN;

@@ -40,6 +40,25 @@ Samples: `car` (↑↓ drive, ←→ steer), `plane` (Z/X throttle, ↓ pull up)
 hold; ↑↓←→ move, A/D turn), `tank` (A/D turret, Z fire). The course has a
 ramp, kerbs, a gate, a wall and crates to knock over.
 
+## Build visually
+
+Press **組む** to pause simulation and edit the assembled model. Click a tile
+in the 3D view or select it in the part list. Choose a part type and N/S/E/W
+to attach it, change the selected tile's type or numeric angle, or delete
+its branch. Core cannot be deleted. ↶ / ↷ undo and redo edits, including
+after a test run; **保存** downloads the model. Press ▶ to test it and update
+the shareable URL, then **組む** to return to its construction pose.
+
+Edits patch only the affected source ranges. Other attributes, comments,
+Val/Key definitions and scripts are retained. Variable-driven angles remain
+read-only in the visual panel; edit their expressions in the source. Manual
+source edits reset visual undo history. Power, key bindings, colours and Lua
+still use the text editor; mirroring and multi-selection are not implemented.
+The editor is independently implemented, without RCD/RCM source or assets.
+
+Browser regression (against an already running dev server):
+`node tools/editor-probe.mjs http://127.0.0.1:<port>/`.
+
 ## Model file
 
 ```
