@@ -213,11 +213,21 @@ export class SceneView {
     this.resize();
   }
 
-  resize(): void {
+  resize(preserveFraming = false): void {
     const w = this.canvas.clientWidth || 1;
     const h = this.canvas.clientHeight || 1;
     this.renderer.setSize(w, h, false);
+    // Preserve the user's zoom relative to the limiting viewport dimension.
+    // This also keeps a previously fitted bounding sphere visible after rotation/resizing.
+    const halfFov = THREE.MathUtils.degToRad(this.camera.fov) / 2;
+    const oldLimit = Math.atan(Math.tan(halfFov) * Math.min(1, this.camera.aspect));
     this.camera.aspect = w / h;
+    if (preserveFraming) {
+      const newLimit = Math.atan(Math.tan(halfFov) * Math.min(1, this.camera.aspect));
+      const scale = Math.sin(oldLimit) / Math.sin(newLimit);
+      this.camDist *= scale;
+      this.camera.position.sub(this.camTarget).multiplyScalar(scale).add(this.camTarget);
+    }
     this.camera.updateProjectionMatrix();
   }
 

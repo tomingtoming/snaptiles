@@ -384,7 +384,7 @@ function drawHud(buf: number[], s: Simulation): void {
 function fmt(v: number): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(2);
 }
-new ResizeObserver(() => scene.resize()).observe(canvas);
+new ResizeObserver(() => scene.resize(builder.active)).observe(canvas);
 requestAnimationFrame(frame);
 
 // ---- files in, links out ----

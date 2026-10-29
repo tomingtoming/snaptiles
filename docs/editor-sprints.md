@@ -499,3 +499,28 @@ Keep labels readable in screen space while anchoring their leaders in model
 space. These samples do not prove collision-free labels at every degenerate
 camera angle. Next: investigate framing after changing the construction view,
 particularly the clipping seen in the enlarged-wheel review fixture.
+
+
+## 2026-10-30 — Preserve construction framing across viewport changes
+
+Goal: distinguish ordinary manual enlargement from unintended clipping after
+camera/view changes. A fitted 15-part span stays visible while orbiting, but
+resizing a 1600x600 window to 850x1000 reproduced clipping (projected extent
+1.759, where 1 is the viewport boundary). 800px uses the mobile layout and did
+not reproduce it; the responsive boundary matters.
+
+Scene resize now scales editor camera distance by the old/new limiting field
+of view. It preserves the viewing direction and the user's relative manual
+zoom, rather than unconditionally fitting the full model again. Runtime camera
+distance is unchanged. The new browser probe checks geometry bounds, orbit,
+wide/narrow/mobile resize, a manual-zoom resize round trip and runtime isolation.
+Independent visual review confirms all model ends remain visible in three sizes.
+Validation: 88 unit tests, typecheck/build and all 14 browser probes pass.
+
+Retrospective: the previous clipped fixture was enlarged by adding branches
+without refitting, so it alone did not establish a camera defect. A controlled
+full-fit/resize experiment identified a separate real issue. Whole-model view
+can still make attachment points dense; “選択へ” remains the detail view.
+The source field deliberately disables wrapping; the long-line fixture alone
+is insufficient evidence for changing that policy. Next: verify Undo when
+switching between direct source editing and GUI construction.
