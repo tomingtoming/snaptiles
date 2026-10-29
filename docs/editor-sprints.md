@@ -281,3 +281,30 @@ content. Share links still contain model text only, so receiving a link does not
 restore its sender's local filename; no custom-title UI has been introduced.
 Next: assess construction parameters already supported by the runtime but not
 yet editable in the GUI, especially wheel options and ballast weight.
+
+## 2026-10-29 — Adjust wheel radius and ballast from the GUI
+
+Goal: tune construction geometry and balance without editing option syntax.
+Wheel/RLW now expose radii 0.30/0.45/0.60 m and Weight exposes mass multipliers
+1–8 (option 0 retains its existing 1x default meaning). The radius choices use
+the 2026-10-27 measurements in measured.md; ballast choices follow the saved
+public format specification and existing runtime. Existing expression-valued
+options remain source-only. Edits preserve surrounding text and Undo history.
+
+The construction preview now lifts geometry whose bounding box would cross
+the ground, with 0.05 m clearance, and option changes reframe the whole model.
+This only affects the editor pose/camera; runtime spawn rules are unchanged.
+
+Validation: 66 unit tests and typecheck/build pass. The option browser probe
+checks rendered wheel scale, geometry minimum height, projected bounds inside
+the viewport, Undo/Redo, runtime option, Weight assembly mass 806.4 kg and
+combined Core/Weight physics mass 831.6 kg. Expression replacement is blocked.
+Independent mobile review confirms readable settings and no overlapping controls.
+
+Retrospective: the first screenshot caught a large wheel clipped at the top;
+clearing the ground did not automatically update the camera framing. Reframing
+and a projection-bound assertion now cover that defect. An initial physical-mass
+assertion treated Weight as a separate body; fixed parts share one body, so the
+correct probe sums unique bodies and includes Core. These checks establish this
+editor/runtime path, not new original-executable calibration. Next: assess
+appearance controls so builders can distinguish and personalize their parts.

@@ -258,6 +258,12 @@ export class SceneView {
       v.mesh.quaternion.copy(t.quaternion);
     }
     this.group.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(this.group);
+    if (!bounds.isEmpty() && bounds.min.y < 0.05) {
+      const clearance = 0.05 - bounds.min.y;
+      for (const view of this.views.values()) view.mesh.position.y += clearance;
+      this.group.updateMatrixWorld(true);
+    }
   }
 
   frameModel(): void {

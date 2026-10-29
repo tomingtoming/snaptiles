@@ -2,6 +2,12 @@ import { parseRc, findBlocks, declarationRanges, type ChipNode } from '../rc/par
 
 interface DocumentState { text: string; filename?: string }
 
+export const OPTION_SETTINGS: Record<string, {label: string; choices: [number, string][]}> = {
+  wheel: {label: '半径', choices: [[0, '0.30 m'], [1, '0.45 m'], [2, '0.60 m']]},
+  rlw: {label: '半径', choices: [[0, '0.30 m'], [1, '0.45 m'], [2, '0.60 m']]},
+  weight: {label: '重さ倍率', choices: [[0, '1倍（既定）'], ...Array.from({length:8}, (_, i): [number, string] => [i + 1, `${i + 1}倍`])]},
+};
+
 export interface CopiedBranch { text: string; variables: string[]; count: number }
 
 /** Edits use parser offsets: scripts, comments and unrelated attributes remain byte-for-byte. */
@@ -40,6 +46,13 @@ export class ModelDocument {
     if (n.attrs.angle && !Number.isFinite(Number(n.attrs.angle.replace(/\s/g, ''))))
       throw new Error('変数で制御する角度はソースで編集してください');
     this.replace(...this.attributeEdit(index, 'angle', String(value)));
+  }
+  option(index: number, value: number): void {
+    const node = this.nodes()[index], settings = OPTION_SETTINGS[node.type.toLowerCase()];
+    if (!settings?.choices.some(([choice]) => choice === value)) throw new Error('この部品では使えない設定値です');
+    const old = (node.attrs.option ?? '0').replace(/\s/g, '');
+    if (!Number.isFinite(Number(old))) throw new Error('式で指定した設定はソースで編集してください');
+    this.replace(...this.attributeEdit(index, 'option', String(value)));
   }
   power(index: number, value: number | string): void {
     if (typeof value === 'number' ? !Number.isFinite(value) : !parseRc(this.text).vals.some(v => v.name.toUpperCase() === value.replace(/^-/, '').toUpperCase()))

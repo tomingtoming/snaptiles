@@ -154,3 +154,23 @@ describe('document filenames', () => {
     expect(downloadFilename('')).toBe('model.rcd');
   });
 });
+
+
+describe('wheel and ballast options', () => {
+  it('changes only option, preserves script and undoes exactly', () => {
+    const text = 'Body { Core() { E:Wheel(angle=90, option=0, power=P) N:Weight() } }\nLua { -- preserved\n }';
+    const d = new ModelDocument(text);
+    d.option(1, 2); expect(d.nodes()[1].attrs.option).toBe('2');
+    expect(d.text).toBe(text.replace('option=0', 'option=2'));
+    d.undo(); expect(d.text).toBe(text);
+    d.option(2, 8); expect(d.nodes()[2].attrs.option).toBe('8');
+    d.undo(); expect(d.text).toBe(text);
+  });
+  it('rejects wrong types, out-of-range values and expression replacement', () => {
+    const d = new ModelDocument('Val { R(default=1) } Body { Core() { E:Wheel(option=R) N:Weight() } }');
+    const before=d.text;
+    expect(()=>d.option(0,1)).toThrow(); expect(()=>d.option(1,2)).toThrow();
+    expect(()=>d.option(2,9)).toThrow(); expect(()=>d.option(2,1.5)).toThrow();
+    expect(d.text).toBe(before);
+  });
+});

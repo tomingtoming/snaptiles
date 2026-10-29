@@ -1,5 +1,5 @@
 import { DraftStore } from './draft';
-import { ModelDocument, type CopiedBranch } from './document';
+import { OPTION_SETTINGS, ModelDocument, type CopiedBranch } from './document';
 import { parseRc } from '../rc/parser';
 import { assemble, type Assembly } from '../model/assemble';
 import type { SceneView } from '../render/scene';
@@ -21,6 +21,8 @@ export class BuildPanel {
   private angle = document.getElementById('part-angle') as HTMLInputElement;
   private angleControl = document.getElementById('angle-control') as HTMLSelectElement;
   private angleRow = document.getElementById('angle-control-row')!;
+  private option = document.getElementById('part-option') as HTMLSelectElement;
+  private optionField = document.getElementById('option-field')!;
   private power = document.getElementById('part-power') as HTMLInputElement;
   private powerControl = document.getElementById('power-control') as HTMLSelectElement;
   private powerRow = document.getElementById('power-row')!;
@@ -47,6 +49,7 @@ export class BuildPanel {
     this.tree.onchange = () => { this.selected = Number(this.tree.value); this.paintSelection(); };
     this.type.onchange = () => this.edit(() => this.document.type(this.selected, this.type.value));
     this.angle.onchange = () => this.edit(() => { if (!this.angle.value.trim()) throw new Error('角度には数値を入力してください'); const expression = this.document.nodes()[this.selected].attrs.angle ?? '0'; if (this.document.controlStrength(expression) !== null) this.document.setControlStrength(expression, Number(this.angle.value)); else this.document.angle(this.selected, Number(this.angle.value)); });
+    this.option.onchange = () => this.edit(() => this.document.option(this.selected, Number(this.option.value)), true);
     this.power.onchange = () => this.edit(() => {
       if (!this.power.value.trim()) throw new Error('出力には数値を入力してください');
       const expression = this.document.nodes()[this.selected].attrs.power ?? '0';
@@ -171,6 +174,20 @@ export class BuildPanel {
     this.scene.selectTile(tile.id);
     this.type.value = TYPES.find(t => t.toLowerCase() === tile.type) ?? 'Core';
     this.type.disabled = !tile.parent;
+    const settings = OPTION_SETTINGS[tile.type];
+    this.optionField.hidden = !settings;
+    this.option.replaceChildren();
+    if (settings) {
+      document.getElementById('option-label')!.textContent = settings.label;
+      for (const [value, label] of settings.choices) this.option.add(new Option(label, String(value)));
+      const raw = (tile.node.attrs.option ?? '0').replace(/\s/g, '');
+      const numeric = Number(raw);
+      const value = Number.isFinite(numeric) ? String(numeric) : raw;
+      if (![...this.option.options].some(option => option.value === value)) this.option.add(new Option(`元の値: ${raw}`, value));
+      this.option.value = value;
+      this.option.disabled = !Number.isFinite(numeric);
+      this.option.title = this.option.disabled ? `ソースで編集: ${raw}` : '';
+    }
     const angle = tile.node.attrs.angle ?? '0';
     const angleStrength = this.document.controlStrength(angle);
     this.angle.value = angleStrength === null ? angle.replace(/\s/g, '') : String(angleStrength);

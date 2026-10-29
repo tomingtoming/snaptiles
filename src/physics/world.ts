@@ -1358,8 +1358,7 @@ function toLocalDir(body: RAPIER.RigidBody, worldDir: THREE.Vector3) {
   return { x: v.x, y: v.y, z: v.z };
 }
 
-/** rotor radius per Wheel option (0/1/2). Only the ordering is documented; sizes are guesses,
- *  chosen so the tyre reaches beyond the corners of the rim plate (half-diagonal 0.71). */
+/** Wheel/RLW radius: 0.30/0.45/0.60 m, measured against 1.5B26 on 2026-10-27. */
 export function wheelRadius(option: number): number {
   const tune = (globalThis as unknown as { __tune?: { wheelRadius?: number } }).__tune?.wheelRadius;
   const base = tune ?? WHEEL_RADIUS0;
