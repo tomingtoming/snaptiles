@@ -1707,3 +1707,32 @@ models, preserving the documented limits on numeric references.
 Final validation: complete move and custom-key workflows pass in Windows WebKit
 against the dev server and Chromium against the existing production build with
 the settled-input probes. Full suite was not rerun for this test-only change.
+
+
+## 2026-10-30 — Move scripted branches through save and share (Sprint 57)
+
+Goal: verify that relocation preserves named control bindings through actual
+file and shared-link round trips. Added editor-move-script-probe.mjs to the
+production-preview suite (35 scenarios). Product code is unchanged.
+
+The fixture reads USER1 through BRANCH by name and through numeric index 1.
+Both initially return 11. After moving the named Frame/Wheel subtree under
+TARGET, BRANCH still returns 11, while index 1 returns TARGET's 99. Lua remains
+byte-for-byte unchanged. This verifies the documented numbering limitation;
+numeric references are deliberately not rewritten. Actual C press/release
+produces wheel power 700/0 without script errors after moving, sharing to a
+fresh 390px browser context, and reopening the downloaded file. The receiver
+can then edit power to 500 and operate the same named wheel.
+
+Validation: Chromium production-preview probe passes. Undo/Redo restores exact
+source; exported bytes and named-move.rcd filename match; fresh shared and
+reopened sources match. Reopen waits for a different simulation instance as
+well as expected outputs, preventing matching old state from passing the test.
+No browser page errors. The fixture covers one named tree and one numeric
+reference, not arbitrary script equivalence.
+
+Retrospective: preserving script text is necessary but insufficient evidence
+of preserved meaning. Observe named identity and numeric ordering separately,
+and prove that a file was actually reloaded before checking identical values.
+Next: run the accumulated editor regression suite with a fresh build. No push
+or deployment.
