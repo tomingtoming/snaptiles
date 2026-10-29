@@ -101,7 +101,7 @@ This browser keeps one latest draft, including unfinished text and its filename.
 The recovery card identifies its name and local save time before **下書きを復元**.
 Restoration is undoable. It is not a multi-model library or cloud backup; save
 files for durable copies. The editor is independently implemented without
-RCD/RCM source or assets. Mirroring, multi-selection, a general key-mapping GUI
+RCD/RCM source or assets. Multi-selection, an arbitrary key-mapping GUI
 and a Lua programming GUI are not implemented; the source remains editable.
 A working construction loop does not establish compatibility with every
 RigidChips model, script or physical behavior. See `docs/editor-sprints.md` for

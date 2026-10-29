@@ -1515,3 +1515,43 @@ to accumulate isolated UI changes. No push or deployment.
 
 Independent 390px image review found the shared-strength paragraph fully
 readable and all four distinctions explicit, without overlap or clipping.
+
+
+## 2026-10-30 — Integrated build/play verification (Sprint 52)
+
+Goal: revalidate the accumulated editor/control/diagnostic changes together.
+Started from clean commit 62ea700. 155 unit/integration tests in 20 files and a
+fresh production build pass. Firefox 157.0 and Windows WebKit 27.2 each build a
+seven-part vehicle, drive/release, save a named 458-byte file, share to a fresh
+context, edit at narrow width and reopen the file. Distances in these runs were
+3.86m and 4.03m respectively; these are workflow observations, not browser
+performance rankings. WebKit audio remains unavailable with graceful fallback.
+
+Both plane scenarios pass: the corrected sample takes off at tick 178, and the
+GUI-created 30-part aircraft takes off, saves 1,218 bytes, shares and re-edits.
+The 101-part/100-control scale probe passes strength/history/named-branch guards
+and the Lua exact-byte colour round trip; median synchronous selection duration
+was 8.3ms on this host. These scenarios do not establish steady flight, arbitrary
+model compatibility, real mobile keyboard behavior or Apple Safari rendering.
+
+Documentation audit found an outdated README sentence still listing mirroring
+as unimplemented despite its earlier implemented-feature paragraph. Removed
+that contradiction and clarified that the remaining key-mapping gap is arbitrary
+key selection, beyond the existing four key-pair choices.
+
+Retrospective: integrated workflows remain the meaningful checkpoint after a
+series of small fixes. Tests and feature documentation can drift independently;
+read the unsupported-feature list against actual implemented paths. Do not
+substitute a passing workflow for full original-engine fidelity. No push/deploy;
+remote CI and production still do not contain these local changes.
+
+
+Final result: all 31 default Chromium scenarios completed successfully on the
+fresh build, including new unknown-section/type diagnostics, failed-view cleanup,
+shared-control separation, multi-step branch history and failure recovery. The
+same run also completed the two browser portability loops, two plane scenarios
+and scale scenario described above. No application change was required in this
+sprint. Windows WebKit's known 3D screenshot limitation still prevents claiming
+full visual parity with Apple Safari. Next: assess extending control assignment
+beyond the four preset key pairs, starting from concrete construction needs and
+preserving existing shared/reversed/held behavior.
