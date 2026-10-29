@@ -405,3 +405,26 @@ which bypassed the real transition failure. The new probe preserves actual
 keyboard focus transitions. This is a keyboard workflow check, not a complete
 screen-reader or accessibility audit. Next: audit icon labels and discoverability
 of construction commands, including guidance that does not require reading README.
+
+## 2026-10-30 — Put the construction guide in the app
+
+Goal: make the build/configure/run/save loop discoverable without opening README.
+Added a ? button with a native modal guide covering the five-step workflow,
+branch copy, camera/touch gestures, and keyboard navigation. Icon controls now
+have Japanese accessible labels and state/tooltips. Entering the builder also
+synchronizes the view button/index with the orbit camera instead of leaving a
+chase icon for an orbit view. Narrow headers wrap below 360px.
+
+Validation: typecheck/build passes. The guide probe opens the named dialog,
+checks view-state labels, preserves source and editor state, closes with Escape
+and its button, and checks focus returns to the initiating control. At 320px,
+header/document width and the reachable close button stay inside the viewport.
+Independent review finds readable steps and no text overlap at 390/320px.
+
+Retrospective: a small-screen check found the native dialog initially focused
+its last Close button and scrolled past the opening instructions. Explicitly
+focusing the heading restores the intended reading order; that condition is
+now asserted. Review also caught missing touch instructions despite existing
+pinch support; the guide now names both gestures. This is a layout/focus and
+content check, not a first-time-user comprehension study. Next: test touch
+pinch/cancellation sequences rather than infer their reliability from code.

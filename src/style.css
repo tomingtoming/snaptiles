@@ -95,3 +95,11 @@ button:disabled { opacity: .4; cursor: default !important; }
 #reset-color { min-height: 44px; }
 
 #view:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+
+#help { flex-shrink: 0; width: 28px; height: 30px; border: 1px solid #59636e; border-radius: 5px; color: var(--ink); background: #303840; cursor: pointer; }
+#help-dialog { width: min(620px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 20px; background: var(--panel); color: var(--ink); border: 1px solid #59636e; border-radius: 8px; }
+#help-dialog::backdrop { background: #0009; }
+#help-dialog h2 { margin-top: 0; font-size: 20px; }
+#help-dialog ol { padding-left: 22px; }
+#help-dialog li { margin: 10px 0; }
+@media(max-width: 360px) { #bar { flex-wrap: wrap; } #samples { flex-basis: 100%; } }

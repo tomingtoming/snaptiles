@@ -12,12 +12,13 @@
     <aside id="side">
       <header id="bar">
         <nav id="samples"></nav>
-        <button id="viewmode" type="button" aria-label="view">◎</button>
-        <button id="mute" type="button" aria-label="sound">🔊</button>
+        <button id="viewmode" type="button" aria-label="視点を切り替える">◎</button>
+        <button id="mute" type="button" aria-label="消音">🔊</button>
         <button id="open-model" type="button">開く</button>
         <input id="model-file" type="file" accept=".rc,.rcd,.txt" hidden />
+        <button id="help" type="button" aria-label="使い方" title="使い方">?</button>
         <button id="build" type="button" aria-pressed="false">組む</button>
-        <button id="run" type="button" aria-label="run">▶</button>
+        <button id="run" type="button" aria-label="実行" title="実行（ソース欄ではCtrl / ⌘ + Enter）">▶</button>
       </header>
       <section id="builder" hidden aria-label="モデル編集">
         <div class="edit-row"><button id="new-model">新規</button><button id="frame-model">全体</button><button id="focus-part">選択へ</button><button id="restore-draft" hidden>下書きを復元</button><button id="save-model">保存</button><button id="share-model">共有リンク</button><button id="copy-branch">コピー</button><button id="edit-undo" aria-label="取り消し">↶</button><button id="edit-redo" aria-label="やり直し">↷</button></div>
@@ -45,6 +46,20 @@
       <input id="share-url" type="text" readonly />
       <p id="share-status" role="status"></p>
       <div class="share-actions"><button id="copy-link" type="button">リンクをコピー</button><form method="dialog"><button>閉じる</button></form></div>
+    </dialog>
+    <dialog id="help-dialog" aria-labelledby="help-title">
+      <h2 id="help-title" tabindex="-1">作って、走らせる</h2>
+      <ol>
+        <li><strong>組む → 新規</strong>でCoreから作成。サンプルを選んで改造することもできます。</li>
+        <li>画面の部品か一覧を選び、種類・角度を調整。<strong>N / W / E / S ＋</strong>で選んだ部品の辺に追加します。「全体」「選択へ」で見やすい距離へ移動できます。</li>
+        <li>WheelやJetの<strong>操作</strong>から↑ / ↓を追加。RudderやTrimの<strong>角度の操作</strong>から← / →を追加できます。車輪が互いに逆向きに回る場合は、片側の操作を「（逆）」へ切り替えます。</li>
+        <li><strong>▶ 実行</strong>で試運転。表示されたキーで操縦し、<strong>組む</strong>で編集へ戻ります。</li>
+        <li><strong>保存</strong>でファイルへ、<strong>開く</strong>で読込。<strong>共有リンク</strong>は今の編集内容を渡せます。下書きはこのブラウザに保存されます。</li>
+      </ol>
+      <p><strong>枝のコピー：</strong>部品を選んで「コピー」、接続先の部品を選び、N / W / E / S ＋で貼り付けます。</p>
+      <p><strong>画面操作：</strong>ドラッグで回転、ホイールで拡大縮小。タッチでは1本指で回転、2本指で拡大縮小。視点ボタンで追従・周回・上空・車載を切り替えます。</p>
+      <p><strong>キーボード：</strong>Ctrl / ⌘ + ZでUndo、Shiftを加えるとRedo。文字入力中は入力欄のUndoになります。ソース欄はCtrl / ⌘ + Enterで実行、Tabで字下げ、Shift + Tabで前の操作へ移動します。</p>
+      <div class="share-actions"><form method="dialog"><button>閉じる</button></form></div>
     </dialog>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -6,7 +6,7 @@ try {
  const page=await browser.newPage({viewport:{width:390,height:844}});
  await page.goto(process.argv[2]??'http://127.0.0.1:5175/'); await page.waitForFunction(()=>window.__sim);
  await page.click('#build'); await page.click('#new-model'); await page.selectOption('#add-type','Cowl'); await page.click('[data-edge="N"]');
- await page.click('#viewmode'); await page.click('#viewmode');
+ await page.click('#viewmode');
  const geometry=[];
  for(let shape=0;shape<8;shape++) {
    await page.selectOption('#part-option',String(shape));

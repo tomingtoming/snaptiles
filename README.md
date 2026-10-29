@@ -137,3 +137,5 @@ Expand **色** to set a selected part’s fixed RGB color, including Core. **既
 Cowl parts expose shape options 0–7: plate, outline, disc, two triangles, a rounded end, and the two plate variants retained by the format. Shape changes preserve angle/color and support Undo/Redo.
 
 Keyboard workflow: running a model focuses the view so arrow controls work immediately; a focus change made during loading is respected. Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z work from part selectors. Source Tab inserts indentation; Shift+Tab leaves the source field. Modifier shortcuts do not act as vehicle controls.
+
+The **?** button opens an in-app building guide with control assignment, branch copy, saving/sharing, camera controls and keyboard navigation. View and sound icons expose Japanese labels and current-state hints.

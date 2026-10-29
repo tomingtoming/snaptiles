@@ -23,7 +23,7 @@ const sfx = new Sfx();
 window.addEventListener('pointerdown', () => sfx.unlock(), { capture: true });
 window.addEventListener('keydown', () => sfx.unlock(), { capture: true });
 const muteBtn = $<HTMLButtonElement>('mute');
-const paintMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; muteBtn.setAttribute('aria-pressed', String(sfx.muted)); };
+const paintMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; muteBtn.setAttribute('aria-pressed', String(sfx.muted)); muteBtn.title = sfx.muted ? '音を出す' : '消音'; };
 muteBtn.addEventListener('click', () => { sfx.setMuted(!sfx.muted); paintMute(); });
 paintMute();
 (window as unknown as { __sfx: Sfx }).__sfx = sfx; // probe hook
@@ -137,10 +137,10 @@ sourceEl.addEventListener('modelchange', refreshSampleButtons);
 runBtn.addEventListener('click', () => void loadAndShare(sourceEl.value));
 // ---- view modes (1-4 or the button; those digits carry no key number in the original) ----
 const VIEWS = [
-  { mode: 'chase', glyph: '◎' },
-  { mode: 'orbit', glyph: '✥' },
-  { mode: 'top', glyph: '⬒' },
-  { mode: 'onboard', glyph: '◉' },
+  { mode: 'chase', glyph: '◎', label: '追従' },
+  { mode: 'orbit', glyph: '✥', label: '周回' },
+  { mode: 'top', glyph: '⬒', label: '上空' },
+  { mode: 'onboard', glyph: '◉', label: '車載' },
 ] as const;
 const viewBtn = $<HTMLButtonElement>('viewmode');
 let viewIndex = 0;
@@ -148,8 +148,12 @@ function setView(i: number): void {
   viewIndex = (i + VIEWS.length) % VIEWS.length;
   scene.setView(VIEWS[viewIndex].mode);
   viewBtn.textContent = VIEWS[viewIndex].glyph;
+  viewBtn.title = `視点: ${VIEWS[viewIndex].label}（クリックで切替）`;
+  viewBtn.setAttribute('aria-label', viewBtn.title);
 }
 viewBtn.addEventListener('click', () => setView(viewIndex + 1));
+setView(0);
+$('help').addEventListener('click', () => { $<HTMLDialogElement>('help-dialog').showModal(); $('help-title').focus(); });
 let paused = false;
 let windLevel = 0;
 sourceEl.addEventListener('keydown', (e) => {
@@ -494,6 +498,6 @@ async function boot(): Promise<void> {
   refreshSampleButtons();
   await loadAndShare(SAMPLES[idx].source, request);
 }
-builder = new BuildPanel(sourceEl, scene, statusEl, () => { ++loadGeneration; paused = true; sfx.update(0, 0); });
+builder = new BuildPanel(sourceEl, scene, statusEl, () => { ++loadGeneration; paused = true; sfx.update(0, 0); setView(1); });
 void boot();
 window.addEventListener('hashchange', () => void boot()); // #car / #plane / #m=... links switch models
