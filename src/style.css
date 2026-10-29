@@ -64,8 +64,8 @@ button:disabled { opacity: .4; cursor: default !important; }
 @media(max-width: 800px) {
   #builder { padding: 4px 12px; }
   #parts { height: 76px; }
-  .edges { grid-template-columns: repeat(4, auto); }
-  .edges button:nth-child(n) { grid-row: auto; grid-column: auto; padding: 5px; }
+  .edges { grid-template-columns: repeat(4, auto); gap: 6px; }
+  .edges button:nth-child(n) { grid-row: auto; grid-column: auto; padding: 5px; min-width: 44px; min-height: 44px; }
 }
 
 #angle-control-row[hidden], #power-row[hidden] { display: none; }

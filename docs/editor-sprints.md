@@ -189,3 +189,23 @@ previous paused simulation; waiting for editing to close as well as the new
 assembly avoids that false failure. Independent visual review flagged small,
 closely spaced direction buttons as a possible touch issue. Next: measure and
 improve mobile touch targets while preserving usable model preview space.
+
+## 2026-10-29 — Enlarge mobile attachment targets
+
+Goal: make repeated branch attachment easier to tap without reducing the 3D view.
+Measured direction buttons at 32px high, with E/S slightly below 44px wide.
+Mobile N/W/E/S targets now have a 44px minimum in both dimensions and 6px gaps.
+The measured final sizes are 44.67x44, 47.63x44, 44x44 and 44x44 CSS pixels.
+
+Validation: typecheck/build and all four production browser probes pass.
+The editor probe asserts target dimensions and confirms the power controls,
+part selector and direction row remain inside the editor panel. Independent
+screenshot review finds no overlap or clipping in that row and no reduction
+in the 3D viewport. This is layout evidence, not a user touch-accuracy study.
+The source pane remains compact and scrollable; the change does not claim to
+make every mobile control 44px or to optimize source-code editing on phones.
+
+Retrospective: a small measured adjustment solved the specific review finding
+without restructuring the editor. Next: make sharing the latest model explicit;
+currently the user must run and manually copy the address, and an edited source
+can differ from the last successfully published hash.

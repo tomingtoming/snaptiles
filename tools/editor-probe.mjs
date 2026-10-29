@@ -66,6 +66,11 @@ try {
  await page.click('#build'); await page.selectOption('#parts', '1');
  await page.setViewportSize({width: 390, height: 844});
  await page.screenshot({path: `${out}/editor-power-mobile.png`});
+ for (const target of await page.locator('.edges button').all()) {
+   const rect = await target.boundingBox();
+   assert.ok(rect.width >= 44 && rect.height >= 44, 'mobile direction targets must be at least 44px');
+ }
+
  for (const selector of ['#part-power', '#power-control', '#add-type', '[data-edge="S"]']) {
    assert.equal(await page.locator(selector).evaluate(el => { const b = el.getBoundingClientRect(), p = document.querySelector('#builder').getBoundingClientRect(); return b.top >= p.top && b.bottom <= p.bottom; }), true, `${selector} must fit with power controls`);
  }
