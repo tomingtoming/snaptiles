@@ -215,7 +215,8 @@ export function assemble(model: RcModel, env: ValEnv): Assembly | null {
 
   const visit = (node: ChipNode, parent: TileInstance | null): TileInstance => {
     const typeKey = node.type.toLowerCase();
-    const spec = TYPES[typeKey] ?? TYPES.chip;
+    if (!Object.hasOwn(TYPES, typeKey)) throw new Error(`未対応の部品「${node.type}」です (line ${node.line})。ソースで部品名を確認してください。`);
+    const spec = TYPES[typeKey];
     const option = attr(node, 'option', env, 0);
     const inst: TileInstance = {
       id: tiles.length,

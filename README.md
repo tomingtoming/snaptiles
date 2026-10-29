@@ -206,3 +206,7 @@ Imported expression-valued angle, power, option and colour fields show a
 「ソースで編集」button in the builder. It focuses and selects that exact attribute
 in the source without changing it. Strength editing remains limited to recognised
 generated controls; arbitrary expressions retain their source representation.
+
+Unknown part types stop assembly with the original type name and line number;
+they are not substituted with Chip. The source remains available for repair.
+This check does not detect every unsupported section or attribute.

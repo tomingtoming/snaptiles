@@ -1346,3 +1346,34 @@ than silently accepting content the simulator cannot represent. No push/deploy.
 Independent final image review confirmed the diagnostic beginning is readable
 after Home, wraps within the viewport, and the focus outline does not overlap
 text. Source and top controls remain in separate visible regions.
+
+
+## 2026-10-30 — Stop substituting unknown parts (Sprint 47)
+
+Goal: inspect whether unsupported model content is silently accepted. Assembly
+used TYPES[type] ?? TYPES.chip, so an unknown spelling such as Wheeel acquired
+Chip physics instead of producing a diagnostic. It could appear to load while
+representing different hardware. Inherited JavaScript object properties were
+also not excluded by that lookup.
+
+Require an own entry in the supported type table before creating a tile. Unknown
+types now produce a Japanese diagnostic containing the original spelling and
+source line. Parsing still preserves the source and ranges, allowing repair;
+this is not a parser rewrite or a claim that every unsupported feature is now
+identified. Unknown top-level sections and unconsumed attributes need separate
+analysis; their behavior is unchanged.
+
+Validation: 146 tests in 18 files and production build pass. Five new cases cover
+Wheeel/constructor/toString/__proto__ rejection without mutating parsed content,
+and case-insensitive assembly of every supported type. A production-browser
+scenario imports an unknown.rcd, checks the explicit line-3 error and unchanged
+source, repairs only the spelling, undoes/redoes it, runs a real Wheel and saves
+exact corrected bytes with the imported filename. The prior long-error/recovery
+scenario also passes. Added the new case to the default runner (28 scenarios);
+full suite and non-Chromium runs were not repeated this sprint.
+
+Retrospective: permissive parsing and silent semantic substitution are distinct.
+Retain source for repair, but do not invent a supported part for an unknown name.
+This is one bounded compatibility diagnostic, not proof of full compatibility.
+Next: inspect the stale visual state left after failed assembly so users do not
+mistake the previous model for the rejected one. No push or deployment.
