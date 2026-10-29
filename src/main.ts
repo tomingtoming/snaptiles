@@ -80,7 +80,7 @@ async function load(source: string, request: number): Promise<boolean> {
     acc = 0; last = performance.now(); lastCoreVel = null; lastShells = 0; crateVel.length = 0;
     buildKeyCaps(next);
     if (document.activeElement === focusBeforeLoad) canvas.focus({preventScroll: true});
-    if (next.scriptError) statusEl.textContent = next.scriptError;
+    statusEl.textContent = [...next.model.warnings, next.scriptError].filter(Boolean).join('\n');
     return true;
   } catch (e) {
     if (next) await next.dispose();
@@ -368,7 +368,10 @@ function updateOverlay(s: Simulation): void {
   valsEl.textContent = lines.join('\n');
   outEl.textContent = s.out.join('\n').replace(/\n+$/, '');
   for (const c of keyCaps) c.el.dataset.down = String(keys.isDown(c.n));
-  if (s.scriptError && statusEl.textContent !== s.scriptError) statusEl.textContent = s.scriptError;
+  if (s.scriptError) {
+    const diagnostic = [...s.model.warnings, s.scriptError].filter(Boolean).join('\n');
+    if (statusEl.textContent !== diagnostic) statusEl.textContent = diagnostic;
+  }
 }
 // _MOVE2D/_LINE2D overlay: x spans -1..1 across the width, y is 1 at the top and -1 at the bottom
 const hud = $<HTMLCanvasElement>('hud');

@@ -100,7 +100,7 @@ export class BuildPanel {
         this.clipboard = this.document.copyBranch(this.selected);
         this.addType.querySelector('option[value="clipboard"]')?.remove();
         this.addType.add(new Option(`コピーした枝（${this.clipboard.count}部品）`, 'clipboard'));
-        this.addType.value = 'clipboard'; this.status.textContent = '';
+        this.addType.value = 'clipboard'; this.status.textContent = parseRc(this.document.text).warnings.join('\n');
       } catch (e) { this.status.textContent = e instanceof Error ? e.message : String(e); }
     };
     this.remove.onclick = () => this.edit(() => { const parent = this.assembly?.tiles[this.selected].parent?.id ?? 0; this.document.remove(this.selected); this.selected = parent; });
@@ -203,7 +203,10 @@ export class BuildPanel {
       : '保存時刻不明';
   }
   private saveDraft(): void {
-    if (!this.drafts.save(this.source.value, this.document.filename)) this.status.textContent ||= '下書きを保存できません。保存ボタンでファイルに残してください。';
+    if (!this.drafts.save(this.source.value, this.document.filename)) {
+      const message = '下書きを保存できません。保存ボタンでファイルに残してください。';
+      if (!this.status.textContent?.includes(message)) this.status.textContent = [this.status.textContent, message].filter(Boolean).join('\n');
+    }
     this.paintDraft();
   }
   private refresh(fit = false): void {
@@ -224,7 +227,7 @@ export class BuildPanel {
       }
       // Source offsets identify surviving parts; an unknown/replaced declaration falls back to Core.
       if (fit) this.scene.frameModel();
-      this.status.textContent = ''; this.paintSelection();
+      this.status.textContent = model.warnings.join('\n'); this.paintSelection();
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = false);
     } catch (e) {
       this.assembly = null; this.tree.replaceChildren(); this.scene.clearModel();

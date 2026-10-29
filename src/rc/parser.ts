@@ -35,6 +35,7 @@ export interface ChipNode {
 }
 
 export interface RcModel {
+  warnings: string[];
   vals: ValDecl[];
   keys: KeyBinding[];
   /** first Core (kept for convenience); all Cores are in `bodies` */
@@ -341,7 +342,7 @@ function parseBody(inner: string, baseLine: number, offset: number): ChipNode[] 
 
 export function parseRc(source: string): RcModel {
   const text = source.replace(/\r\n?/g, '\n');
-  const model: RcModel = { vals: [], keys: [], body: null, bodies: [], script: null };
+  const model: RcModel = { warnings: [], vals: [], keys: [], body: null, bodies: [], script: null };
   const blocks = findBlocks(text);
   for (const b of blocks) {
     const name = b.name.toLowerCase();
@@ -361,6 +362,8 @@ export function parseRc(source: string): RcModel {
       const roots = parseBody(inner, b.line, b.offset);
       model.bodies.push(...roots);
       model.body = model.bodies[0] ?? null;
+    } else {
+      model.warnings.push(`未対応のセクション「${b.name}」(line ${b.line})。内容は実行に反映されません。`);
     }
   }
   return model;

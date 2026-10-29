@@ -210,3 +210,8 @@ generated controls; arbitrary expressions retain their source representation.
 Unknown part types stop assembly with the original type name and line number;
 they are not substituted with Chip. The source remains available for repair.
 This check does not detect every unsupported section or attribute.
+
+Unknown top-level sections are preserved but produce a non-blocking warning with
+name and line number, since their contents are not executed. Attribute presence
+alone is not treated as unsupported: scripts can read attributes through _GET.
+Warnings coexist with script errors and draft-storage failures.

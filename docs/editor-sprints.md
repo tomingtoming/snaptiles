@@ -1412,3 +1412,42 @@ explicit warning or implementation. No push or deployment.
 Final targeted general-editor and reflected-geometry browser checks also pass.
 The full default suite and unit baseline were not rerun for this scene-lifecycle
 change; validation is the build and listed browser scenarios.
+
+
+## 2026-10-30 — Report ignored sections without rejecting readable models (Sprint 49)
+
+Goal: distinguish genuinely ignored content from data consumed elsewhere.
+Attribute-only allowlists would be incorrect: _GET falls back to attributes,
+and an actual Lua fixture reads USER1=7. Unknown top-level sections, however,
+were discarded by parseRc without a diagnostic. Known aliases and Lua precedence
+must retain their behavior.
+
+RcModel now carries warnings for unknown top-level sections with original name
+and line number. Runtime and editor show these as non-blocking diagnostics;
+known model content still runs, unknown source remains intact for editing and
+export. Comments and script strings do not create spurious sections. Copy keeps
+the model warning visible. Script failures and draft-storage failure messages
+are appended rather than hidden behind the warning; the footer label now covers
+both warnings and errors. No blanket attribute rejection was added.
+
+Validation: 148 tests in 19 files and production build pass. Parser/document
+cases cover names/lines, multiple sections, nested braces, comment/string false
+positives, Var alias/Lua precedence and exact preservation through edit/Undo.
+A production-browser scenario runs USER1 access with a Metadata warning, edits
+and exports exact bytes, checks warning persistence after copy, injects a storage
+failure and triggers a real Lua error, then verifies a clean reload clears the
+warning. Existing long-error/recovery probe passes. The default suite now has
+30 scenarios; full suite/non-Chromium runs were not repeated in this sprint.
+
+Retrospective: source preservation, execution support and diagnostics are three
+different promises. Inspect consumers before classifying attributes, and avoid
+rejecting an entire useful model merely because it carries an ignored block.
+Warnings must not suppress a more actionable failure. Unknown text outside
+recognised section syntax and attribute semantics remain outside this check.
+Next: review construction control conflicts and whether shared controls can be
+separated without hand-editing source. No push or deployment.
+
+Independent image review confirms both Metadata warning and Lua failure are
+readable within the 390px footer without overlapping controls. The unwrapped
+source is horizontally scrolled in this capture; full source-line visibility is
+not claimed by the diagnostic review.
