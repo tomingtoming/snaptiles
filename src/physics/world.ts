@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { DIR_VEC, TILE, TILE_T, assemblyBottom, attr, jointSign, refreshJointFrames, type Assembly, type TileInstance, type ValEnv } from '../model/assemble';
 import { exprIsConstant } from '../rc/expr';
 import { COURSE, CRATES } from '../model/course';
+import { balancePose, type MassPoint } from './pose-balance';
 
 /**
  * Tiles whose angle never changes are welded into their parent's rigid body
@@ -143,8 +144,8 @@ export const WHEEL_FRICTION = 1.1; // measured against the dynamic (contact) loa
 /** measured 2026-10-27: the original applies a commanded joint angle within one frame (a Rudder reads
  *  60° one frame after the Val changes), so the servo is instant by default (deg per physics step) */
 export const SERVO_RATE = 180;
-/** apply servo angles by rigidly turning both sides about the hinge (momentum-free, inertia-weighted)
- *  instead of through rapier joint limits, which take ~10 frames to catch up and chatter under load */
+/** Apply commanded poses kinematically, then balance the component mass pose.
+ * Fixed frames retain the result; contact impulses remain the solver’s responsibility. */
 export const SERVO_TELEPORT = true;
 /** extra inertia factor (× mass) for a grounded body a servo would drag along the ground */
 export const SERVO_HOLD = 0;
@@ -665,7 +666,7 @@ export class PhysicsWorld {
   }
 
   /** rigidly rotate a joint's whole subtree about its hinge so the joint reads its commanded angle */
-  private servoTeleport(tb: TileBody): void {
+  private servoTeleport(tb: TileBody, splitOverride?: boolean): void {
     const rawDelta = tb.servoAngle - this.jointAngle(tb);
     const delta = Math.atan2(Math.sin(rawDelta), Math.cos(rawDelta));
     if (Math.abs(delta) < 1e-4) return;
@@ -728,7 +729,7 @@ export class PhysicsWorld {
         b.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true);
       }
     };
-    const split = (globalThis as unknown as { __tune?: { servoSplit?: boolean } }).__tune?.servoSplit ?? true;
+    const split = splitOverride ?? (globalThis as unknown as { __tune?: { servoSplit?: boolean } }).__tune?.servoSplit ?? true;
     // the ground as a constraint on the split (knob servoGround): a side whose rotation would push one of its
     // tiles below the ground only turns as far as the ground allows, the remainder of the step goes to the other
     // side (which then lifts) - no energy is added, the rotation is merely reallocated. Measured: a foot driven
@@ -1035,6 +1036,42 @@ export class PhysicsWorld {
     }
   }
 
+  private servoMassPoints(): Map<number, MassPoint[]> {
+    const groups = new Map<number, MassPoint[]>();
+    for (const tb of this.tiles) {
+      if (tb.tile.mass <= 0) continue;
+      const root = this.componentRoot(tb.tile);
+      let points = groups.get(root);
+      if (!points) { points = []; groups.set(root, points); }
+      const pose = this.pose(tb);
+      // Eight quadrature points reproduce the mass and second moment of a solid plate.
+      for (const x of [-1,1]) for (const y of [-1,1]) for (const z of [-1,1]) {
+        points.push({ mass: tb.tile.mass/8, position: new THREE.Vector3(
+          x*TILE/Math.sqrt(12), y*TILE_T/Math.sqrt(12), z*TILE/Math.sqrt(12),
+        ).applyQuaternion(pose.quaternion).add(pose.position) });
+      }
+    }
+    return groups;
+  }
+
+  private balanceServoPose(roots: Set<number>, before: Map<number, MassPoint[]>): void {
+    if (!roots.size) return;
+    const after = this.servoMassPoints();
+    for (const root of roots) {
+      const oldPoints = before.get(root), newPoints = after.get(root);
+      if (!oldPoints || !newPoints) continue;
+      const { rotation, from, to } = balancePose(oldPoints, newPoints);
+      const moved = new Set<number>();
+      for (const tb of this.tiles) {
+        if (this.componentRoot(tb.tile) !== root || moved.has(tb.body.handle)) continue;
+        moved.add(tb.body.handle);
+        const p = tb.body.translation(), r = tb.body.rotation();
+        tb.body.setTranslation(new THREE.Vector3(p.x,p.y,p.z).sub(from).applyQuaternion(rotation).add(to),true);
+        tb.body.setRotation(rotation.clone().multiply(new THREE.Quaternion(r.x,r.y,r.z,r.w)),true);
+      }
+    }
+  }
+
   private servoContactAnchors(): {root:number;body:RAPIER.RigidBody;local:THREE.Vector3;point:THREE.Vector3;normal:THREE.Vector3;weight:number;friction:number}[] {
     const anchors: {root:number;body:RAPIER.RigidBody;local:THREE.Vector3;point:THREE.Vector3;normal:THREE.Vector3;weight:number;friction:number}[] = [];
     const seen = new Set<number>();
@@ -1061,6 +1098,35 @@ export class PhysicsWorld {
       }
     }
     return anchors;
+  }
+
+  /** Keep loaded contacts planted tangentially; leave penetration and normal
+   * impulses to the solver. Lifting contacts release immediately. */
+  private anchorServoTangents(roots: Set<number>, anchors: ReturnType<PhysicsWorld['servoContactAnchors']>): void {
+    for (const root of roots) {
+      const shift = new THREE.Vector3();
+      let weight = 0;
+      for (const anchor of anchors) {
+        if (anchor.root !== root) continue;
+        const r=anchor.body.rotation(),p=anchor.body.translation();
+        const delta=anchor.local.clone().applyQuaternion(new THREE.Quaternion(r.x,r.y,r.z,r.w))
+          .add(new THREE.Vector3(p.x,p.y,p.z)).sub(anchor.point);
+        const lift=delta.dot(anchor.normal);
+        if (lift>1e-4) continue;
+        delta.addScaledVector(anchor.normal,-lift);
+        const w=anchor.weight*anchor.friction;
+        shift.addScaledVector(delta,-w);weight+=w;
+      }
+      if (!weight) continue;
+      shift.divideScalar(weight);
+      const moved = new Set<number>();
+      for (const tb of this.tiles) {
+        if (this.componentRoot(tb.tile)!==root || moved.has(tb.body.handle)) continue;
+        moved.add(tb.body.handle);
+        const p=tb.body.translation();
+        tb.body.setTranslation(new THREE.Vector3(p.x,p.y,p.z).add(shift),true);
+      }
+    }
   }
 
   private resolveServoContacts(changedRoots: Set<number>, anchors: ReturnType<PhysicsWorld['servoContactAnchors']>): void {
@@ -1123,6 +1189,8 @@ export class PhysicsWorld {
       tb.body.resetForces(false);
       tb.body.resetTorques(false);
     }
+    const simultaneous = (globalThis as unknown as {__tune?:{simultaneousServo?:boolean}}).__tune?.simultaneousServo ?? true;
+    const massBefore = simultaneous ? this.servoMassPoints() : new Map<number, MassPoint[]>();
     const anchors = ((globalThis as unknown as { __tune?: { servoContactStick?: boolean } }).__tune?.servoContactStick ?? true) ? this.servoContactAnchors() : [];
     const changedRoots = new Set<number>();
     for (const tb of this.tiles) {
@@ -1145,7 +1213,7 @@ export class PhysicsWorld {
           const revolute = joint as RAPIER.RevoluteImpulseJoint;
           if (joint.type() === this.R.JointType.Fixed && tb.jointAxisLocal) {
             // Change the pose only when the command changes; retain the angle with a bilateral constraint.
-            if (teleport && Math.abs(d) > 1e-8) this.servoTeleport(tb);
+            if (teleport && Math.abs(d) > 1e-8) this.servoTeleport(tb, simultaneous ? false : undefined);
             joint.setFrameX1(new THREE.Quaternion().setFromAxisAngle(tb.jointAxisLocal, tb.servoAngle));
           } else if (teleport && tb.jointAxisLocal && tb.jointAnchorLocal && tile.parent) {
             // the original sets a commanded angle instantly, without giving the moved chips any momentum
@@ -1196,7 +1264,11 @@ export class PhysicsWorld {
 
     }
     const tune = (globalThis as unknown as { __tune?: { splitServo?: boolean; finalGroundPose?: boolean } }).__tune;
-    if ((tune?.splitServo ?? true) && (tune?.finalGroundPose ?? true)) this.resolveServoContacts(changedRoots,anchors);
+    if (simultaneous) {
+      this.balanceServoPose(changedRoots, massBefore);
+      this.anchorServoTangents(changedRoots, anchors);
+    }
+    else if ((tune?.splitServo ?? true) && (tune?.finalGroundPose ?? true)) this.resolveServoContacts(changedRoots,anchors);
     this.distributeLoads();
     const UP = new THREE.Vector3(0, 1, 0);
     for (const tb of this.tiles) {

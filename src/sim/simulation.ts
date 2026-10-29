@@ -162,7 +162,8 @@ export class Simulation {
       if (!this.keysNow.has(k.key)) continue;
       const v = this.vals.get(k.var.toUpperCase());
       if (!v) continue;
-      v.value += k.step;
+      // Key-controlled limits apply before the model reads the value this frame.
+      v.value = Math.max(v.min, Math.min(v.max, v.value + k.step));
       v.touched = true;
     }
 

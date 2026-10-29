@@ -19,12 +19,12 @@ Body
 {
   Core(color=#f2b705){
     N:Chip(color=#d8d8d8){
-      W:Rudder(angle=FL_H, color=#7fb7ff){ W:Frame(angle=FL_K, color=#7fb7ff){ W:Frame(angle=90, color=#303030){ } } }
-      E:Rudder(angle=-FR_H, color=#7fb7ff){ E:Frame(angle=FR_K, color=#7fb7ff){ E:Frame(angle=90, color=#303030){ } } }
+      W:Rudder(angle=FL_H, color=#7fb7ff){ W:Frame(angle=FL_K, color=#7fb7ff){ W:Weight(angle=90, color=#303030){ } } }
+      E:Rudder(angle=-FR_H, color=#7fb7ff){ E:Frame(angle=FR_K, color=#7fb7ff){ E:Weight(angle=90, color=#303030){ } } }
     }
     S:Chip(color=#d8d8d8){
-      W:Rudder(angle=RL_H, color=#b7ff7f){ W:Frame(angle=RL_K, color=#b7ff7f){ W:Frame(angle=90, color=#303030){ } } }
-      E:Rudder(angle=-RR_H, color=#b7ff7f){ E:Frame(angle=RR_K, color=#b7ff7f){ E:Frame(angle=90, color=#303030){ } } }
+      W:Rudder(angle=RL_H, color=#b7ff7f){ W:Frame(angle=RL_K, color=#b7ff7f){ W:Weight(angle=90, color=#303030){ } } }
+      E:Rudder(angle=-RR_H, color=#b7ff7f){ E:Frame(angle=RR_K, color=#b7ff7f){ E:Weight(angle=90, color=#303030){ } } }
     }
   }
 }

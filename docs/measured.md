@@ -197,3 +197,15 @@ versions produce identical stable traces in the original. Production behavior is
 unchanged by this investigation. See [sprints 45–47](sprints-45-47.md) for controls,
 measurements, limitations and the required separation of static hold from active
 commanded rotation.
+
+
+## 2026-10-29: walking completion (S77–88)
+
+Use `docs/sprints-77-88.md` for the current result, superseding earlier walker
+blockers. Fixed frames retain static folds; simultaneous mass-pose balance avoids
+joint-order reaction drift; tangential support is separate from solver contact
+normals. Key steps are clamped before script evaluation (zrobo previously read
+S_SP=20 despite max=10). Four community walkers pass 300 seconds of held input;
+zrobo stops when its own energy expires. Original 2walk path length is 170.155 m
+in 60 seconds despite net displacement of 22.408 m. Numeric stability is not
+bit-identical trajectory or transient-velocity equivalence.

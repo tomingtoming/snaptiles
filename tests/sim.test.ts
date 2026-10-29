@@ -3,6 +3,7 @@ import { initRapier } from '../src/physics/world';
 import { Simulation } from '../src/sim/simulation';
 import { KeyState } from '../src/input/keys';
 import { CAR } from '../src/samples/car';
+import standingFixture from '../tools/orig-harness/standing-angle-variable.rcd?raw';
 
 // a KeyState that never sees DOM events; tests press keys directly
 const fakeKeys = () => new KeyState(new EventTarget());
@@ -64,6 +65,25 @@ describe('brakes and lifecycle callbacks', () => {
     for (let i = 0; i < 60; i++) sim.step();
     expect(api._VEL(0) as number).toBeLessThan(vFast * 0.3);
     await sim.lua.dispose();
+  });
+
+  it('clamps held-key values before Lua reads them', async () => {
+    const R = await initRapier();
+    const keys = fakeKeys();
+    const sim = new Simulation(R, `
+      Val { SPEED(default=0,min=0,max=10) }
+      Key { 0:SPEED(step=10) }
+      Body { Core(){} }
+      Lua { seen=0; function OnFrame() seen=SPEED end }
+    `, keys);
+    await sim.start();
+    try {
+      keys.press(0);
+      for (let i=0;i<3;i++) {
+        sim.step();
+        expect(sim.lua.getNumber('seen')).toBe(10);
+      }
+    } finally { await sim.lua.dispose(); sim.physics.world.free(); }
   });
 
   it('OnInit runs once at load and OnReset on reset', async () => {
@@ -150,8 +170,7 @@ describe('plane sample', () => {
 
 describe('loaded static servo regression', () => {
   it('holds the original-measured variable-angle standing fixture without ground-hold compensation', async () => {
-    const { readFileSync } = await import('node:fs');
-    const source = readFileSync(new URL('../tools/orig-harness/standing-angle-variable.rcd', import.meta.url), 'utf8');
+    const source = standingFixture;
     const R = await initRapier();
     const sim = new Simulation(R, source, fakeKeys());
     await sim.start();
@@ -169,4 +188,32 @@ describe('loaded static servo regression', () => {
       sim.physics.world.free();
     }
   });
+});
+
+
+it('balances symmetric airborne folds without rolling the core or translating the mass centre', async () => {
+  const R = await initRapier();
+  const sim = new Simulation(R, `
+    Val { A(default=0,min=-90,max=90) } Key {}
+    Body { Core(){
+      W:Frame(angle=A){W:Weight(angle=-A){}}
+      E:Frame(angle=A){E:Weight(angle=-A){}}
+    } }
+  `, fakeKeys());
+  await sim.start();
+  try {
+    const centre = () => {
+      const total=sim.physics.tiles.reduce((sum,t)=>sum+t.tile.mass,0);
+      return sim.physics.tiles.reduce((sum,t)=> {
+        const p=sim.physics.pose(t).position;
+        return sum.map((v,i)=>v+p.getComponent(i)*t.tile.mass/total);
+      },[0,0,0]);
+    };
+    const before=centre();
+    sim.vals.get('A')!.value=45;
+    sim.physics.applyControls(sim.env);
+    const q=sim.physics.pose(sim.physics.tiles[0]).quaternion;
+    expect(Math.abs(q.z)).toBeLessThan(1e-6);
+    centre().forEach((v,i)=>expect(Math.abs(v-before[i])).toBeLessThan(1e-6));
+  } finally {await sim.lua.dispose();sim.physics.world.free();}
 });
