@@ -227,3 +227,25 @@ describe('cowl construction shapes', () => {
     if(option!==0) { d.undo(); expect(d.text).toBe(text); }
   });
 });
+
+
+describe('source and construction history', () => {
+  it('groups direct input without discarding previous construction or filename', () => {
+    const d = new ModelDocument(source, 'custom.rcd'); d.add(0, 'E', 'Chip');
+    const added = d.text;
+    d.editSource(added + '// a'); d.editSource(added + '// abc', true);
+    d.undo(); expect(d.text).toBe(added); d.undo(); expect(d.text).toBe(source);
+    d.redo(); d.redo(); expect(d.text).toBe(added + '// abc'); expect(d.filename).toBe('custom.rcd');
+  });
+  it('can recover an incomplete source and branch after undo without deleting its checkpoint', () => {
+    const d = new ModelDocument(source); d.editSource('Body {'); d.editSource('Body { Core(', true);
+    d.undo(); expect(d.text).toBe(source);
+    d.editSource('Body { Core() }', true); expect(d.redoStack).toHaveLength(0);
+    d.undo(); expect(d.text).toBe(source);
+  });
+  it('does not create history or clear redo for unchanged normalized input', () => {
+    const d = new ModelDocument('Body { Core() }\n'); d.editSource('broken'); d.undo();
+    d.editSource('Body { Core() }\r\n'); expect(d.redoStack).toHaveLength(1);
+    d.redo(); expect(d.text).toBe('broken');
+  });
+});

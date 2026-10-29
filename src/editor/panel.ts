@@ -8,6 +8,8 @@ import type { SceneView } from '../render/scene';
 const TYPES = ['Chip', 'Frame', 'Wheel', 'Rudder', 'RudderF', 'Trim', 'TrimF', 'Jet', 'Weight', 'Cowl', 'Arm', 'RLW'];
 export class BuildPanel {
   active = false;
+  private sourceComposing = false;
+  private sourceEditGroup: { type: string; time: number; end: number } | null = null;
   private drafts = new DraftStore({ getItem: key => localStorage.getItem(key), setItem: (key, value) => localStorage.setItem(key, value) });
   private restoreButton = document.getElementById('restore-draft') as HTMLButtonElement;
   document: ModelDocument;
@@ -41,7 +43,8 @@ export class BuildPanel {
     document.getElementById('focus-part')!.onclick = () => { if (this.assembly) this.scene.focusTile(this.selected); };
     window.addEventListener('keydown', event => {
       const target = event.target as HTMLElement | null;
-      if (!this.active || target?.matches('input, textarea') || target?.isContentEditable || event.repeat) return;
+      const inSource = target === this.source;
+      if ((!this.active && !inSource) || (!inSource && target?.matches('input, textarea')) || target?.isContentEditable || event.repeat || event.isComposing) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
         event.preventDefault(); this.edit(() => event.shiftKey ? this.document.redo() : this.document.undo());
       }
@@ -94,7 +97,27 @@ export class BuildPanel {
         this.selected = next;
       });
     });
-    source.addEventListener('input', () => { this.document = new ModelDocument(source.value, this.document.filename); if (this.active) this.refresh(); this.saveDraft(); });
+    source.addEventListener('compositionstart', () => { this.sourceComposing = true; this.sourceEditGroup = null; });
+    source.addEventListener('compositionend', () => { this.sourceComposing = false; });
+    source.addEventListener('beforeinput', event => {
+      if (event.inputType === 'historyUndo' || event.inputType === 'historyRedo') {
+        event.preventDefault();
+        this.edit(() => event.inputType === 'historyUndo' ? this.document.undo() : this.document.redo());
+      } else if (!this.sourceComposing && (source.selectionStart !== source.selectionEnd || source.selectionStart !== this.sourceEditGroup?.end)) {
+        this.sourceEditGroup = null;
+      }
+    });
+    source.addEventListener('blur', () => { this.sourceEditGroup = null; });
+    source.addEventListener('pointerdown', () => { this.sourceEditGroup = null; });
+    source.addEventListener('input', event => {
+      const type = event instanceof InputEvent ? event.inputType : '';
+      const time = performance.now();
+      const continuous = ['insertText', 'insertCompositionText', 'deleteContentBackward', 'deleteContentForward'].includes(type);
+      const group = this.sourceEditGroup;
+      this.document.editSource(source.value, continuous && group?.type === type && (this.sourceComposing || time - group.time < 1000));
+      this.sourceEditGroup = continuous ? {type, time, end: source.selectionEnd} : null;
+      if (this.active) this.refresh(); this.saveDraft();
+    });
     const canvas = document.getElementById('view')!;
     let down: { x: number; y: number; id: number } | null = null;
     canvas.addEventListener('pointerdown', e => { down = e.isPrimary && e.button === 0 ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null; });
@@ -108,6 +131,7 @@ export class BuildPanel {
     });
   }
   loadSource(text: string, filename?: string): void {
+    this.sourceEditGroup = null;
     this.source.value = text; this.document = new ModelDocument(this.source.value, filename);
     this.source.dispatchEvent(new Event('modelchange'));
   }
@@ -124,7 +148,8 @@ export class BuildPanel {
     this.scene.selectTile(null);
   }
   private edit(action: () => void, fit = false): void {
-    try { action(); this.source.value = this.document.text; this.source.dispatchEvent(new Event('modelchange')); this.refresh(fit); this.saveDraft(); }
+    this.sourceEditGroup = null;
+    try { action(); this.source.value = this.document.text; this.source.dispatchEvent(new Event('modelchange')); if (this.active) this.refresh(fit); this.saveDraft(); }
     catch (e) { this.status.textContent = e instanceof Error ? e.message : String(e); }
   }
   private paintDraft(): void {

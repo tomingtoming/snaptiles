@@ -119,6 +119,13 @@ export class ModelDocument {
   restore(text: string, filename?: string): void {
     this.undoStack.push(this.snapshot()); this.redoStack = []; this.text = text.replace(/\r\n?/g, '\n'); this.filename = filename;
   }
+  /** Direct typing may temporarily be invalid; preserve it and the preceding GUI history. */
+  editSource(text: string, coalesce = false): void {
+    const next = text.replace(/\r\n?/g, '\n');
+    if (next === this.text) return;
+    if (!coalesce || this.redoStack.length || !this.undoStack.length) this.undoStack.push(this.snapshot());
+    this.redoStack = []; this.text = next;
+  }
   newModel(): void { this.restore('Body {\n  Core() {\n  }\n}\n'); }
   private addControl(index: number, attribute: 'power' | 'angle', magnitude: number, keys: [number, number]): void {
     if (!Number.isFinite(magnitude) || magnitude <= 0) throw new Error('出力の大きさは正の数で指定してください');

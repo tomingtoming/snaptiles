@@ -524,3 +524,33 @@ can still make attachment points dense; “選択へ” remains the detail view.
 The source field deliberately disables wrapping; the long-line fixture alone
 is insufficient evidence for changing that policy. Next: verify Undo when
 switching between direct source editing and GUI construction.
+
+
+## 2026-10-30 — Share Undo between source and visual construction
+
+Goal: preserve work when alternating direct source edits and GUI construction.
+Reproduced adding a part, typing a comment, and losing even the preceding GUI
+Undo history. Each source input constructed a new ModelDocument. Direct source
+changes now enter the existing history without requiring valid intermediate
+syntax. Adjacent typing/deletion within one second is grouped; focus changes,
+selection replacement, input-type changes, GUI edits and Undo delimit groups.
+IME composition stays in one group, including slow candidate changes.
+
+Source keyboard Undo/Redo and browser beforeinput history requests use the same
+document history, including outside build mode. Other text/number fields keep
+native Undo. Programmatic indentation becomes undoable. The guide describes
+this distinction. Imported filenames survive direct edits and history travel.
+
+Validation: 91 unit tests and all 15 browser probes pass. Typecheck/build passes.
+New unit cases cover grouped input after GUI edits, incomplete
+source recovery, redo branching and normalized no-op input. The browser probe
+reproduces the original loss and verifies GUI/source Undo/Redo, invalid syntax,
+indentation outside build mode, Chromium IME composition/commit and new input
+after Undo. Synthetic beforeinput verifies the history-gesture handler; actual
+mobile keyboard gesture behavior has not been tested on a physical device.
+
+Retrospective: native textarea Undo and a separate model history did not form
+one reversible document. Preserving a single history fixes the boundary; it
+also requires grouping typing so Undo does not regress to character-by-character
+steps. Next: verify selection/caret position and viewport continuity when
+Undo/Redo crosses source and visual edits.
