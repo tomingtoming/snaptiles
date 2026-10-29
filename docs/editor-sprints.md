@@ -1736,3 +1736,30 @@ of preserved meaning. Observe named identity and numeric ordering separately,
 and prove that a file was actually reloaded before checking identical values.
 Next: run the accumulated editor regression suite with a fresh build. No push
 or deployment.
+
+
+## 2026-10-30 — Accumulated editor regression checkpoint (Sprint 58)
+
+Goal: validate the accumulated editor changes together, against a fresh
+production build at 423acdf, rather than infer integration from targeted passes.
+No application or test behavior changed in this sprint.
+
+Validation: all 163 unit tests in 22 files pass. Type checking and production
+build pass, retaining the existing wasmoon externalized-module and large-chunk
+warnings. All 35 default Chromium editor scenarios pass in one uninterrupted
+run (exit 0), including source/history, file/share/draft recovery, unsupported
+content and failed-view cleanup, narrow layouts, mixed input, branch copy,
+mirror and relocation, named/numeric script round trips, generated controls,
+custom keys and held throttle. Raw local output: .shots/sprint58-editor.log.
+
+Retrospective: individually passing new scenarios do not establish that the
+accumulated application still supports its complete creation loop. This fresh
+checkpoint supplies that evidence within Chromium. It does not establish
+original-engine parity, physical mobile usability, current Firefox/WebKit full
+coverage, or production deployment. Separate plane/scale/other-engine suites
+were not rerun because this checkpoint targets the accumulated default editor
+suite; their prior evidence remains dated to its own sprint.
+
+Next: check relocation beneath transformed parents, comparing the intended
+local attachment and preview/runtime geometry rather than assuming unchanged
+world-space pose. All changes remain local; no push or deployment.
