@@ -1969,3 +1969,37 @@ actual evaluator narrows checks to supported semantics while making their limits
 explicit. Do not treat reference existence as behavioral equivalence. Next: run
 the accumulated full production editor suite after these interaction changes,
 and measure its duration against the CI time budget. No push or deployment.
+
+
+## 2026-10-30 — Full editor regression and mobile layout recovery (Sprint 65)
+
+Goal: validate all accumulated editing changes and measure the CI time budget.
+The first fresh-build run failed in the general editor scenario: at 390x844,
+the added search heading pushed the add-part selector and direction buttons
+below the builder viewport when power controls were visible. The standalone
+short-height test had allowed scrolling and therefore did not cover this
+existing unscrolled workflow requirement.
+
+Reduced the narrow-screen part list from 76px to 60px. This preserves roughly
+three visible rows and list scrolling/search while restoring room for common
+controls. Desktop list sizing, 44px direction targets and the two-line source
+minimum remain unchanged. The before/after power screenshots were inspected:
+the add selector and all four direction buttons are now completely visible.
+General-editor, short-height and search scenarios pass after the correction.
+
+A fresh full run then passed all 39 default Chromium scenarios in 402.4585806
+seconds (6m42s), exit 0. Raw local evidence: .shots/sprint65-full.log and
+.shots/sprint65-full-timing.json; initial failure remains in sprint65-editor.log.
+This is a local Windows measurement, not a prediction of GitHub runner speed.
+The existing 7-minute CI limit left about 18 seconds on this host, so the overall
+editor step now allows 10 minutes. Each scenario retains its existing 120-second
+limit. Remote CI was not run. The latest unit baseline is 176 tests/25 files from
+Sprint 64; this sprint changes only CSS and CI configuration, so no unit rerun.
+Build passes with the existing warnings.
+
+Retrospective: a new control's own test can pass while it displaces an older
+workflow. Preserve the general scenario's visible-controls assertion, and run
+it when changing panel height or headings. Full-suite timing should be measured
+before tightening a shared timeout; allowance is not evidence of speed. Next:
+review branch creation placement for occupied-edge behavior and avoid accidental
+construction overlap during repeated additions/pastes. No push or deployment.
