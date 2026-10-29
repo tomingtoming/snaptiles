@@ -585,3 +585,34 @@ the editing position is part of the operation. Keep this metadata in ephemeral
 history rather than modifying model format or draft storage. Next: verify that
 part selection remains understandable when removing branches and using Undo,
 and when source edits change traversal indices.
+
+
+## 2026-10-30 — Keep the selected construction target through edits
+
+Goal: avoid changing the edit target merely because traversal indices change.
+Removal previously selected Core unconditionally and history did not restore
+the deleted part's selection. The document now stores a source-position anchor
+in transient history. Removing a branch selects its surviving parent; Undo
+restores the original part, and Redo restores the parent. Run/build also keeps
+the target when the document is unchanged.
+
+Direct input uses the verified beforeinput replacement range where available,
+so inserting identical declarations before a selected one preserves the old
+part rather than matching the first identical text. A prefix/suffix span is the
+fallback for input paths without a valid range. Replacing/removing the anchor
+falls back to Core; it never guesses another traversal index. GUI operations
+with unchanged topology, including generated controls inserted in several
+regions, retain traversal identity. No persistent IDs are added to model files.
+
+Validation: 96 unit tests, typecheck/build and all 17 browser probes pass.
+Targeted browser coverage checks nested branch deletion, Undo/Redo,
+source insertion, identical insertion, generated controls, deleting the selected
+declaration directly, run/build and scene-highlight agreement. Unit tests cover
+anchor mapping, deletion fallback, history restoration and generated controls.
+
+Retrospective: a list index is presentation order, not stable edit identity.
+Actual input ranges resolve ambiguity that text comparison alone cannot.
+Selection metadata belongs alongside history, while arbitrary source replacement
+requires a conservative fallback. Next: run another complete construction-to-
+share workflow and prioritize failures that interrupt that loop over isolated
+control polish.

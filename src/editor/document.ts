@@ -5,7 +5,7 @@ export interface SourceViewState {
   start: number; end: number; direction: 'forward' | 'backward' | 'none';
   top: number; left: number;
 }
-interface DocumentState { text: string; filename?: string; sourceView?: SourceViewState }
+interface DocumentState { text: string; filename?: string; sourceView?: SourceViewState; selectedOffset?: number }
 
 export const OPTION_SETTINGS: Record<string, {label: string; choices: [number, string][]}> = {
   wheel: {label: '半径', choices: [[0, '0.30 m'], [1, '0.45 m'], [2, '0.60 m']]},
@@ -19,6 +19,7 @@ export interface CopiedBranch { text: string; variables: string[]; count: number
 /** Edits use parser offsets: scripts, comments and unrelated attributes remain byte-for-byte. */
 export class ModelDocument {
   text: string;
+  selectedOffset?: number;
   sourceView?: SourceViewState;
   undoStack: DocumentState[] = [];
   redoStack: DocumentState[] = [];
@@ -33,6 +34,8 @@ export class ModelDocument {
     const next = this.text.slice(0, start) + value + this.text.slice(end);
     parseRc(next); // do not commit a malformed edit
     if (next === this.text) return;
+    const oldNodes = this.selectedOffset === undefined ? [] : this.nodes();
+    const selectedIndex = oldNodes.findIndex(n => n.source?.start === this.selectedOffset);
     this.undoStack.push(this.snapshot()); this.redoStack = [];
     if (this.sourceView) {
       // Find the changed span even for whole-document operations that preserve most text.
@@ -42,7 +45,13 @@ export class ModelDocument {
       const move = (position: number) => position <= first ? position : position >= oldEnd ? position + newEnd - oldEnd : newEnd;
       this.sourceView = {...this.sourceView, start: move(this.sourceView.start), end: move(this.sourceView.end)};
     }
+    this.remapSelection(next);
     this.text = next;
+    // GUI operations with unchanged topology (e.g. generated controls) preserve traversal identity.
+    if (selectedIndex >= 0) {
+      const newNodes = this.nodes();
+      if (newNodes.length === oldNodes.length) this.selectedOffset = newNodes[selectedIndex].source?.start;
+    }
   }
   type(index: number, type: string): void {
     const n = this.nodes()[index];
@@ -131,14 +140,28 @@ export class ModelDocument {
   }
   fixedAngle(index: number): void { this.replace(...this.attributeEdit(index, 'angle', '0')); }
   restore(text: string, filename?: string): void {
-    this.undoStack.push(this.snapshot()); this.redoStack = []; this.text = text.replace(/\r\n?/g, '\n'); this.filename = filename; this.sourceView = undefined;
+    this.undoStack.push(this.snapshot()); this.redoStack = []; this.text = text.replace(/\r\n?/g, '\n'); this.filename = filename; this.sourceView = undefined; this.selectedOffset = undefined;
   }
   /** Direct typing may temporarily be invalid; preserve it and the preceding GUI history. */
-  editSource(text: string, coalesce = false): void {
+  editSource(text: string, coalesce = false, range?: {start: number; end: number}): void {
     const next = text.replace(/\r\n?/g, '\n');
     if (next === this.text) return;
     if (!coalesce || this.redoStack.length || !this.undoStack.length) this.undoStack.push(this.snapshot());
-    this.redoStack = []; this.text = next;
+    this.redoStack = []; this.remapSelection(next, range); this.text = next;
+  }
+  private remapSelection(next: string, range?: {start: number; end: number}): void {
+    const position = this.selectedOffset;
+    if (position === undefined) return;
+    let first = 0, oldEnd = this.text.length, newEnd = next.length;
+    while (first < oldEnd && first < newEnd && this.text[first] === next[first]) first++;
+    while (oldEnd > first && newEnd > first && this.text[oldEnd - 1] === next[newEnd - 1]) { oldEnd--; newEnd--; }
+    if (range && next.length - (this.text.length - range.end) >= range.start &&
+      next.slice(0, range.start) === this.text.slice(0, range.start) && next.endsWith(this.text.slice(range.end))) {
+      first = range.start; oldEnd = range.end; newEnd = next.length - (this.text.length - range.end);
+    }
+    // Keep a surviving source anchor. If its declaration was replaced, do not guess another part.
+    if (position >= oldEnd) this.selectedOffset = position + newEnd - oldEnd;
+    else if (position >= first) this.selectedOffset = undefined;
   }
   newModel(): void { this.restore('Body {\n  Core() {\n  }\n}\n'); }
   private addControl(index: number, attribute: 'power' | 'angle', magnitude: number, keys: [number, number]): void {
@@ -191,7 +214,7 @@ export class ModelDocument {
     if (!n?.dir) throw new Error('Coreは削除できません');
     this.replace(n.source!.start, n.source!.end, '');
   }
-  private snapshot(): DocumentState { return {text: this.text, filename: this.filename, sourceView: this.sourceView ? {...this.sourceView} : undefined}; }
+  private snapshot(): DocumentState { return {text: this.text, filename: this.filename, sourceView: this.sourceView ? {...this.sourceView} : undefined, selectedOffset: this.selectedOffset}; }
   undo(): void { const state = this.undoStack.pop(); if (state) { this.redoStack.push(this.snapshot()); Object.assign(this, state); } }
   redo(): void { const state = this.redoStack.pop(); if (state) { this.undoStack.push(this.snapshot()); Object.assign(this, state); } }
 }

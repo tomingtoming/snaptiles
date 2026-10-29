@@ -8,12 +8,20 @@ import type { SceneView } from '../render/scene';
 const TYPES = ['Chip', 'Frame', 'Wheel', 'Rudder', 'RudderF', 'Trim', 'TrimF', 'Jet', 'Weight', 'Cowl', 'Arm', 'RLW'];
 export class BuildPanel {
   active = false;
+  private sourceInputRange?: {start: number; end: number};
   private sourceComposing = false;
   private sourceEditGroup: { type: string; time: number; end: number } | null = null;
   private drafts = new DraftStore({ getItem: key => localStorage.getItem(key), setItem: (key, value) => localStorage.setItem(key, value) });
   private restoreButton = document.getElementById('restore-draft') as HTMLButtonElement;
   document: ModelDocument;
-  selected = 0;
+  get selected(): number {
+    const index = this.assembly?.tiles.findIndex(t => t.node.source?.start === this.document.selectedOffset) ?? -1;
+    return Math.max(0, index);
+  }
+  set selected(index: number) {
+    try { this.document.selectedOffset = this.document.nodes()[index]?.source?.start; }
+    catch { this.document.selectedOffset = undefined; }
+  }
   private clipboard: CopiedBranch | null = null;
   private copy = document.getElementById('copy-branch') as HTMLButtonElement;
   assembly: Assembly | null = null;
@@ -84,7 +92,7 @@ export class BuildPanel {
         this.addType.value = 'clipboard'; this.status.textContent = '';
       } catch (e) { this.status.textContent = e instanceof Error ? e.message : String(e); }
     };
-    this.remove.onclick = () => this.edit(() => { this.document.remove(this.selected); this.selected = 0; });
+    this.remove.onclick = () => this.edit(() => { const parent = this.assembly?.tiles[this.selected].parent?.id ?? 0; this.document.remove(this.selected); this.selected = parent; });
     this.undo.onclick = () => this.edit(() => this.document.undo());
     this.redo.onclick = () => this.edit(() => this.document.redo());
     this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(button => {
@@ -101,6 +109,7 @@ export class BuildPanel {
     source.addEventListener('compositionend', () => { this.sourceComposing = false; });
     source.addEventListener('beforeinput', event => {
       this.captureSourceView();
+      this.sourceInputRange = {start: source.selectionStart, end: source.selectionEnd};
       if (event.inputType === 'historyUndo' || event.inputType === 'historyRedo') {
         event.preventDefault();
         this.edit(() => event.inputType === 'historyUndo' ? this.document.undo() : this.document.redo());
@@ -115,7 +124,8 @@ export class BuildPanel {
       const time = performance.now();
       const continuous = ['insertText', 'insertCompositionText', 'deleteContentBackward', 'deleteContentForward'].includes(type);
       const group = this.sourceEditGroup;
-      this.document.editSource(source.value, continuous && group?.type === type && (this.sourceComposing || time - group.time < 1000));
+      this.document.editSource(source.value, continuous && group?.type === type && (this.sourceComposing || time - group.time < 1000), this.sourceInputRange);
+      this.sourceInputRange = undefined;
       this.captureSourceView();
       this.sourceEditGroup = continuous ? {type, time, end: source.selectionEnd} : null;
       if (this.active) this.refresh(); this.saveDraft();
@@ -139,7 +149,7 @@ export class BuildPanel {
   }
   open(): void {
     if (this.document.text !== this.source.value.replace(/\r\n?/g, '\n')) this.document = new ModelDocument(this.source.value);
-    this.active = true; this.selected = 0;
+    this.active = true;
     this.panel.hidden = false; this.toggle.setAttribute('aria-pressed', 'true');
     document.body.classList.add('building');
     this.paintDraft(); this.enter(); this.scene.setView('orbit'); this.refresh(true);
@@ -188,7 +198,7 @@ export class BuildPanel {
         option.dataset.label = option.text;
         this.tree.add(option);
       }
-      this.selected = Math.min(this.selected, assembly.tiles.length - 1);
+      // Source offsets identify surviving parts; an unknown/replaced declaration falls back to Core.
       if (fit) this.scene.frameModel();
       this.status.textContent = ''; this.paintSelection();
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = false);

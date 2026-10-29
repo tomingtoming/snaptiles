@@ -269,3 +269,26 @@ describe('source view history', () => {
     d.undo(); expect(d.sourceView?.start).toBe(2);
   });
 });
+
+
+describe('part selection anchors', () => {
+  it('tracks an identical insertion by its actual input range and restores through history', () => {
+    const text = 'Body { Core(){N:Chip() S:Chip()} }';
+    const d = new ModelDocument(text); const start = text.indexOf('S:Chip'); d.selectedOffset = start;
+    const inserted = 'S:Chip() ';
+    d.editSource(text.slice(0,start)+inserted+text.slice(start),false,{start,end:start});
+    expect(d.selectedOffset).toBe(start+inserted.length); d.undo(); expect(d.selectedOffset).toBe(start);
+    d.redo(); expect(d.selectedOffset).toBe(start+inserted.length);
+  });
+  it('does not guess another part when the selected declaration is removed', () => {
+    const text = 'Body { Core(){N:Chip() S:Chip()} }'; const d = new ModelDocument(text);
+    const start=text.indexOf('N:Chip'); d.selectedOffset=start;
+    d.editSource(text.replace('N:Chip() ',''),false,{start,end:start+9}); expect(d.selectedOffset).toBeUndefined();
+    d.undo(); expect(d.selectedOffset).toBe(start);
+  });
+  it('retains GUI selection when generated controls change multiple source regions', () => {
+    const d = new ModelDocument('Body { Core(){N:Wheel()} }'); d.selectedOffset=d.nodes()[1].source!.start;
+    d.addPowerControl(1,1000); expect(d.selectedOffset).toBe(d.nodes()[1].source!.start);
+    d.undo(); expect(d.selectedOffset).toBe(d.nodes()[1].source!.start);
+  });
+});
