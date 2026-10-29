@@ -109,7 +109,9 @@ measured scope. Local checkout behavior may differ from the deployed website.
 
 Production-build browser regression: `bun run build && bun run test:editor`
 (install Chromium first with `bun x playwright install chromium`). This runs
-in CI with an OS-assigned port and uploads screenshots on failure.
+in CI with an OS-assigned port and uploads screenshots on failure. The branch
+workflow covers copying, subtree removal, reflection, multi-step history, live
+controls, exact export and editing the result in a fresh shared-link context.
 `bun run test:plane` separately checks the plane sample in Chromium: takeoff
 under throttle/pull-up input and exact source export. A second flow reconstructs
 the 30-part aircraft through GUI operations, compares its construction poses,

@@ -1274,3 +1274,36 @@ verify navigation is non-mutating and history still works after hand-off.
 Next: exercise the combined creation/edit/save loop with imported multi-branch
 models, especially selection and history after structural edits rather than
 adding further isolated presentation tweaks.
+
+
+## 2026-10-30 — Combined branch editing and history (Sprint 45)
+
+Goal: exercise structural operations in combination rather than extrapolate from
+isolated buttons. A seven-part imported fixture includes nested branches, custom
+Val control, a coloured untouched branch, comments and Lua. Through GUI actions,
+copy the north branch to the south, add a generated wheel control, change its
+strength, delete the original north subtree and mirror the copied south branch
+back north. The final model has ten parts.
+
+At every step, assert part count/type, selected highlight, untouched branch and
+Lua preservation. Undo all five mutations and compare the exact source and
+selected part with each pre-edit snapshot; redo restores every text state and
+the final selection. Then run, verify 1500 power while holding Up and release to
+zero, return to editing, export exact bytes and open a fresh shared-link context
+at 390x844. That receiver edits the shared wheel strength and undoes it exactly.
+The production-preview scenario passed without requiring application changes.
+It is now part of the default editor runner (26 scenarios).
+
+Retrospective: the combined branch workflow provides stronger evidence than
+isolated controls, but still covers one constructed fixture. No arbitrary-model
+or physical-stability claim follows. No defect was found in this scope, so this
+sprint adds durable regression coverage rather than inventing a product change.
+Next: inspect model import/runtime failure handling, particularly recovery to an
+editable model after a script or unsupported-content failure. No push/deployment.
+
+
+Final validation: the entire 26-scenario Chromium production-build editor suite
+completed successfully, including the new combined branch workflow and recent
+short-height/source-help additions. The production build is the successful
+Sprint 44 build; Sprint 45 changes only probes/documentation. This local full run
+does not establish remote CI or Firefox/WebKit full-suite coverage.
