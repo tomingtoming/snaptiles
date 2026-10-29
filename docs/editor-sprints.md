@@ -475,3 +475,27 @@ The existing simulation API stays unchanged. Gamepad remains its existing
 separate source; physical multi-device behavior beyond these browser cases is
 not claimed. Next: check whether construction direction controls are legible
 from different camera angles and identify a concrete orientation aid if needed.
+
+
+## 2026-10-30 — Show selected attachment directions
+
+Goal: make N/W/E/S understandable after rotating the construction camera.
+Selected parts now show upright direction letters with leaders and endpoint dots.
+The markers use nominal joint edges transformed by the selected tile orientation;
+wheel visual radius does not move the attachment points. The overlay ignores
+pointer events and disappears on run. The guide explains its letters and dots.
+
+Validation: 88 unit tests, build, and all 13 browser probes pass. After the
+endpoint-dot refinement, the targeted probe and final build pass again.
+The new browser probe compares each marker with actual child hinge
+anchors on an enlarged wheel folded 65 degrees, across three camera/viewport
+configurations. Independent visual review confirmed readable separated letters
+on mobile and desktop. Its first review found ambiguous line endpoints; adding
+small outlined dots resolved that observation. Camera projection testing also
+caught a one-frame stale matrix, fixed by updating it before projecting markers.
+
+Retrospective: direction names alone do not identify a construction destination.
+Keep labels readable in screen space while anchoring their leaders in model
+space. These samples do not prove collision-free labels at every degenerate
+camera angle. Next: investigate framing after changing the construction view,
+particularly the clipping seen in the enlarged-wheel review fixture.

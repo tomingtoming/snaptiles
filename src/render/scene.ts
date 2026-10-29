@@ -110,6 +110,15 @@ export class SceneView {
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
   camera: THREE.PerspectiveCamera;
+  private selectedId: number | null = null;
+  private directionOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  private directionMarks = ['N', 'W', 'E', 'S'].map((dir) => {
+    const group = document.createElementNS(this.directionOverlay.namespaceURI, 'g');
+    group.setAttribute('data-direction', dir);
+    group.innerHTML = `<line stroke="#785f00" stroke-width="2"/><circle r="12" fill="#242a30" stroke="#ffd900"/><text text-anchor="middle" dominant-baseline="central" fill="#ffe76b" font-size="12" font-family="sans-serif">${dir}</text><circle class="anchor" r="3" fill="#ffe76b" stroke="#242a30"/>`;
+    this.directionOverlay.append(group);
+    return group;
+  });
   private selectionBox: THREE.BoxHelper | null = null;
   private views = new Map<number, TileView>();
   private plateGeo = new THREE.BoxGeometry(TILE, TILE_T, TILE);
@@ -138,6 +147,10 @@ export class SceneView {
   private tmpPose = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
 
   constructor(public canvas: HTMLCanvasElement) {
+    this.directionOverlay.setAttribute('aria-hidden', 'true');
+    this.directionOverlay.classList.add('attachment-directions');
+    this.directionOverlay.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:hidden;display:none';
+    canvas.parentElement?.append(this.directionOverlay);
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
@@ -293,6 +306,7 @@ export class SceneView {
   updateEditorCamera(): void { this.follow(this.camTarget, 1); }
 
   selectTile(id: number | null): void {
+    this.selectedId = id;
     if (this.selectionBox) {
       this.scene.remove(this.selectionBox);
       this.selectionBox.geometry.dispose(); this.selectionBox.material.dispose(); this.selectionBox = null;
@@ -470,7 +484,51 @@ export class SceneView {
     this.sun.target.updateMatrixWorld();
   }
 
+  private updateDirectionMarks(): void {
+    const view = this.selectedId === null ? undefined : this.views.get(this.selectedId);
+    this.directionOverlay.style.display = view ? 'block' : 'none';
+    if (!view) return;
+    const width = this.canvas.clientWidth, height = this.canvas.clientHeight;
+    const project = (v: THREE.Vector3) => {
+      v.project(this.camera);
+      return {x: (v.x + 1) * width / 2, y: (1 - v.y) * height / 2, z: v.z};
+    };
+    const center = project(view.mesh.position.clone());
+    const vectors = [[0, 0, -1], [-1, 0, 0], [1, 0, 0], [0, 0, 1]];
+    const placed: {x: number; y: number}[] = [];
+    this.directionMarks.forEach((mark, i) => {
+      // Nominal tile edges define joints, including on enlarged wheels.
+      const anchor = new THREE.Vector3(...vectors[i]).multiplyScalar(TILE / 2)
+        .applyQuaternion(view.tile.quaternion).add(view.mesh.position);
+      const edge = project(anchor);
+      const visible = center.z > -1 && center.z < 1 && edge.z > -1 && edge.z < 1;
+      mark.setAttribute('visibility', visible ? 'visible' : 'hidden');
+      let dx = edge.x - center.x, dy = edge.y - center.y;
+      const length = Math.hypot(dx, dy);
+      if (length < 1) { dx = i % 2 ? -1 : 1; dy = i < 2 ? -1 : 1; }
+      const norm = Math.hypot(dx, dy);
+      let x = center.x + dx / norm * Math.max(length + 20, 34);
+      let y = center.y + dy / norm * Math.max(length + 20, 34);
+      x = Math.max(14, Math.min(width - 14, x));
+      y = Math.max(14, Math.min(height - 14, y));
+      // Edge-on projections can coincide. Keep letters apart while lines retain the exact anchors.
+      for (let attempt = 0; attempt < 8 && placed.some(p => Math.hypot(p.x-x, p.y-y) < 27); attempt++) {
+        y = Math.max(14, Math.min(height - 14, y + (y < height / 2 ? 28 : -28)));
+      }
+      placed.push({x,y});
+      const [line, circle, text] = Array.from(mark.children);
+      line.setAttribute('x1', String(edge.x)); line.setAttribute('y1', String(edge.y));
+      line.setAttribute('x2', String(x)); line.setAttribute('y2', String(y));
+      circle.setAttribute('cx', String(x)); circle.setAttribute('cy', String(y));
+      text.setAttribute('x', String(x)); text.setAttribute('y', String(y));
+      const dot = mark.querySelector('.anchor')!;
+      dot.setAttribute('cx', String(edge.x)); dot.setAttribute('cy', String(edge.y));
+    });
+  }
+
   render(): void {
+    this.camera.updateMatrixWorld();
+    this.updateDirectionMarks();
     this.renderer.render(this.scene, this.camera);
   }
 }

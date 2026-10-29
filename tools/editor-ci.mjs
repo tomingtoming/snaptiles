@@ -8,7 +8,7 @@ try {
   const address = server.httpServer.address();
   if (!address || typeof address === 'string') throw new Error('Preview did not bind a TCP port');
   const url = `http://127.0.0.1:${address.port}/`;
-  for (const script of ['editor-probe.mjs', 'editor-build-probe.mjs', 'load-probe.mjs', 'editor-file-probe.mjs', 'editor-share-probe.mjs', 'editor-option-probe.mjs', 'editor-color-probe.mjs', 'editor-cowl-probe.mjs', 'editor-keyboard-probe.mjs', 'editor-help-probe.mjs', 'editor-touch-probe.mjs', 'editor-mixed-input-probe.mjs']) {
+  for (const script of ['editor-probe.mjs', 'editor-build-probe.mjs', 'load-probe.mjs', 'editor-file-probe.mjs', 'editor-share-probe.mjs', 'editor-option-probe.mjs', 'editor-color-probe.mjs', 'editor-cowl-probe.mjs', 'editor-keyboard-probe.mjs', 'editor-help-probe.mjs', 'editor-touch-probe.mjs', 'editor-mixed-input-probe.mjs', 'editor-direction-probe.mjs']) {
     await new Promise((resolve, reject) => {
       const child = spawn(process.execPath, [fileURLToPath(new URL(script, import.meta.url)), url], {cwd:root, stdio:'inherit', windowsHide:true});
       const timer = setTimeout(() => { child.kill(); reject(new Error(`${script} exceeded 120s`)); }, 120000);
