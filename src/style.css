@@ -78,10 +78,10 @@ button:disabled { opacity: .4; cursor: default !important; }
 
 #parts option:checked { background: var(--accent); color: #111; }
 
-#share-dialog { width: min(520px, calc(100vw - 32px)); padding: 20px; border: 1px solid #59636e; border-radius: 8px; background: var(--panel); color: var(--ink); }
-#share-dialog::backdrop { background: #0009; }
-#share-dialog h2 { margin-top: 0; font-size: 18px; }
-#share-url { width: 100%; min-height: 44px; background: #15181c; color: var(--ink); border: 1px solid #59636e; padding: 8px; }
+#share-dialog, #filename-dialog { width: min(520px, calc(100vw - 32px)); padding: 20px; border: 1px solid #59636e; border-radius: 8px; background: var(--panel); color: var(--ink); }
+#share-dialog::backdrop, #filename-dialog::backdrop { background: #0009; }
+#share-dialog h2, #filename-dialog h2 { margin-top: 0; font-size: 18px; }
+#share-url, #filename-input { width: 100%; min-height: 44px; background: #15181c; color: var(--ink); border: 1px solid #59636e; padding: 8px; }
 #share-status { overflow-wrap: anywhere; }
 .share-actions { display: flex; justify-content: space-between; gap: 12px; }
 .share-actions button { min-height: 44px; padding: 8px 12px; background: #303840; color: var(--ink); border: 1px solid #59636e; border-radius: 4px; cursor: pointer; }
@@ -103,3 +103,6 @@ button:disabled { opacity: .4; cursor: default !important; }
 #help-dialog ol { padding-left: 22px; }
 #help-dialog li { margin: 10px 0; }
 @media(max-width: 360px) { #bar { flex-wrap: wrap; } #samples { flex-basis: 100%; } }
+
+#filename-preview { overflow-wrap: anywhere; color: var(--dim); }
+#filename-dialog { max-height: calc(100dvh - 32px); overflow: auto; }

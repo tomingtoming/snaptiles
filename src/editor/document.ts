@@ -163,6 +163,11 @@ export class ModelDocument {
     if (position >= oldEnd) this.selectedOffset = position + newEnd - oldEnd;
     else if (position >= first) this.selectedOffset = undefined;
   }
+  renameFile(filename: string): void {
+    const next = downloadFilename(filename);
+    if (next === this.filename) return;
+    this.undoStack.push(this.snapshot()); this.redoStack = []; this.filename = next;
+  }
   newModel(): void { this.restore('Body {\n  Core() {\n  }\n}\n'); }
   private addControl(index: number, attribute: 'power' | 'angle', magnitude: number, keys: [number, number]): void {
     if (!Number.isFinite(magnitude) || magnitude <= 0) throw new Error('出力の大きさは正の数で指定してください');

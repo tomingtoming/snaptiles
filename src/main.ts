@@ -173,12 +173,27 @@ sourceEl.addEventListener('keydown', (e) => {
     sourceEl.dispatchEvent(new Event('input', { bubbles: true }));
   }
 });
+function currentFilename(): string {
+  const name = builder.document.text === sourceEl.value.replace(/\r\n?/g, '\n') ? builder.document.filename : undefined;
+  return downloadFilename(name ?? SAMPLES[currentSample()]?.name ?? 'model');
+}
+const filenameDialog = $<HTMLDialogElement>('filename-dialog');
+const filenameInput = $<HTMLInputElement>('filename-input');
+const filenamePreview = $('filename-preview');
+const showFilename = () => { filenamePreview.textContent = `保存される名前: ${downloadFilename(filenameInput.value)}`; };
+$('rename-model').addEventListener('click', () => {
+  filenameInput.value = currentFilename(); showFilename(); filenameDialog.showModal(); filenameInput.select();
+});
+filenameInput.addEventListener('input', showFilename);
+$('filename-cancel').addEventListener('click', () => filenameDialog.close());
+$('filename-form').addEventListener('submit', event => {
+  event.preventDefault(); builder.renameFile(filenameInput.value); filenameDialog.close();
+});
 function saveModel(): void {
     const blob = new Blob([sourceEl.value], { type: 'text/plain' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    const importedName = builder.document.text === sourceEl.value.replace(/\r\n?/g, '\n') ? builder.document.filename : undefined;
-    a.download = downloadFilename(importedName ?? SAMPLES[currentSample()]?.name ?? 'model');
+    a.download = currentFilename();
     a.click();
     URL.revokeObjectURL(a.href);
 }
@@ -186,8 +201,13 @@ $('save-model').addEventListener('click', saveModel);
 window.addEventListener('keydown', (e) => {
   const typing = e.target instanceof HTMLElement && (['TEXTAREA', 'INPUT', 'SELECT', 'BUTTON'].includes(e.target.tagName) || e.target.isContentEditable);
   if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-    // save the editor contents as a model file
+    // Commit an open filename edit before saving, just as the dialog's submit does.
     e.preventDefault();
+    if (filenameDialog.open) {
+      const form = $<HTMLFormElement>('filename-form');
+      if (!form.reportValidity()) return;
+      form.requestSubmit();
+    }
     saveModel();
     return;
   }

@@ -679,3 +679,33 @@ Measure actual rendered poses and use the same target as the follow camera.
 Expanding the fit range also requires auditing manual-control limits. Next:
 review how a creator names and distinguishes saved models and shared variants
 when completing several build/test iterations.
+
+
+## 2026-10-30 — Name saved model variants
+
+Goal: distinguish iterations without every new creation downloading as model.rcd.
+Added a compact 保存名 action that opens a native dialog with the current default
+or imported filename. It previews the actual sanitized .rcd filename before
+confirmation. Renaming changes document metadata only, is undoable, and travels
+with the existing draft filename field. Cancel and Escape leave it unchanged.
+The dialog explicitly says the name is local to this browser and is not included
+in source-only share links. Ordinary one-click Save remains available.
+
+Ctrl/Command+S while the naming dialog is open validates and applies the entered
+name before downloading, so it cannot silently use the previous name. Empty
+required input blocks that shortcut until corrected. The in-app guide points
+to 保存名 before Save.
+
+Validation: 97 unit tests, final typecheck/build and all 19 browser probes pass.
+Coverage includes actual suggested download filenames, unchanged model source,
+Undo/Redo, cancel/Escape, sanitization preview, keyboard save and draft restore.
+Independent visual review passes the 390px and 320px dialog captures: input,
+actual filename, explanation and both actions fit. Physical on-screen keyboard
+behavior is not established by these viewport captures.
+
+Retrospective: the imported filename machinery already supplied persistence and
+history; a small naming action exposes that capability without changing the
+model format or adding a library. Names and source-only links have different
+lifetimes, so the UI must state that distinction. Next: check whether the saved
+variant remains understandable when imported beside an existing unsaved draft,
+and whether recovery offers enough context to choose the intended document.

@@ -292,3 +292,14 @@ describe('part selection anchors', () => {
     d.undo(); expect(d.selectedOffset).toBe(d.nodes()[1].source!.start);
   });
 });
+
+
+describe('named model variants', () => {
+  it('renames without rewriting the source and supports undo/redo', () => {
+    const d = new ModelDocument(source); d.renameFile('試作:02?');
+    expect(d.filename).toBe('試作_02_.rcd'); expect(d.text).toBe(source);
+    d.undo(); expect(d.filename).toBeUndefined(); expect(d.text).toBe(source);
+    d.redo(); expect(d.filename).toBe('試作_02_.rcd');
+    const count=d.undoStack.length;d.renameFile('試作_02_.rcd');expect(d.undoStack).toHaveLength(count);
+  });
+});

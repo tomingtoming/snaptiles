@@ -142,6 +142,7 @@ export class BuildPanel {
       down = null;
     });
   }
+  renameFile(filename: string): void { this.edit(() => this.document.renameFile(filename)); }
   loadSource(text: string, filename?: string): void {
     this.sourceEditGroup = null;
     this.source.value = text; this.document = new ModelDocument(this.source.value, filename);
