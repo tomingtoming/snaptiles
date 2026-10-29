@@ -269,3 +269,11 @@ Definitions and scripts are not imported. Same-name definitions may still mean
 something different in another model; unknown identifiers already present in
 the source remain unchanged. This check does not establish behavioral equivalence
 or analyze arbitrary Lua/Script programs.
+
+
+The N/W/E/S add buttons show how many direct children are already attached in
+each direction, or 空き when none are attached. Counts follow selection, paste,
+removal and Undo/Redo. Adding/pasting multiple children on one edge remains
+supported; equal angles can overlap visually. These are connectivity counts,
+not geometric collision detection. Move and mirror retain their separate
+occupied-destination guards.

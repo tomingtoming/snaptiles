@@ -2003,3 +2003,34 @@ it when changing panel height or headings. Full-suite timing should be measured
 before tightening a shared timeout; allowance is not evidence of speed. Next:
 review branch creation placement for occupied-edge behavior and avoid accidental
 construction overlap during repeated additions/pastes. No push or deployment.
+
+
+## 2026-10-30 — Expose occupied connection directions (Sprint 66)
+
+Goal: make repeated additions/pastes understandable without silently removing
+supported multiple-child construction. A browser reproduction selected Core
+and added N twice: both children had identical preview coordinates (0,0.4,-0.6),
+while N looked identical to unoccupied buttons. The source and assembly allowed
+both; this is not evidence that duplicate directions are invalid.
+
+Each add-direction button now shows its current direct-child count (接続N) or
+空き. Accessible labels state the direction, action and count; tooltips explain
+that another child can still be added. Counts refresh on selection and all model
+edits and are cleared when invalid source disables the controls. No confirmation
+modal or blanket overlap rejection was added. Move/mirror retain their existing
+occupied-target guards. These are connectivity counts, not collision detection.
+
+Validation: production build and new Chromium workflow pass for repeated
+add/paste, selection, delete, Undo/Redo and invalid-source recovery. The general
+editor, short-height and guide scenarios pass, including the unscrolled mobile
+power/add controls assertion from Sprint 65. Count labels fit inside existing
+44px mobile targets; the 390x844 screenshot was visually inspected. No model
+editing/physics logic changed, so no new unit tests were added. Default suite
+now has 40 scripts; no full-suite rerun. Existing build warnings remain.
+
+Retrospective: identical-looking controls hid existing structure. Showing the
+state is useful without prohibiting intentional construction patterns. Distinguish
+attachment counts from world-space overlap and avoid claiming more detection
+than was implemented. Next: check recovery when opening a different model file,
+including whether the previous in-progress construction can be restored.
+No push or deployment.

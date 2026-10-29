@@ -245,7 +245,7 @@ export class BuildPanel {
       this.type.disabled = this.angle.disabled = this.remove.disabled = this.copy.disabled = this.mirror.disabled = this.move.disabled = this.namePart.disabled = this.findPart.disabled = true;
       this.sourceHelp.hidden = true; this.sourceHelp.replaceChildren();
       this.powerRow.hidden = this.angleRow.hidden = true; this.angleSettings.disabled = true; this.angleSettings.setAttribute('aria-expanded','false');
-      this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = true);
+      this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => { b.disabled = true; b.textContent = `${b.dataset.edge} ＋`; b.removeAttribute('title'); b.setAttribute('aria-label',`${b.dataset.edge}方向に追加`); });
       this.status.textContent = e instanceof Error ? e.message : String(e);
     }
     this.undo.disabled = !this.document.undoStack.length; this.redo.disabled = !this.document.redoStack.length;
@@ -378,6 +378,14 @@ export class BuildPanel {
     for (const option of this.tree.options) option.text = `${option.selected ? '● ' : ''}${option.dataset.label ?? option.text}`;
     this.revealSelection();
     this.scene.selectTile(tile.id);
+    this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(button => {
+      const dir = button.dataset.edge!, count = tile.children.filter(child=>child.dir===dir).length;
+      const badge = document.createElement('small'); badge.className = 'edge-count';
+      badge.textContent = count ? `接続${count}` : '空き';
+      button.replaceChildren(document.createTextNode(`${dir} ＋`),badge);
+      button.setAttribute('aria-label',`${dir}方向に追加（接続済み${count}部品）`);
+      button.title = count ? `${dir}方向には${count}部品が接続済みです。同じ方向へさらに追加できます。` : `${dir}方向には子の部品がありません。`;
+    });
     this.type.value = TYPES.find(t => t.toLowerCase() === tile.type) ?? 'Core';
     this.type.disabled = !tile.parent;
     this.namePart.disabled = this.findPart.disabled = false;

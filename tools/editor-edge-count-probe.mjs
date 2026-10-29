@@ -1,0 +1,11 @@
+import {chromium} from 'playwright';import assert from 'node:assert/strict';
+const b=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});try{
+ const p=await b.newPage({viewport:{width:390,height:844}});await p.goto(process.argv[2]??'http://127.0.0.1:5175/');await p.waitForFunction(()=>window.__sim);await p.click('#build');await p.click('#new-model');
+ const count=async(dir,n)=>{assert.equal(await p.locator(`[data-edge="${dir}"] small`).textContent(),n?`接続${n}`:'空き');assert.match(await p.locator(`[data-edge="${dir}"]`).getAttribute('aria-label'),new RegExp(`接続済み${n}部品`));};
+ await count('N',0);await p.click('[data-edge="N"]');await count('N',0);await p.selectOption('#parts','0');await count('N',1);await p.click('[data-edge="N"]');await p.selectOption('#parts','0');await count('N',2);assert.equal(await p.locator('#parts option').count(),3);const doubled=await p.inputValue('#source');
+ await p.selectOption('#parts','1');await p.click('#copy-branch');await p.selectOption('#parts','0');await p.click('[data-edge="N"]');await p.selectOption('#parts','0');await count('N',3);await p.click('#edit-undo');assert.equal(await p.inputValue('#source'),doubled);await p.selectOption('#parts','0');await count('N',2);await p.click('#edit-redo');await p.selectOption('#parts','0');await count('N',3);
+ await p.selectOption('#parts','2');await p.click('#part-delete');await count('N',2);await p.click('#edit-undo');await p.selectOption('#parts','0');await count('N',3);await count('E',0);await p.screenshot({path:'.shots/editor-edge-count.png'});
+ for(const button of await p.locator('[data-edge]').all()){const r=await button.boundingBox();assert.ok(r.width>=44&&r.height>=44);}
+ const valid=await p.inputValue('#source');await p.fill('#source','Body {');assert.equal(await p.locator('[data-edge="N"]').isDisabled(),true);assert.doesNotMatch(await p.locator('[data-edge="N"]').textContent(),/接続/);await p.keyboard.press('Control+z');assert.equal(await p.inputValue('#source'),valid);await count('N',3);
+ console.log('Edge counts: selection, repeated add/paste, delete, Undo/Redo, 44px targets and invalid-source clearing/recovery pass');
+}finally{await b.close()}
