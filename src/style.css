@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --bg: #16191d;
   --panel: #1e2328;
   --ink: #e6e9ec;
@@ -74,9 +75,9 @@ button:disabled { opacity: .4; cursor: default !important; }
   #builder { max-height: 43vh; }
 }
 
-#builder > .edit-row:first-child { flex-wrap: wrap; }
+#editor-toolbar { flex-wrap: wrap; }
 
-#parts option:checked { background: var(--accent); color: #111; }
+#parts option:checked { background: #59636e; color: var(--ink); }
 
 #share-dialog, #filename-dialog { width: min(520px, calc(100vw - 32px)); padding: 20px; border: 1px solid #59636e; border-radius: 8px; background: var(--panel); color: var(--ink); }
 #share-dialog::backdrop, #filename-dialog::backdrop { background: #0009; }

@@ -851,3 +851,52 @@ as described above. Additional minimal controls capture animated red WebGL with
 both preserveDrawingBuffer false and true; removing overlays or forcing a CSS
 canvas layer does not restore the application screenshot. Neither buffer
 retention alone nor overlay presence alone explains the result.
+
+## 2026-10-30 — Repair toolbar wrapping and distinguish resize capture failures
+
+Goal: address Sprint 34's rejected narrow-view images. The toolbar's wrapping
+selector depended on being the builder's first child; the draft recovery card
+had displaced it. Gave the toolbar an explicit id and restored wrapping without
+coupling it to sibling order. Declared the existing dark theme as color-scheme:
+dark so native selects use readable surfaces. Selected tree rows now use light
+text on a muted background instead of black text whose requested background
+was not consistently honored by native controls.
+
+All toolbar buttons are now checked by bounding rectangle at both 320px and
+390px in Chromium and the Firefox/WebKit portability flows. This is stronger
+than the former document scrollWidth check, which missed internal overflow.
+Build and the general editor, help, filename, recovery and framing probes pass;
+Firefox/WebKit creation-loop probes pass. The application changes are HTML/CSS,
+so the prior 105-unit baseline is retained rather than needlessly repeated.
+
+The WebKit blank canvas was isolated without modifying production rendering.
+Single-scene rendering and a copied framebuffer contain geometry. The new
+`node tools/webkit-resize-diagnostic.mjs` uses only raw WebGL: on this Windows
+WebKit 27.2, the screenshot pixel changes from red [255,0,0,255] to white
+[255,255,255,255] after changing canvas height, while immediate framebuffer
+readback remains red, context loss is false and GL error is zero. This proves
+a limitation in this engine's presentation/capture path after resize, not an
+original-model or Three.js geometry defect. Actual Apple Safari remains untested.
+No production buffer-retention or renderer workaround was introduced.
+
+An additional Firefox blank image had a different cause: capture followed two
+viewport changes before the replacement drawing buffer had been rendered. Its
+raw WebGL resize control stayed red. Waiting for two animation frames before
+capture restored the vehicle, ground and selection box; WebKit stayed blank
+under the same wait. The portability probe now uses this rendering boundary.
+A mistaken interim visual reading of deduplicated tool images was corrected by
+comparing PNG pixel distributions: adding a second 2D canvas had no effect.
+
+Retrospective: DOM bounds, framebuffer contents and a composited screenshot
+answer different questions. One symptom can have different causes by engine.
+Use a minimal independent control before changing working renderer code, and
+wait for the actual rendering boundary after resize. Next: exercise creation
+workflow accessibility through keyboard/focus and compact viewport states,
+including the now-wrapped toolbar and recovery-card state; keep WebKit 3D visual
+acceptance explicitly open rather than replacing it with state assertions.
+No push or deployment was performed.
+
+Independent visual review: toolbar wrapping, select contrast and selected-row
+readability pass in all three captured engines. Chromium and the recaptured
+Firefox model/selection/ground pass. WebKit DOM review passes, while its 3D
+capture remains unverified under the diagnosed limitation.

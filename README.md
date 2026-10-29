@@ -100,9 +100,12 @@ construction, driving, source Undo, named download, share/re-edit and file reope
 The same core-loop scenario runs in WebKit via `bun run test:editor:webkit`
 (install with `bun x playwright install webkit`). CI is configured for both.
 These automated engines and narrow desktop windows do not establish physical
-mobile-device or Safari-on-Apple-device support. Windows WebKit visual acceptance
-is still open: its captured 3D canvas is blank and native controls need contrast
-corrections, even though the workflow state assertions pass. Audio is optional: when its API
+mobile-device or Safari-on-Apple-device support. Windows WebKit 27.2 on this host loses WebGL pixels in screenshots after a
+canvas-size change, even though framebuffer pixels and workflow assertions pass.
+`node tools/webkit-resize-diagnostic.mjs` reproduces this without the app or
+Three.js. This limits visual acceptance in that engine; it does not establish
+Safari behavior on Apple devices. Native-control contrast and toolbar wrapping
+are checked separately. Audio is optional: when its API
 is unavailable, the sound button is disabled and editing/driving remain usable.
 
 Optional external-model edit regression (models stay outside this repository):

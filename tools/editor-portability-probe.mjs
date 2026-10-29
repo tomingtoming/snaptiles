@@ -34,6 +34,14 @@ try {
  const receiver=await browser.newPage({viewport:{width:390,height:844}});receiver.on('pageerror',e=>errors.push(e.message));await receiver.goto(link);await receiver.waitForFunction(()=>window.__sim?.assembly?.tiles.length===7);
  assert.equal(await receiver.inputValue('#source'),built);await receiver.click('#build');await receiver.selectOption('#parts','1');
  await receiver.fill('#part-power','1100');await receiver.locator('#part-power').press('Tab');await receiver.click('#frame-model');
+ for(const width of [320,390]) {
+  await receiver.setViewportSize({width,height:844});
+  const bounds=await receiver.locator('#editor-toolbar button').evaluateAll(buttons=>buttons.map(b=>{const r=b.getBoundingClientRect();return {id:b.id,left:r.left,right:r.right};}));
+  assert.ok(bounds.every(r=>r.left>=0&&r.right<=width),`${engine} toolbar ${width}: ${JSON.stringify(bounds)}`);
+ }
+ assert.equal(await receiver.locator('html').evaluate(e=>getComputedStyle(e).colorScheme),'dark');
+ // ResizeObserver updates the drawing buffer; wait for subsequent rendered frames.
+ await receiver.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
  await receiver.screenshot({path:fileURLToPath(new URL(`../.shots/editor-${engine}-narrow.png`,import.meta.url))});
  await receiver.click('#edit-undo');assert.equal(await receiver.inputValue('#part-power'),'800');await receiver.click('#edit-redo');assert.equal(await receiver.inputValue('#part-power'),'1100');
  const picker=receiver.waitForEvent('filechooser');await receiver.click('#open-model');await (await picker).setFiles({name:`${engine}試作.rcd`,mimeType:'text/plain',buffer:bytes});

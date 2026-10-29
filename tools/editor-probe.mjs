@@ -52,6 +52,12 @@ try {
  assert.equal(await shared.inputValue('#source'), saved); await shared.close();
  await page.setViewportSize({ width: 390, height: 844 }); await page.screenshot({ path: `${out}/editor-mobile.png` });
  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+ for (const width of [320,390]) {
+   await page.setViewportSize({width,height:844});
+   const bounds=await page.locator('#editor-toolbar button').evaluateAll(buttons=>buttons.map(b=>{const r=b.getBoundingClientRect();return {id:b.id,left:r.left,right:r.right};}));
+   assert.ok(bounds.every(r=>r.left>=0&&r.right<=width),`toolbar ${width}: ${JSON.stringify(bounds)}`);
+ }
+
  for (const selector of ['#add-type', '[data-edge="S"]', '#part-angle', '#save-model']) {
    assert.equal(await page.locator(selector).evaluate(el => { const b = el.getBoundingClientRect(), p = document.querySelector('#builder').getBoundingClientRect(); return b.top >= p.top && b.bottom <= p.bottom; }), true, `${selector} must be visible without panel scrolling`);
  }
