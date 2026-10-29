@@ -1,3 +1,4 @@
+import { parseRc } from './rc/parser';
 import { BuildPanel } from './editor/panel';
 import { initRapier } from './physics/world';
 import { SceneView } from './render/scene';
@@ -398,6 +399,42 @@ async function readModelFile(f: File): Promise<string> {
     return utf8;
   }
 }
+const shareDialog = $<HTMLDialogElement>('share-dialog');
+const shareUrl = $<HTMLInputElement>('share-url');
+const shareStatus = $('share-status');
+const copyLink = $<HTMLButtonElement>('copy-link');
+let shareGeneration = 0;
+shareDialog.addEventListener('close', () => { ++shareGeneration; });
+$('share-model').addEventListener('click', async () => {
+  const text = sourceEl.value;
+  const request = ++shareGeneration;
+  shareUrl.value = ''; copyLink.disabled = true;
+  shareStatus.textContent = 'リンクを作成しています…';
+  shareDialog.showModal();
+  try {
+    if (!parseRc(text).body) throw new Error('Body がありません');
+    const hash = await encodeHash(text);
+    if (request !== shareGeneration || !shareDialog.open) return;
+    const url = new URL(location.href); url.hash = `m=${hash}`;
+    shareUrl.value = url.href; copyLink.disabled = false;
+    shareStatus.textContent = ''; shareUrl.focus(); shareUrl.select();
+  } catch (error) {
+    if (request === shareGeneration && shareDialog.open) shareStatus.textContent = `リンクを作れませんでした: ${error instanceof Error ? error.message : String(error)}`;
+  }
+});
+copyLink.addEventListener('click', async () => {
+  const request = shareGeneration;
+  copyLink.disabled = true;
+  try {
+    await navigator.clipboard.writeText(shareUrl.value);
+    if (request === shareGeneration) shareStatus.textContent = 'コピーしました';
+  } catch {
+    if (request === shareGeneration) {
+      shareStatus.textContent = '自動コピーできませんでした。URLを選択してコピーしてください。';
+      shareUrl.focus(); shareUrl.select();
+    }
+  } finally { if (request === shareGeneration) copyLink.disabled = false; }
+});
 async function encodeHash(text: string): Promise<string> {
   const cs = new CompressionStream('deflate-raw');
   const w = cs.writable.getWriter();

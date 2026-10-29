@@ -209,3 +209,28 @@ Retrospective: a small measured adjustment solved the specific review finding
 without restructuring the editor. Next: make sharing the latest model explicit;
 currently the user must run and manually copy the address, and an edited source
 can differ from the last successfully published hash.
+
+## 2026-10-29 — Share the current edited model explicitly
+
+Goal: share the current construction without accidentally sending the last run.
+Added a Share Link action that captures the editor text, checks model syntax and
+Body presence, and builds a compressed URL without running or replacing the
+current model/address. A modal exposes a selectable URL and an explicit Copy
+button. Clipboard denial leaves the URL selected with manual-copy instructions.
+Malformed input clears the result and disables copying rather than offering a
+stale link. Closing the dialog restores focus to the initiating control.
+
+Validation: typecheck/build and all five production browser probes pass. The
+new probe opens a URL made from unrun GUI edits in a separate page and compares
+the exact source. It also tests changed-source links, clipboard success/denial
+with a stub (the host clipboard is not touched), invalid syntax, and focus
+return. Independent mobile screenshot review confirms readable title, URL,
+fallback instructions and both actions without overlap or horizontal overflow.
+Clipboard interaction on every real browser and very large link transport
+limits remain unmeasured. Syntax validation does not certify model dynamics.
+
+Retrospective: the address bar represented the last successful run, which was
+not necessarily the construction being viewed. Capturing the current text at
+an explicit share action resolves that ambiguity while preserving editing.
+Next: audit state and document identity across new/import/edit/save, including
+whether download names misleadingly retain a previous sample name.
