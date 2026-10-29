@@ -1236,3 +1236,41 @@ at 390 a third line is partially visible below the two-line reserved area and
 long unwrapped lines extend horizontally. Source remains a scrolling textarea;
 this change guarantees readable content space, not that every visible fragment
 or complete model fits without scrolling.
+
+
+## 2026-10-30 — Explain and reach source-only attributes (Sprint 44)
+
+Goal: inspect the editing boundary for imported expressions. Custom angle and
+option fields had only hover titles, while custom power had no explanation;
+colour's note lived inside its disclosure. Disabled controls therefore did not
+provide a reliable route for touch/keyboard users.
+
+For selected attributes whose numeric/colour GUI editor is disabled, the builder
+now shows labelled source-edit buttons (angle, power, the type-specific option
+label, colour). Clicking selects the exact parser-recorded attribute range,
+focuses the textarea and scrolls to its line/column without modifying source.
+Buttons are absent for normal editable values and cleared for invalid source or
+a newly selected part without those fields. This does not rewrite custom control
+definitions or extend the generated-strength editor to arbitrary expressions.
+
+The new browser fixture imports a Wheel with four expressions, a long indented
+line and 25 preceding comments. It checks all four exact selections, unchanged
+source during navigation, vertical/horizontal scroll, a selected-expression edit,
+Undo, stale-hint clearing on Core selection/invalid source and exact export.
+Chromium production preview, Firefox and Windows WebKit dev-server runs pass.
+Added the scenario to the default editor suite (now 25 scenarios). 141 unit tests,
+production build and targeted general-editor, short-height, source-history and
+caret probes pass. Full 25-scenario execution and real mobile keyboards were not
+retested. Existing build warnings remain; no push or deployment.
+
+Independent image review at 390x844 found all four labelled buttons readable in
+two rows, no overlap with add/power controls, and the selected P*2 expression
+visible. The scrolled builder clips earlier rows at its upper boundary, as a
+scrolling region; this is not a claim that all settings fit simultaneously.
+
+Retrospective: a disabled field plus a hover title is not a complete editing
+path. Explain the specific field and take the user to its existing source;
+verify navigation is non-mutating and history still works after hand-off.
+Next: exercise the combined creation/edit/save loop with imported multi-branch
+models, especially selection and history after structural edits rather than
+adding further isolated presentation tweaks.

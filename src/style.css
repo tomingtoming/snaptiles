@@ -119,3 +119,7 @@ button:disabled { opacity: .4; cursor: default !important; }
 
 .angle-heading { display:flex; align-items:center; justify-content:space-between; gap:4px; }
 #builder #angle-settings { min-width:44px; min-height:28px; padding:0 4px; font:inherit; line-height:1.2; }
+
+#source-edit-help { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+#source-edit-help[hidden] { display: none; }
+#source-edit-help button { min-height: 44px; }

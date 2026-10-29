@@ -36,6 +36,7 @@ export class BuildPanel {
   private angleRow = document.getElementById('angle-control-row')!;
   private angleSettings = document.getElementById('angle-settings') as HTMLButtonElement;
   private angleControlFor = '';
+  private sourceHelp = document.getElementById('source-edit-help')!;
   private resetColor = document.getElementById('reset-color') as HTMLButtonElement;
   private color = document.getElementById('part-color') as HTMLInputElement;
   private option = document.getElementById('part-option') as HTMLSelectElement;
@@ -228,6 +229,7 @@ export class BuildPanel {
     } catch (e) {
       this.assembly = null; this.tree.replaceChildren(); this.scene.selectTile(null);
       this.type.disabled = this.angle.disabled = this.remove.disabled = this.copy.disabled = this.mirror.disabled = true;
+      this.sourceHelp.hidden = true; this.sourceHelp.replaceChildren();
       this.powerRow.hidden = this.angleRow.hidden = true; this.angleSettings.disabled = true; this.angleSettings.setAttribute('aria-expanded','false');
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = true);
       this.status.textContent = e instanceof Error ? e.message : String(e);
@@ -310,6 +312,32 @@ export class BuildPanel {
     for (const [key,pair] of Object.entries(CONTROL_KEYS)) this.powerControl.add(new Option(`${pair.label} を追加`, key === 'vertical' ? 'new' : `new:${key}`));
     for (const [key,pair] of Object.entries(CONTROL_KEYS)) this.powerControl.add(new Option(`${pair.label} を追加（保持）`, `hold:${key}`));
     this.powerControl.value = constant ? 'constant' : power.toUpperCase();
+    this.sourceHelp.replaceChildren();
+    const sourceFields: [string, string, boolean][] = [
+      ['angle', '角度', !!tile.parent && this.angle.disabled],
+      ['power', '出力', !this.powerRow.hidden && this.power.disabled],
+      ['option', settings?.label ?? '設定', !!settings && this.option.disabled],
+      ['color', '色', this.color.disabled],
+    ];
+    for (const [attribute, label, needed] of sourceFields) {
+      const range = tile.node.source?.attributes[attribute];
+      if (!needed || !range) continue;
+      const button = document.createElement('button');
+      button.type = 'button'; button.dataset.sourceAttribute = attribute;
+      button.textContent = `${label}をソースで編集`;
+      button.onclick = () => {
+        this.sourceEditGroup = null;
+        this.source.focus(); this.source.setSelectionRange(range[0], range[1]);
+        const before = this.source.value.slice(0, range[0]).split('\n');
+        const style = getComputedStyle(this.source);
+        this.source.scrollTop = (before.length - 1) * parseFloat(style.lineHeight);
+        const measure = document.createElement('canvas').getContext('2d')!;
+        measure.font = style.font;
+        this.source.scrollLeft = Math.max(0, measure.measureText(before.at(-1)!).width - 12);
+      };
+      this.sourceHelp.append(button);
+    }
+    this.sourceHelp.hidden = !this.sourceHelp.childElementCount;
     this.remove.disabled = this.copy.disabled = this.mirror.disabled = !tile.parent;
     this.remove.textContent = tile.children.length ? '枝ごと削除' : '削除';
   }

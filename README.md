@@ -198,3 +198,9 @@ Keyboard workflow: running a model focuses the view so arrow controls work immed
 The **?** button opens an in-app building guide with control assignment, branch copy, saving/sharing, camera controls and keyboard navigation. View and sound icons expose Japanese labels and current-state hints.
 
 Keyboard aliases and on-screen controls can be held together: releasing one source leaves the others active. Starting another model clears old keycap presses.
+
+
+Imported expression-valued angle, power, option and colour fields show a
+「ソースで編集」button in the builder. It focuses and selects that exact attribute
+in the source without changing it. Strength editing remains limited to recognised
+generated controls; arbitrary expressions retain their source representation.
