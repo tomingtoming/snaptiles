@@ -1158,3 +1158,40 @@ button, numeric input, A/D selector or direction controls. The 138-unit baseline
 covers the unchanged document operations; the final UI behavior is covered by
 the browser checks. Windows WebKit 3D screenshot limits remain as previously
 recorded; its state assertions do not replace visual acceptance.
+
+
+## 2026-10-30 — Many-control selection and scripted model preservation (Sprint 42)
+
+Goal: test editing beyond small vehicle fixtures. Selecting a part repeatedly
+parsed the entire source while producing generated-control labels. Cache control
+metadata for the exact current source and index key bindings once; source edits,
+Undo/Redo and restore invalidate it naturally. Altered or duplicate declarations
+remain source-edited rather than offering ambiguous strength changes.
+
+On the same synthetic 101-part/100-control fixture (11,995 bytes), five synchronous
+selection-handler measurements changed from a median 311.6ms to 7.9ms. These are
+local dispatch durations, not frame rates or a universal performance guarantee.
+The permanent browser probe uses named parts and reports timing without a
+machine-dependent threshold; its final median was 8ms. It also checks strength
+changes, Undo/Redo and rejection of named-branch copy/mirror.
+
+The existing Walker Lua model is imported, one colour token is edited, and the
+whole source is compared with the expected single-token substitution. Download
+bytes and reopening match exactly, with no script error. This is evidence for
+this scripted fixture, not an audit of external community models.
+
+Validation: 141 tests in 17 files, production build and the new scale probe pass.
+Control-key, held-throttle and source-history browser probes also passed during
+this sprint. Unit tests assert one parse for repeated metadata queries, cache
+refresh after direct edits/history/restore, invalid-source recovery, and refusal
+of altered or duplicate declarations in either order. Added test:editor:scale
+and a separate CI step; remote CI has not run. Existing build-size/wasmoon
+warnings remain. No push or deployment was performed.
+
+Retrospective: repeated work inside option rendering was measurable before any
+renderer optimisation was needed. Keep performance fixtures separate from exact
+source-preservation checks. The initial benchmark attempted to fill the source
+field at 1280x720 and timed out on visibility; importing the fixture at 1280x1000
+made measurement possible. That timeout is not evidence of parsing cost. Next:
+inspect source-editor reachability at shorter viewport heights and distinguish
+intentional collapsed state from actual layout obstruction.

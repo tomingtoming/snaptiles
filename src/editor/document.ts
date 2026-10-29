@@ -27,6 +27,7 @@ export interface CopiedBranch { text: string; variables: string[]; count: number
 /** Edits use parser offsets: scripts, comments and unrelated attributes remain byte-for-byte. */
 export class ModelDocument {
   text: string;
+  private controlCache?: {text: string; entries: Map<string, {strength: number; label: string}>};
   selectedOffset?: number;
   sourceView?: SourceViewState;
   undoStack: DocumentState[] = [];
@@ -111,26 +112,37 @@ export class ModelDocument {
     this.replace(...this.attributeEdit(index, 'power', String(value)));
   }
   /** One undoable edit; a fresh variable never overwrites existing controls or scripts. */
-  controlStrength(variable: string): number | null {
+  private controlInfo(variable: string): {strength: number; label: string} | undefined {
     const name = variable.replace(/\s/g, '').replace(/^-/, '').toUpperCase();
-    if (!/^ST_(POWER|STEER|THROTTLE)_\d+$/.test(name)) return null;
-    const model = parseRc(this.text), v = model.vals.find(v => v.name.toUpperCase() === name);
-    const keys = model.keys.filter(k => k.var.toUpperCase() === name);
-    const held = name.startsWith('ST_THROTTLE');
-    if (!v || v.default !== 0 || v.min !== (held ? 0 : -v.max) || v.max <= 0 || v.step !== (held ? 0 : v.max) || keys.length !== 2) return null;
-    const sign = name.startsWith('ST_STEER') ? -1 : 1;
-    const increment = held ? v.max / 100 : v.max;
-    return Object.values(CONTROL_KEYS).some(pair =>
-      keys.some(k => k.key === pair.keys[0] && k.step === sign * increment) &&
-      keys.some(k => k.key === pair.keys[1] && k.step === -sign * increment)) ? v.max : null;
+    if (!/^ST_(POWER|STEER|THROTTLE)_\d+$/.test(name)) return undefined;
+    if (this.controlCache?.text !== this.text) {
+      const model = parseRc(this.text);
+      const keysByVariable = new Map<string, typeof model.keys>();
+      for (const key of model.keys) {
+        const name = key.var.toUpperCase(), bindings = keysByVariable.get(name) ?? [];
+        bindings.push(key); keysByVariable.set(name, bindings);
+      }
+      const entries = new Map<string, {strength: number; label: string}>(), seen = new Set<string>();
+      for (const v of model.vals) {
+        const name = v.name.toUpperCase();
+        if (seen.has(name)) { entries.delete(name); continue; } // Ambiguous declarations stay source-edited.
+        seen.add(name);
+        if (!/^ST_(POWER|STEER|THROTTLE)_\d+$/.test(name)) continue;
+        const keys = keysByVariable.get(name) ?? [], held = name.startsWith('ST_THROTTLE');
+        if (v.default !== 0 || v.min !== (held ? 0 : -v.max) || v.max <= 0 || v.step !== (held ? 0 : v.max) || keys.length !== 2) continue;
+        const sign = name.startsWith('ST_STEER') ? -1 : 1, increment = held ? v.max / 100 : v.max;
+        const pair = Object.values(CONTROL_KEYS).find(pair =>
+          keys.some(k => k.key === pair.keys[0] && k.step === sign * increment) &&
+          keys.some(k => k.key === pair.keys[1] && k.step === -sign * increment));
+        if (pair) entries.set(name, {strength: v.max, label: pair.label + (held ? '（保持）' : '')});
+      }
+      // Key by exact source, including changes made through undo/restore or direct typing.
+      this.controlCache = {text: this.text, entries};
+    }
+    return this.controlCache.entries.get(name);
   }
-  controlKeyLabel(variable: string): string | null {
-    if (this.controlStrength(variable) === null) return null;
-    const name = variable.replace(/\s/g, '').replace(/^-/, '').toUpperCase();
-    const keys = parseRc(this.text).keys.filter(k=>k.var.toUpperCase()===name).map(k=>k.key);
-    const label = Object.values(CONTROL_KEYS).find(pair=>pair.keys.every(key=>keys.includes(key)))?.label;
-    return label ? label + (name.startsWith('ST_THROTTLE') ? '（保持）' : '') : null;
-  }
+  controlStrength(variable: string): number | null { return this.controlInfo(variable)?.strength ?? null; }
+  controlKeyLabel(variable: string): string | null { return this.controlInfo(variable)?.label ?? null; }
   setControlStrength(variable: string, magnitude: number): void {
     if (this.controlStrength(variable) === null) throw new Error('変更済みの操作はソースで編集してください');
     if (!Number.isFinite(magnitude) || magnitude <= 0) throw new Error('大きさは正の数で指定してください');

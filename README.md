@@ -117,6 +117,12 @@ flies it, exports named bytes and re-edits the shared result. Unit tests verify 
 surface geometry and isolated airborne axis responses. These checks do not
 establish trimmed cruise or original-engine flight fidelity.
 
+`bun run test:editor:scale` checks 101 named parts with 100 generated controls,
+strength/history changes, named-branch guards and a Lua model colour edit with
+exact-byte export/reopening. It reports selection timings without a machine-
+dependent timing threshold. Control metadata is cached only for unchanged source;
+altered or duplicate declarations stay source-edited.
+
 The separate Firefox creation-loop check is `bun run test:editor:firefox`
 (install its browser with `bun x playwright install firefox`). It covers GUI
 construction, driving, source Undo, named download, share/re-edit and file reopen.
