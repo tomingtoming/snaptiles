@@ -103,3 +103,23 @@ Retrospective: copying shape alone can silently break control bindings or
 name-based scripts. Preserve expressions and explicitly reject unresolved
 references instead of producing a plausible-looking broken model. Next: test
 source-preserving edits against the existing external model corpus.
+
+## 2026-10-29 — External-model editing regression
+
+Goal: test edits beyond the generated toy models used during implementation.
+Added a local-only corpus probe that decodes UTF-8/Shift-JIS, parses and
+assembles each model, adds a tile, changes an eligible angle, copies an
+unnamed leaf and verifies exact source restoration by Undo. Lua source stays
+unchanged after edits. No community model data is committed.
+
+Validation: 90/90 sprishri models and 5/5 RCModel1 models pass on 2026-10-29.
+The slowest complete edit-probe sequence was 45 ms in this run (not a browser
+rendering or large-corpus performance guarantee). Ignored reports are under
+.shots/editor-corpus-x.json and .shots/editor-corpus-RCModel1.json.
+
+Retrospective: all 95 passing here does not replace the earlier runtime smoke
+results or measure behavioral compatibility. Preserving script text is also
+not enough to preserve numerical chip references when structure changes;
+that limitation is now explicit. Next: inspect large imported models in the
+browser and resolve concrete editing/accessibility defects before adding more
+features. Public push/deployment still awaits the requested scope confirmation.

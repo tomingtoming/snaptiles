@@ -49,7 +49,8 @@ to attach it, change the selected tile's type or numeric angle, or delete
 its branch. **コピー** keeps the selected branch; select its new parent and an
 N/S/E/W edge to attach a copy. Expressions and controls remain shared. Named
 branches are protected against name collisions, and pasting requires the
-referenced variables to exist. Core cannot be deleted or copied. ↶ / ↷ undo and redo edits, including
+referenced variables to exist. Core cannot be deleted or copied. Adding or removing parts can change numerical
+chip indices; Lua that refers to chip numbers may need corresponding edits. ↶ / ↷ undo and redo edits, including
 after a test run; **保存** downloads the model. Press ▶ to test it and update
 the shareable URL, then **組む** to return to its construction pose.
 
@@ -76,6 +77,10 @@ The editor is independently implemented, without RCD/RCM source or assets.
 Production-build browser regression: `bun run build && bun run test:editor`
 (install Chromium first with `bun x playwright install chromium`). This runs
 in CI with an OS-assigned port and uploads screenshots on failure.
+
+Optional external-model edit regression (models stay outside this repository):
+`bun run tools/editor-corpus.ts <model-directory>`. This checks parsing,
+assembly and reversible edits, not physics or full Lua compatibility.
 
 Browser regression (against an already running dev server):
 `node tools/editor-probe.mjs http://127.0.0.1:<port>/`.
