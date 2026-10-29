@@ -210,8 +210,14 @@ let pinchDist = 0;
 // pointer state for the model's _MX/_MY/_ML/_MR/_MM (canvas pixels)
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 canvas.addEventListener('pointermove', (e) => { const r = canvas.getBoundingClientRect(); keys.mouse.x = Math.round(e.clientX - r.left); keys.mouse.y = Math.round(e.clientY - r.top); });
-canvas.addEventListener('pointerdown', (e) => { if (e.button === 0) keys.mouse.l = 1; if (e.button === 2) keys.mouse.r = 1; if (e.button === 1) keys.mouse.m = 1; });
-window.addEventListener('pointerup', (e) => { if (e.button === 0) keys.mouse.l = 0; if (e.button === 2) keys.mouse.r = 0; if (e.button === 1) keys.mouse.m = 0; });
+const pointerButtons = new Map<number, number>();
+const updateMouseButtons = () => {
+  let buttons = 0;
+  for (const held of pointerButtons.values()) buttons |= held;
+  keys.mouse.l = buttons & 1 ? 1 : 0; keys.mouse.r = buttons & 2 ? 1 : 0; keys.mouse.m = buttons & 4 ? 1 : 0;
+};
+canvas.addEventListener('pointerdown', (e) => { pointerButtons.set(e.pointerId, e.buttons); updateMouseButtons(); });
+canvas.addEventListener('pointermove', (e) => { if (pointerButtons.has(e.pointerId)) { pointerButtons.set(e.pointerId, e.buttons); updateMouseButtons(); } });
 canvas.addEventListener('pointerdown', (e) => {
   touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
   dragging = touches.size === 1;
@@ -242,12 +248,19 @@ canvas.addEventListener('pointermove', (e) => {
   lastY = e.clientY;
 });
 const endPointer = (e: PointerEvent) => {
-  touches.delete(e.pointerId);
-  dragging = false;
-  pinchDist = 0;
+  pointerButtons.delete(e.pointerId); updateMouseButtons();
+  if (!touches.delete(e.pointerId)) return;
+  const [a, b] = [...touches.values()];
+  dragging = touches.size === 1;
+  pinchDist = a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  if (a) { lastX = a.x; lastY = a.y; }
 };
-canvas.addEventListener('pointerup', endPointer);
-canvas.addEventListener('pointercancel', endPointer);
+window.addEventListener('pointerup', endPointer);
+window.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('lostpointercapture', endPointer);
+window.addEventListener('blur', () => {
+  touches.clear(); pointerButtons.clear(); updateMouseButtons(); dragging = false; pinchDist = 0;
+});
 (window as unknown as { __scene: SceneView }).__scene = scene; // probe hook
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();

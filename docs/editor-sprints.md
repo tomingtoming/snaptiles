@@ -428,3 +428,26 @@ now asserted. Review also caught missing touch instructions despite existing
 pinch support; the guide now names both gestures. This is a layout/focus and
 content check, not a first-time-user comprehension study. Next: test touch
 pinch/cancellation sequences rather than infer their reliability from code.
+
+## 2026-10-30 — Continue and release multi-pointer gestures correctly
+
+Goal: keep mobile camera gestures and model mouse state consistent when fingers
+are removed or cancelled. Reproduced a pinch followed by one remaining pointer
+that no longer orbited, while _ML cleared despite that pointer remaining down.
+Cancellation could also leave _ML pressed. Pointer button masks are now tracked
+per pointer, and the remaining gesture is rebased when a pointer ends. Up,
+cancel, capture loss and window blur clear the appropriate state; mouse button
+chords update when one button lifts while another remains held.
+
+Validation: 84 unit tests and typecheck/build pass. A browser probe uses CDP
+touch input to zoom, lift only one named finger, continue orbiting with the same
+pointer, cancel and restart. It verifies actual got/lost-pointer-capture events,
+mouse button chords, and the blur cleanup handler. The blur event is injected;
+physical-device gestures and OS focus transitions are not certified here.
+
+Retrospective: the first CDP test specified the remaining finger in touchEnd,
+but this command names the fingers being removed. Event logging exposed the
+mistake. A release-capture test initially released a pending request before the
+browser acquired capture; a move plus observed gotpointercapture makes the
+precondition explicit. Test timing alone was not enough. Next: test simultaneous
+keyboard and on-screen control inputs so releasing one does not cancel another.
