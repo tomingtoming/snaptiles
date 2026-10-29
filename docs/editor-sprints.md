@@ -380,3 +380,28 @@ confirms smooth plate/disc/rounded-end faces; tiny contact-shadow offsets and
 all lighting/view angles remain unmeasured. Keep striping in visual checklists.
 Next: audit the growing editor as a complete workflow for discoverability and
 keyboard operation, before adding further part parameters.
+
+## 2026-10-30 — Keep the keyboard workflow connected
+
+Goal: move from editing to driving and back without a pointer-only workaround.
+Reproduced Enter on Run leaving focus on the button: ArrowUp produced ENGINE=0.
+Also reproduced Ctrl+Z doing nothing while the part list was focused. Successful
+loads now focus an accessible, keyboard-focusable canvas, unless the user moved
+focus elsewhere during initialization. The view has a visible inset focus ring.
+Select elements permit GUI Undo/Redo; text inputs retain native editing behavior.
+Source Shift+Tab leaves the field instead of inserting a tab. Ctrl/Meta/Alt
+shortcuts no longer become model key presses.
+
+Validation: 84 unit tests and typecheck/build pass. The keyboard browser probe
+uses Tab/Shift+Tab/Enter to run, drive, enter the builder, create/add a part, and
+Undo/Redo from the list. It holds a modifier shortcut across simulation ticks
+and checks no brake input, and delays initialization to verify a user's move to
+the source field keeps focus. Reproduction after the fix reports view focus,
+ENGINE=900 while held, and a successful part removal by Undo. Independent image
+review confirms the focus border is visible without obscuring model or controls.
+
+Retrospective: prior browser tests explicitly focused the view before driving,
+which bypassed the real transition failure. The new probe preserves actual
+keyboard focus transitions. This is a keyboard workflow check, not a complete
+screen-reader or accessibility audit. Next: audit icon labels and discoverability
+of construction commands, including guidance that does not require reading README.

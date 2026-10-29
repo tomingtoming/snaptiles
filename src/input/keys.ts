@@ -48,7 +48,7 @@ export class KeyState {
   }
 
   private onDown = (e: KeyboardEvent) => {
-    if (isTyping(e)) return;
+    if (isTyping(e) || e.ctrlKey || e.metaKey || e.altKey) return;
     const n = this.aliases.get(e.code) ?? this.byCode.get(e.code);
     if (n === undefined) return;
     this.down.add(n);

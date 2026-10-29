@@ -40,6 +40,7 @@ const R = await initRapier();
 
 async function load(source: string, request: number): Promise<boolean> {
   if (request !== loadGeneration) return false;
+  const focusBeforeLoad = document.activeElement;
   builder?.close();
   paused = false;
   statusEl.textContent = '';
@@ -69,6 +70,7 @@ async function load(source: string, request: number): Promise<boolean> {
     scene.snap(next.corePosition());
     acc = 0; last = performance.now(); lastCoreVel = null; lastShells = 0; crateVel.length = 0;
     buildKeyCaps(next);
+    if (document.activeElement === focusBeforeLoad) canvas.focus({preventScroll: true});
     if (next.scriptError) statusEl.textContent = next.scriptError;
     return true;
   } catch (e) {
@@ -156,7 +158,7 @@ sourceEl.addEventListener('keydown', (e) => {
     void loadAndShare(sourceEl.value);
     return;
   }
-  if (e.key === 'Tab') {
+  if (e.key === 'Tab' && !e.shiftKey) {
     // keep Tab in the editor (model files are tab-indented)
     e.preventDefault();
     const { selectionStart: a, selectionEnd: b, value } = sourceEl;

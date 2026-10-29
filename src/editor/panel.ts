@@ -41,7 +41,7 @@ export class BuildPanel {
     document.getElementById('focus-part')!.onclick = () => { if (this.assembly) this.scene.focusTile(this.selected); };
     window.addEventListener('keydown', event => {
       const target = event.target as HTMLElement | null;
-      if (!this.active || target?.matches('input, textarea, select') || target?.isContentEditable || event.repeat) return;
+      if (!this.active || target?.matches('input, textarea') || target?.isContentEditable || event.repeat) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
         event.preventDefault(); this.edit(() => event.shiftKey ? this.document.redo() : this.document.undo());
       }

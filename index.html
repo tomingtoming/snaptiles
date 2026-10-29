@@ -28,11 +28,11 @@
         <div class="edit-row"><label>追加する部品<select id="add-type"></select></label><div class="edges" aria-label="接続方向"><button data-edge="N">N ＋</button><button data-edge="W">W ＋</button><button data-edge="E">E ＋</button><button data-edge="S">S ＋</button></div></div>
         <details id="appearance"><summary>色</summary><div class="edit-row"><label>部品の色<input id="part-color" type="color" /></label><button id="reset-color" type="button">既定色</button><span id="color-note"></span></div></details>
       </section>
-      <textarea id="source" spellcheck="false" wrap="off"></textarea>
+      <textarea aria-label="モデルのソース。Tabで字下げ、ShiftとTabで前の操作へ移動" id="source" spellcheck="false" wrap="off"></textarea>
       <footer id="status"></footer>
     </aside>
     <main id="stage">
-      <canvas id="view"></canvas>
+      <canvas id="view" tabindex="0" aria-label="モデルの操縦・表示画面"></canvas>
       <canvas id="hud"></canvas>
       <pre id="vals"></pre>
       <pre id="out"></pre>

@@ -135,3 +135,5 @@ Wheel/RLW parts expose three radius choices (0.30/0.45/0.60 m); Weight parts exp
 Expand **色** to set a selected part’s fixed RGB color, including Core. **既定色** removes the color override without undoing other edits; changing the part type then uses its default palette. Undo restores the previous color. Variable-driven colors remain source-only; Lua can still override color during simulation.
 
 Cowl parts expose shape options 0–7: plate, outline, disc, two triangles, a rounded end, and the two plate variants retained by the format. Shape changes preserve angle/color and support Undo/Redo.
+
+Keyboard workflow: running a model focuses the view so arrow controls work immediately; a focus change made during loading is respected. Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z work from part selectors. Source Tab inserts indentation; Shift+Tab leaves the source field. Modifier shortcuts do not act as vehicle controls.
