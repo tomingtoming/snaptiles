@@ -62,12 +62,23 @@
         <div class="share-actions"><button id="filename-cancel" type="button">キャンセル</button><button type="submit">名前を設定</button></div>
       </form>
     </dialog>
+    <dialog id="control-key-dialog" aria-labelledby="control-key-title">
+      <form id="control-key-form">
+        <h2 id="control-key-title">操作キーを選ぶ</h2>
+        <p id="control-key-description"></p>
+        <label>1つ目のキー<select id="control-key-first"></select></label>
+        <label>2つ目のキー<select id="control-key-second"></select></label>
+        <p>同じキーを別の操作でも使うと、同時に動きます。</p>
+        <p id="control-key-status" role="status"></p>
+        <div class="share-actions"><button id="control-key-cancel" type="button">キャンセル</button><button type="submit">操作を追加</button></div>
+      </form>
+    </dialog>
     <dialog id="help-dialog" aria-labelledby="help-title">
       <h2 id="help-title" tabindex="-1">作って、走らせる</h2>
       <ol>
         <li><strong>組む → 新規</strong>でCoreから作成。サンプルを選んで改造することもできます。</li>
         <li>画面の部品か一覧を選び、種類・角度を調整。<strong>N / W / E / S ＋</strong>で選んだ部品の辺に追加します。画面の黄色いN/W/E/Sと丸印が、その部品の接続方向と接続点です。「全体」「選択へ」で見やすい距離へ移動できます。</li>
-        <li>WheelやJetの<strong>操作</strong>、部品の<strong>角度の操作</strong>から、↑ / ↓、← / →、Z / X、A / Dを選んで追加できます。離すとゼロへ戻ります。同じキーを複数の操作に割り当てると同時に動きます。角度の操作が隠れているときは、角度欄の「操作」で開きます。角度も出力も「（逆）」で逆向きに連動できます。</li>
+        <li>WheelやJetの<strong>操作</strong>、部品の<strong>角度の操作</strong>から、↑ / ↓、← / →、Z / X、A / Dを選んで追加できます。離すとゼロへ戻ります。同じキーを複数の操作に割り当てると同時に動きます。角度の操作が隠れているときは、角度欄の「操作」で開きます。角度も出力も「（逆）」で逆向きに連動できます。「キーを選んで追加…」なら、17キーから異なる2キーを選べます。出力には保持式もあります。</li>
         <li><strong>▶ 実行</strong>で試運転。表示されたキーで操縦し、<strong>組む</strong>で編集へ戻ります。</li>
         <li><strong>保存名</strong>で名前を付け、<strong>保存</strong>でファイルへ、<strong>開く</strong>で読込。<strong>共有リンク</strong>は今の編集内容を渡せます。下書きはこのブラウザに最新の1件が保存され、復元後はUndoで戻せます。</li>
       </ol>

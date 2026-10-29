@@ -1555,3 +1555,41 @@ sprint. Windows WebKit's known 3D screenshot limitation still prevents claiming
 full visual parity with Apple Safari. Next: assess extending control assignment
 beyond the four preset key pairs, starting from concrete construction needs and
 preserving existing shared/reversed/held behavior.
+
+
+## 2026-10-30 — Choose arbitrary two-key controls (Sprint 53)
+
+Goal: remove the four-preset limitation when constructing independent mechanisms.
+Angle and power selectors now offer a dialog choosing any two distinct keys from
+the existing 17-key input table; power also offers held mode. Existing presets
+remain. The dialog states signed direction/hold semantics and warns that reusing
+a physical key moves multiple controls together. Cancel leaves source/history
+unchanged; invalid identical choices stay in the dialog. Source changes while
+it is open are rejected at submit rather than applying to a stale selected part.
+
+Generated-control recognition now derives the ordered pair from valid signed
+increments and validates key numbers, rather than requiring one of four presets.
+Custom controls retain labels, magnitude edits, reversed bindings, separation
+and Undo/Redo. Separation preserves the original pair. Arbitrary modified control
+curves still remain source-edited; this is creation of two-key controls, not an
+editor for every possible Key declaration or an in-place key reassignment tool.
+
+Validation: 158 tests in 21 files pass, including all 272 ordered distinct pairs,
+invalid/out-of-range/fractional keys, and custom held-control separation/history.
+The browser scenario creates Q/E angle and C/V held output through the dialog,
+checks cancel/focus and duplicate-key refusal, drives the actual controls,
+undoes/redoes creation, separates a custom binding and exports exact source.
+Chromium production preview, Firefox and Windows WebKit dev-server runs pass.
+Existing separation and preset-control browser probes pass. Default runner now
+has 32 scenarios; full suite was not rerun this sprint. Independent 320px image
+review found the directions, values and both action buttons readable without
+clipping. Build warnings remain unchanged.
+
+Retrospective: preset selection and arbitrary pair creation can share the same
+validated model operation. Recognition must evolve with creation, otherwise a
+newly generated custom control would immediately lose GUI editing. The initial
+cancel-focus assertion ran before the asynchronous dialog close event; changed
+it to await the actual focus return, which passes on all three engines. A field
+change also clears old validation text. Next: check custom control ownership and
+conflicting assignments in more complex models, without silently reassigning
+other parts. No push or deployment.

@@ -1,3 +1,4 @@
+import { KEY_TABLE } from '../input/keys';
 import { exprIsConstant } from '../rc/expr';
 import { parseRc, findBlocks, declarationRanges, type ChipNode } from '../rc/parser';
 
@@ -21,13 +22,14 @@ export const CONTROL_KEYS = {
   ad: {label: 'A / D', keys: [7, 9]},
 } as const;
 export type ControlKeys = keyof typeof CONTROL_KEYS;
+export type ControlPair = ControlKeys | readonly [number, number];
 
 export interface CopiedBranch { text: string; variables: string[]; count: number }
 
 /** Edits use parser offsets: scripts, comments and unrelated attributes remain byte-for-byte. */
 export class ModelDocument {
   text: string;
-  private controlCache?: {text: string; entries: Map<string, {strength: number; label: string}>};
+  private controlCache?: {text: string; entries: Map<string, {strength: number; label: string; keys: readonly [number, number]}>};
   selectedOffset?: number;
   sourceView?: SourceViewState;
   undoStack: DocumentState[] = [];
@@ -112,7 +114,7 @@ export class ModelDocument {
     this.replace(...this.attributeEdit(index, 'power', String(value)));
   }
   /** One undoable edit; a fresh variable never overwrites existing controls or scripts. */
-  private controlInfo(variable: string): {strength: number; label: string} | undefined {
+  private controlInfo(variable: string): {strength: number; label: string; keys: readonly [number, number]} | undefined {
     const name = variable.replace(/\s/g, '').replace(/^-/, '').toUpperCase();
     if (!/^ST_(POWER|STEER|THROTTLE)_\d+$/.test(name)) return undefined;
     if (this.controlCache?.text !== this.text) {
@@ -122,7 +124,7 @@ export class ModelDocument {
         const name = key.var.toUpperCase(), bindings = keysByVariable.get(name) ?? [];
         bindings.push(key); keysByVariable.set(name, bindings);
       }
-      const entries = new Map<string, {strength: number; label: string}>(), seen = new Set<string>();
+      const entries = new Map<string, {strength: number; label: string; keys: readonly [number, number]}>(), seen = new Set<string>();
       for (const v of model.vals) {
         const name = v.name.toUpperCase();
         if (seen.has(name)) { entries.delete(name); continue; } // Ambiguous declarations stay source-edited.
@@ -131,10 +133,11 @@ export class ModelDocument {
         const keys = keysByVariable.get(name) ?? [], held = name.startsWith('ST_THROTTLE');
         if (v.default !== 0 || v.min !== (held ? 0 : -v.max) || v.max <= 0 || v.step !== (held ? 0 : v.max) || keys.length !== 2) continue;
         const sign = name.startsWith('ST_STEER') ? -1 : 1, increment = held ? v.max / 100 : v.max;
-        const pair = Object.values(CONTROL_KEYS).find(pair =>
-          keys.some(k => k.key === pair.keys[0] && k.step === sign * increment) &&
-          keys.some(k => k.key === pair.keys[1] && k.step === -sign * increment));
-        if (pair) entries.set(name, {strength: v.max, label: pair.label + (held ? '（保持）' : '')});
+        const first = keys.find(k => k.step === sign * increment), second = keys.find(k => k.step === -sign * increment);
+        if (first && second && first.key !== second.key && [first.key,second.key].every(k => Number.isInteger(k) && k >= 0 && k < KEY_TABLE.length)) {
+          const pair = [first.key,second.key] as const;
+          entries.set(name, {strength:v.max, keys:pair, label:pair.map(k => KEY_TABLE[k].glyph).join(' / ') + (held ? '（保持）' : '')});
+        }
       }
       // Key by exact source, including changes made through undo/restore or direct typing.
       this.controlCache = {text: this.text, entries};
@@ -169,14 +172,14 @@ export class ModelDocument {
     const magnitude = this.controlStrength(expression);
     if (magnitude === null) throw new Error('変更済みの操作はソースで編集してください');
     const name = expression.replace(/^-/, ''), keys = parseRc(this.text).keys.filter(k => k.var.toUpperCase() === name);
-    const pair = (Object.keys(CONTROL_KEYS) as ControlKeys[]).find(p => CONTROL_KEYS[p].keys.every(n => keys.some(k => k.key === n)))!;
+    const pair = this.controlInfo(expression)!.keys;
     this.addControl(index, attribute, magnitude, pair, name.startsWith('ST_THROTTLE'), {
-      prefix: name.replace(/_\d+$/, ''), delta: keys.find(k => k.key === CONTROL_KEYS[pair].keys[0])!.step, reverse: expression.startsWith('-'),
+      prefix: name.replace(/_\d+$/, ''), delta: keys.find(k => k.key === pair[0])!.step, reverse: expression.startsWith('-'),
     });
   }
-  addPowerControl(index: number, magnitude: number, pair: ControlKeys = 'vertical'): void { this.addControl(index, 'power', magnitude, pair); }
-  addThrottleControl(index: number, magnitude: number, pair: ControlKeys = 'zx'): void { this.addControl(index, 'power', magnitude, pair, true); }
-  addSteeringControl(index: number, magnitude = 30, pair: ControlKeys = 'horizontal'): void { this.addControl(index, 'angle', magnitude, pair); }
+  addPowerControl(index: number, magnitude: number, pair: ControlPair = 'vertical'): void { this.addControl(index, 'power', magnitude, pair); }
+  addThrottleControl(index: number, magnitude: number, pair: ControlPair = 'zx'): void { this.addControl(index, 'power', magnitude, pair, true); }
+  addSteeringControl(index: number, magnitude = 30, pair: ControlPair = 'horizontal'): void { this.addControl(index, 'angle', magnitude, pair); }
   bindAngle(index: number, variable: string): void {
     const expression = variable.replace(/\s/g, '').toUpperCase();
     if (!parseRc(this.text).vals.some(v => v.name.toUpperCase() === expression.replace(/^-/, ''))) throw new Error('定義済みの変数を選んでください');
@@ -213,10 +216,9 @@ export class ModelDocument {
     this.undoStack.push(this.snapshot()); this.redoStack = []; this.filename = next;
   }
   newModel(): void { this.restore('Body {\n  Core() {\n  }\n}\n'); }
-  private addControl(index: number, attribute: 'power' | 'angle', magnitude: number, pair: ControlKeys, held = false, template?: {prefix: string; delta: number; reverse: boolean}): void {
-    const binding = CONTROL_KEYS[pair];
-    if (!binding) throw new Error('操作に使うキーを選んでください');
-    const keys = binding.keys;
+  private addControl(index: number, attribute: 'power' | 'angle', magnitude: number, pair: ControlPair, held = false, template?: {prefix: string; delta: number; reverse: boolean}): void {
+    const keys = typeof pair === 'string' ? CONTROL_KEYS[pair]?.keys : pair;
+    if (!keys || keys.length !== 2 || keys[0] === keys[1] || !keys.every(k => Number.isInteger(k) && k >= 0 && k < KEY_TABLE.length)) throw new Error('異なる2つの操作キーを選んでください');
     if (!Number.isFinite(magnitude) || magnitude <= 0) throw new Error('出力の大きさは正の数で指定してください');
     const names = new Set(this.text.toUpperCase().match(/[A-Z_][A-Z0-9_]*/g));
     const prefixName = template?.prefix ?? (held ? 'ST_THROTTLE' : attribute === 'power' ? 'ST_POWER' : 'ST_STEER');

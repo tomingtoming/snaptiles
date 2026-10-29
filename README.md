@@ -101,8 +101,7 @@ This browser keeps one latest draft, including unfinished text and its filename.
 The recovery card identifies its name and local save time before **下書きを復元**.
 Restoration is undoable. It is not a multi-model library or cloud backup; save
 files for durable copies. The editor is independently implemented without
-RCD/RCM source or assets. Multi-selection, an arbitrary key-mapping GUI
-and a Lua programming GUI are not implemented; the source remains editable.
+RCD/RCM source or assets. Multi-selection and a Lua programming GUI are not implemented; the source remains editable.
 A working construction loop does not establish compatibility with every
 RigidChips model, script or physical behavior. See `docs/editor-sprints.md` for
 measured scope. Local checkout behavior may differ from the deployed website.
@@ -221,3 +220,10 @@ to copy the control for that field. Its key pair, reversed binding, magnitude an
 return/hold behavior are preserved, while later strength edits are independent.
 The original definition remains for other parts/scripts; separation retains the
 same physical keys. Custom definitions remain source-edited.
+
+
+Choose 「キーを選んで追加…」 to create an operation from any two distinct keys
+in the 17-key model input table. The held-power variant is also available.
+Direction semantics are stated in the dialog. Existing four preset pairs remain;
+custom pairs participate in strength editing, separation and Undo/Redo. This
+creates a new control rather than changing every binding of an existing one.

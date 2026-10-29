@@ -1,0 +1,17 @@
+import {chromium,firefox,webkit} from 'playwright';import assert from 'node:assert/strict';
+const engine=process.argv[3]??'chromium';
+const b=await ({chromium,firefox,webkit}[engine]).launch(engine==='chromium'?{args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']}:{});try{
+ const p=await b.newPage({viewport:{width:320,height:568}}),errors=[];p.on('pageerror',e=>errors.push(e.message));await p.goto(process.argv[2]??'http://127.0.0.1:5175/');await p.waitForFunction(()=>window.__sim);
+ const initial='Body {Core(){E:Trim() N:Jet()}}';await p.fill('#source',initial);await p.click('#build');await p.selectOption('#parts','1');
+ await p.selectOption('#angle-control','custom');assert.equal(await p.locator('#control-key-first option').count(),17);await p.keyboard.press('Escape');assert.equal(await p.inputValue('#source'),initial);await p.waitForFunction(()=>document.activeElement.id==='angle-control');
+ await p.selectOption('#angle-control','custom');await p.selectOption('#control-key-first','14');await p.selectOption('#control-key-second','14');await p.locator('#control-key-form button[type=submit]').click();assert.match(await p.locator('#control-key-status').textContent(),/異なる/);assert.equal(await p.inputValue('#source'),initial);
+ await p.selectOption('#control-key-second','16');await p.screenshot({path:`.shots/editor-custom-keys-${engine}.png`});await p.locator('#control-key-form button[type=submit]').click();assert.equal(await p.inputValue('#angle-control'),'ST_STEER_1');assert.match(await p.locator('#angle-control option:checked').textContent(),/Q \/ E/);
+ await p.selectOption('#parts','2');await p.selectOption('#power-control','custom-hold');await p.selectOption('#control-key-first','6');await p.selectOption('#control-key-second','10');await p.locator('#control-key-form button[type=submit]').click();const created=await p.inputValue('#source');assert.match(await p.locator('#power-control option:checked').textContent(),/C \/ V（保持）/);
+ await p.click('#edit-undo');assert.doesNotMatch(await p.inputValue('#source'),/ST_THROTTLE/);await p.click('#edit-redo');assert.equal(await p.inputValue('#source'),created);
+ await p.click('#run');await p.waitForFunction(()=>window.__sim?.model.vals.length===2);await p.focus('#view');await p.keyboard.down('q');await p.waitForFunction(()=>window.__sim.env('ST_STEER_1')===-30);await p.keyboard.up('q');await p.waitForFunction(()=>window.__sim.env('ST_STEER_1')===0);
+ await p.keyboard.down('c');await p.waitForFunction(()=>window.__sim.env('ST_THROTTLE_1')===1000);await p.keyboard.up('c');await p.waitForTimeout(100);assert.equal(await p.evaluate(()=>window.__sim.env('ST_THROTTLE_1')),1000);
+ await p.keyboard.down('v');await p.waitForFunction(()=>window.__sim.env('ST_THROTTLE_1')===0);await p.keyboard.up('v');
+ await p.click('#build');await p.selectOption('#parts','2');await p.selectOption('#power-control','separate');assert.match(await p.locator('#power-control option:checked').textContent(),/C \/ V（保持）/);
+ const final=await p.inputValue('#source'),event=p.waitForEvent('download');await p.click('#save-model');let bytes='';for await(const c of await(await event).createReadStream())bytes+=c;assert.equal(bytes,final);assert.deepEqual(errors,[]);
+ console.log('Custom keys: 17 choices, cancel/focus, duplicate rejection, Q/E angle and C/V held runtime, Undo/Redo, separation and exact export pass');
+}finally{await b.close()}

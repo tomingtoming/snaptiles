@@ -1,3 +1,4 @@
+import { KEY_TABLE } from '../input/keys';
 import { exprIsConstant } from '../rc/expr';
 import { DraftStore, type Draft } from './draft';
 import { CONTROL_KEYS, OPTION_SETTINGS, ModelDocument, type CopiedBranch, type ControlKeys } from './document';
@@ -83,14 +84,16 @@ export class BuildPanel {
     });
     this.powerControl.onchange = () => this.edit(() => {
       const value = this.powerControl.value;
-      if (value === 'separate') this.document.separateControl(this.selected, 'power');
+      if (value === 'custom' || value === 'custom-hold') this.openControlKeys('power', value === 'custom-hold');
+      else if (value === 'separate') this.document.separateControl(this.selected, 'power');
       else if (value.startsWith('hold:')) this.document.addThrottleControl(this.selected, Math.abs(Number(this.power.value)) || 1000, value.slice(5) as ControlKeys);
       else if (value === 'new' || value.startsWith('new:')) this.document.addPowerControl(this.selected, Math.abs(Number(this.power.value)) || 1000, value === 'new' ? 'vertical' : value.slice(4) as ControlKeys);
       else this.document.power(this.selected, value === 'constant' ? 0 : value);
     });
     this.angleControl.onchange = () => this.edit(() => {
       const value = this.angleControl.value;
-      if (value === 'separate') this.document.separateControl(this.selected, 'angle');
+      if (value === 'custom') this.openControlKeys('angle', false);
+      else if (value === 'separate') this.document.separateControl(this.selected, 'angle');
       else if (value === 'new' || value.startsWith('new:')) this.document.addSteeringControl(this.selected, 30, value === 'new' ? 'horizontal' : value.slice(4) as ControlKeys);
       else if (value === 'constant') this.document.fixedAngle(this.selected);
       else this.document.bindAngle(this.selected, value);
@@ -248,6 +251,30 @@ export class BuildPanel {
     if (row.bottom > box.bottom - 4) this.tree.scrollTop += row.bottom - box.bottom + 4;
     else if (row.top < box.top + 4) this.tree.scrollTop -= box.top + 4 - row.top;
   }
+  private openControlKeys(attribute: 'angle' | 'power', held: boolean): void {
+    const dialog = document.getElementById('control-key-dialog') as HTMLDialogElement;
+    const first = document.getElementById('control-key-first') as HTMLSelectElement;
+    const second = document.getElementById('control-key-second') as HTMLSelectElement;
+    const status = document.getElementById('control-key-status')!;
+    const selector = attribute === 'angle' ? this.angleControl : this.powerControl;
+    const index = this.selected, original = this.document.text;
+    const magnitude = attribute === 'angle' ? 30 : Math.abs(Number(this.power.value)) || 1000;
+    for (const select of [first,second]) { select.replaceChildren(); KEY_TABLE.forEach((key,i) => select.add(new Option(key.glyph,String(i)))); }
+    first.value = attribute === 'angle' ? '2' : '4'; second.value = attribute === 'angle' ? '3' : '5';
+    status.textContent = ''; first.onchange = second.onchange = () => { status.textContent = ''; };
+    document.getElementById('control-key-description')!.textContent = attribute === 'angle' ? '1つ目で角度を負方向、2つ目で正方向に動かします。離すと0に戻ります。' : held ? '1つ目で出力を増やし、2つ目で減らします。離すと値を保ちます。' : '1つ目で出力を正方向、2つ目で負方向に動かします。離すと0に戻ります。';
+    document.getElementById('control-key-cancel')!.onclick = () => dialog.close();
+    dialog.onclose = () => selector.focus();
+    (document.getElementById('control-key-form') as HTMLFormElement).onsubmit = event => {
+      event.preventDefault();
+      if (first.value === second.value) { status.textContent = '異なる2つのキーを選んでください。'; second.focus(); return; }
+      if (this.document.text !== original) { status.textContent = 'モデルが変更されました。閉じて操作を選び直してください。'; return; }
+      const pair = [Number(first.value),Number(second.value)] as const;
+      this.edit(() => attribute === 'angle' ? this.document.addSteeringControl(index,magnitude,pair) : held ? this.document.addThrottleControl(index,magnitude,pair) : this.document.addPowerControl(index,magnitude,pair));
+      dialog.close();
+    };
+    dialog.showModal(); first.focus();
+  }
   private paintSelection(): void {
     const tile = this.assembly?.tiles[this.selected]; if (!tile) return;
     this.tree.value = String(this.selected);
@@ -299,6 +326,7 @@ export class BuildPanel {
     const fixedAngle = Number.isFinite(Number(angleExpression));
     if (!fixedAngle && ![...this.angleControl.options].some(o => o.value === angleExpression)) this.angleControl.add(new Option(angle, angleExpression));
     for (const [key,pair] of Object.entries(CONTROL_KEYS)) this.angleControl.add(new Option(`${pair.label} を追加`, key === 'horizontal' ? 'new' : `new:${key}`));
+    this.angleControl.add(new Option('キーを選んで追加…', 'custom'));
     if (angleStrength !== null) this.angleControl.add(new Option('この部品用に分ける', 'separate'));
     this.angleControl.value = fixedAngle ? 'constant' : angleExpression;
     this.powerRow.hidden = !['wheel', 'rlw', 'jet', 'arm'].includes(tile.type);
@@ -317,6 +345,8 @@ export class BuildPanel {
     if (!constant && ![...this.powerControl.options].some(o => o.value === power.toUpperCase())) this.powerControl.add(new Option(power, power.toUpperCase()));
     for (const [key,pair] of Object.entries(CONTROL_KEYS)) this.powerControl.add(new Option(`${pair.label} を追加`, key === 'vertical' ? 'new' : `new:${key}`));
     for (const [key,pair] of Object.entries(CONTROL_KEYS)) this.powerControl.add(new Option(`${pair.label} を追加（保持）`, `hold:${key}`));
+    this.powerControl.add(new Option('キーを選んで追加…', 'custom'));
+    this.powerControl.add(new Option('キーを選んで追加（保持）…', 'custom-hold'));
     if (powerStrength !== null) this.powerControl.add(new Option('この部品用に分ける', 'separate'));
     this.powerControl.value = constant ? 'constant' : power.toUpperCase();
     this.sourceHelp.replaceChildren();
