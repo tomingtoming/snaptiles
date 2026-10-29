@@ -25,12 +25,12 @@ Body
     }
     S:Chip(){
       W:Chip(){ W:Chip(){ W:Chip(){ W:Trim(angle=-AIL){ } } } }
-      E:Chip(){ E:Chip(){ E:Chip(){ E:Trim(angle=AIL){ } } } }
+      E:Chip(){ E:Chip(){ E:Chip(){ E:Trim(angle=-AIL){ } } } }
       S:Chip(){
         S:Chip(){
           W:Chip(){ W:Trim(angle=ELEV){ } }
-          E:Chip(){ E:Trim(angle=ELEV){ } }
-          S:Chip(angle=-90){ S:Rudder(angle=RUD){ } }
+          E:Chip(){ E:Trim(angle=-ELEV){ } }
+          S:Trim(angle=90){ S:Chip(angle=RUD){ } }
         }
       }
     }

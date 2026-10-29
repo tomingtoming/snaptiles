@@ -10,6 +10,8 @@ jobs:
       - run: bun run build
       - run: bun run test
       - run: bun x playwright install --with-deps chromium firefox webkit
+      - run: bun run test:plane
+        timeout-minutes: 2
       - run: bun run test:editor
         timeout-minutes: 5
       - run: bun run test:editor:firefox

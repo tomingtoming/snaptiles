@@ -9,6 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "preview": "vite preview",
+    "test:plane": "node tools/editor-ci.mjs plane-control-probe.mjs",
     "test:editor": "node tools/editor-ci.mjs",
     "test:editor:firefox": "node tools/editor-ci.mjs editor-firefox-probe.mjs",
     "test:editor:webkit": "node tools/editor-ci.mjs editor-webkit-probe.mjs",

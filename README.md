@@ -108,6 +108,11 @@ measured scope. Local checkout behavior may differ from the deployed website.
 Production-build browser regression: `bun run build && bun run test:editor`
 (install Chromium first with `bun x playwright install chromium`). This runs
 in CI with an OS-assigned port and uploads screenshots on failure.
+`bun run test:plane` separately checks the plane sample in Chromium: takeoff
+under throttle/pull-up input and exact source export. Unit tests verify control
+surface geometry and isolated airborne axis responses. These checks do not
+establish trimmed cruise or original-engine flight fidelity.
+
 The separate Firefox creation-loop check is `bun run test:editor:firefox`
 (install its browser with `bun x playwright install firefox`). It covers GUI
 construction, driving, source Undo, named download, share/re-edit and file reopen.

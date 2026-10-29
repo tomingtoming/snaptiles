@@ -1059,3 +1059,47 @@ use these controls in a complete aircraft construction and measure actual
 motion, separating missing editor operations from flight-model or sample-design
 issues. No claim of airworthiness or original-engine equivalence is made here.
 No push or deployment was performed.
+
+## 2026-10-30 — Measure flight and repair the sample's control geometry
+
+Goal: move beyond changing control values to measured aircraft motion. The
+existing plane lifted off under neutral controls but pitched through a large
+arc and crashed. Surface-normal inspection showed its elevator deflected the
+two tail surfaces oppositely, while its ailerons deflected together. The vertical
+fin also faced the forward airflow, and its Rudder rotated within that plane
+without changing its normal. These are sample construction errors under the
+current simulator's joint conventions, not evidence requiring physics retuning.
+
+Corrected the E-side aileron/elevator expression signs. Replaced the vertical
+fin mount with a 90-degree Trim and its moving surface with a Chip hinge. The
+neutral fin now lies along forward travel; its hinge rotates about the vertical
+axis. Left/right inputs now roll on the intended side, and A/D produce opposite
+yaw. No physics constants or integration behavior changed.
+
+Controls were compared from the same airborne state: all model bodies shifted
+20m up with 30m/s forward velocity. Over 0.5s, neutral pitch change fell from
+about 40 degrees to 0.7 degrees. Opposite pitch keys produce angular velocities
+roughly -0.68/+0.34 rad/s about X; roll about Z is roughly +1.31/-1.31; yaw about
+Y roughly +0.33/-0.33. The regression checks axis response and unwanted coupling
+with tolerances, not exact snapshot floats. At six seconds in ground-start
+simulations, neutral controls keep height below 2m; pulling up from five seconds
+raises height above 3.5m. Continuous pull-up can loop the aircraft; stable cruise
+and broad flight-envelope behavior are not established.
+
+Validation: four new tests bring the total to 135; all pass, as does build. The
+production Chromium probe reaches height 3.66m at tick 178 with position
+[-50.19,3.66,-131.79], verifies source remains unchanged and downloads exact bytes.
+An initial probe waited only for the editor to close and read a null simulation;
+fixed the test to wait for actual simulation initialization. Independent image
+review confirms full model framing, selected tail readability and visible
+separation from the ground. `bun run test:plane` and a separate CI step retain
+this check without conflating it with generic editor flows. Remote CI has not run.
+
+Retrospective: input names and successful takeoff are weak evidence for intended
+control axes. Inspect surface normals and isolate angular response before tuning
+physics. The investigation also exposed two editor gaps: angle bindings cannot
+be reversed through the selector, and Chip hinges have no angle-control row.
+Next: expose those operations, then reconstruct this corrected aircraft through
+editor operations and verify the full build/control/fly/save loop. This sprint
+repairs the reference sample; it does not claim that the complete aircraft was
+already built through the GUI. No push or deployment was performed.
