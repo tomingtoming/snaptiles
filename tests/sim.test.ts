@@ -146,3 +146,27 @@ describe('plane sample', () => {
     await sim.lua.dispose();
   });
 });
+
+
+describe('loaded static servo regression', () => {
+  it('holds the original-measured variable-angle standing fixture without ground-hold compensation', async () => {
+    const { readFileSync } = await import('node:fs');
+    const source = readFileSync(new URL('../tools/orig-harness/standing-angle-variable.rcd', import.meta.url), 'utf8');
+    const R = await initRapier();
+    const sim = new Simulation(R, source, fakeKeys());
+    await sim.start();
+    try {
+      let minUp = 1;
+      for (let frame = 0; frame < 240; frame++) {
+        sim.step();
+        const q = sim.physics.pose(sim.physics.tiles[0]).quaternion;
+        minUp = Math.min(minUp, 1 - 2 * (q.x * q.x + q.z * q.z));
+      }
+      expect(minUp).toBeGreaterThan(0.97);
+      expect(sim.scriptError).toBeNull();
+    } finally {
+      await sim.lua.dispose();
+      sim.physics.world.free();
+    }
+  });
+});

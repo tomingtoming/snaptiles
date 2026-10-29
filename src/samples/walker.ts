@@ -31,13 +31,13 @@ Body
 Lua
 {
   -- crawl gait (one leg swings at a time, the other three push): a quarter of the cycle lifted and
-  -- swinging forward, three quarters planted and sweeping back. STRIDE flips the walking direction.
-  STRIDE = -30
+  -- swinging forward, three quarters planted and sweeping back. A smaller knee angle lifts the foot.
+  STRIDE = 30
   phase = 0
   function leg(t)
     if t < 0.25 then
       local u = t / 0.25
-      return -STRIDE + 2 * STRIDE * u, 35 + 40 * math.sin(u * math.pi)
+      return -STRIDE + 2 * STRIDE * u, 35 - 30 * math.sin(u * math.pi)
     end
     local u = (t - 0.25) / 0.75
     return STRIDE - 2 * STRIDE * u, 35

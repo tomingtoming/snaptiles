@@ -18,7 +18,7 @@ export interface TileBody {
   /** rest transform of this tile relative to the group root */
   relPos: THREE.Vector3;
   relQuat: THREE.Quaternion;
-  joint: RAPIER.RevoluteImpulseJoint | null;
+  joint: RAPIER.RevoluteImpulseJoint | RAPIER.FixedImpulseJoint | null;
   animated: boolean;
   /** wheels with a variable angle: the rim body and its fold joint (otherwise the rim is welded) */
   rim: RAPIER.RigidBody | null;
@@ -147,7 +147,7 @@ export const SERVO_RATE = 180;
  *  instead of through rapier joint limits, which take ~10 frames to catch up and chatter under load */
 export const SERVO_TELEPORT = true;
 /** extra inertia factor (× mass) for a grounded body a servo would drag along the ground */
-export const SERVO_HOLD = 1000;
+export const SERVO_HOLD = 0;
 /** every hinge/yaw/roll tile is its own body on a hard-limited joint instead of being welded into a group */
 export const ALL_JOINTS = false;
 /** reallocate a servo step away from a side the ground blocks (see servoTeleport) */
@@ -586,7 +586,7 @@ export class PhysicsWorld {
         if (tile.spec.wheel) tyreColliders.set(tile.id, col);
       }
 
-      let joint: RAPIER.RevoluteImpulseJoint | null = null;
+      let joint: RAPIER.RevoluteImpulseJoint | RAPIER.FixedImpulseJoint | null = null;
       let jointAxisLocal: THREE.Vector3 | null = null;
       let jointAnchorLocal: THREE.Vector3 | null = null;
       if (startsGroup && parentTb) {
@@ -598,21 +598,25 @@ export class PhysicsWorld {
         jointAxisLocal = new THREE.Vector3(axisL.x, axisL.y, axisL.z);
         const anchL = toLocal(parentTb.body, anchorW);
         jointAnchorLocal = new THREE.Vector3(anchL.x, anchL.y, anchL.z);
-        const jd = R.JointData.revolute(toLocal(parentTb.body, anchorW), toLocal(body, anchorW), axisL);
-        joint = this.world.createImpulseJoint(jd, parentTb.body, body, true) as RAPIER.RevoluteImpulseJoint;
-        if (animated || everyJoint) joint.setLimits(0, 0);
+        const splitServo = animated && ((globalThis as unknown as { __tune?: { splitServo?: boolean } }).__tune?.splitServo ?? true);
+        const jd = splitServo
+          ? R.JointData.fixed(toLocal(parentTb.body, anchorW), {x:0,y:0,z:0,w:1}, toLocal(body, anchorW), {x:0,y:0,z:0,w:1})
+          : R.JointData.revolute(toLocal(parentTb.body, anchorW), toLocal(body, anchorW), axisL);
+        joint = this.world.createImpulseJoint(jd, parentTb.body, body, true) as RAPIER.RevoluteImpulseJoint | RAPIER.FixedImpulseJoint;
+        const revolute = joint as RAPIER.RevoluteImpulseJoint;
+        if (!splitServo && (animated || everyJoint)) revolute.setLimits(0, 0);
         // a stiff position motor on top of the hard limits: rapier's limits alone give under static load
         // (probe knob jointStiff = stiffness N·m/rad, damping = stiffness/100)
         const stiff = (globalThis as unknown as { __tune?: { jointStiff?: number } }).__tune?.jointStiff ?? 0;
-        if (everyJoint && stiff > 0) {
-          joint.configureMotorModel(R.MotorModel.ForceBased);
-          joint.configureMotorPosition(0, stiff, stiff / 100);
+        if (everyJoint && !splitServo && stiff > 0) {
+          revolute.configureMotorModel(R.MotorModel.ForceBased);
+          revolute.configureMotorPosition(0, stiff, stiff / 100);
         }
         if (compliant) {
           const damper = tile.node.attrs.damper !== undefined ? attr(tile.node, 'damper', env, 0.5) : attr(tile.node, 'dumper', env, 0.5);
-          joint.configureMotorModel(R.MotorModel.ForceBased);
-          joint.configureMotorPosition(0, SPRING_STIFFNESS * Math.max(0.02, springVal), SPRING_DAMPING * Math.max(0.05, damper));
-          joint.setLimits(-SPRING_TRAVEL, SPRING_TRAVEL);
+          revolute.configureMotorModel(R.MotorModel.ForceBased);
+          revolute.configureMotorPosition(0, SPRING_STIFFNESS * Math.max(0.02, springVal), SPRING_DAMPING * Math.max(0.05, damper));
+          revolute.setLimits(-SPRING_TRAVEL, SPRING_TRAVEL);
         }
       }
       const restAngle = angleAnimated ? attr(tile.node, 'angle', env, 0) : 0;
@@ -640,6 +644,11 @@ export class PhysicsWorld {
     return false;
   }
 
+  private componentRoot(tile: TileInstance): number {
+    while (tile.parent && !tile.detached) tile = tile.parent;
+    return tile.id;
+  }
+
   /** current angle of an animated joint, measured from the two bodies' rotations (rad) */
   private jointAngle(tb: TileBody): number {
     const pb = this.byId.get(tb.tile.parent!.id)!.body;
@@ -657,7 +666,8 @@ export class PhysicsWorld {
 
   /** rigidly rotate a joint's whole subtree about its hinge so the joint reads its commanded angle */
   private servoTeleport(tb: TileBody): void {
-    const delta = tb.servoAngle - this.jointAngle(tb);
+    const rawDelta = tb.servoAngle - this.jointAngle(tb);
+    const delta = Math.atan2(Math.sin(rawDelta), Math.cos(rawDelta));
     if (Math.abs(delta) < 1e-4) return;
     const pb = this.byId.get(tb.tile.parent!.id)!.body;
     const pr = pb.rotation();
@@ -674,7 +684,8 @@ export class PhysicsWorld {
     };
     visit(tb.tile);
     const rest = new Map<number, RAPIER.RigidBody>();
-    for (const t of this.tiles) if (!sub.has(t.body.handle)) rest.set(t.body.handle, t.body);
+    const root = this.componentRoot(tb.tile);
+    for (const t of this.tiles) if (this.componentRoot(t.tile) === root && !sub.has(t.body.handle)) rest.set(t.body.handle, t.body);
     // the hinge turns both sides, each by a share inverse to its moment of inertia about the hinge
     // (measured: snapping a loaded arm 45° pitched the light core 31° and the weights only 14°)
     // a body standing on the ground whose motion under this rotation would be tangential (a planted
@@ -756,6 +767,7 @@ export class PhysicsWorld {
       turn(sub, delta * shareUsed);
       turn(rest, -delta * (1 - shareUsed));
     } else turn(sub, delta);
+
   }
 
   /**
@@ -1023,10 +1035,86 @@ export class PhysicsWorld {
     }
   }
 
+  private servoContactAnchors(): {root:number;body:RAPIER.RigidBody;local:THREE.Vector3;point:THREE.Vector3;normal:THREE.Vector3;weight:number;friction:number}[] {
+    const anchors: {root:number;body:RAPIER.RigidBody;local:THREE.Vector3;point:THREE.Vector3;normal:THREE.Vector3;weight:number;friction:number}[] = [];
+    const seen = new Set<number>();
+    for (const tb of this.tiles) {
+      const body=tb.body;if(seen.has(body.handle))continue;seen.add(body.handle);
+      for(let i=0;i<body.numColliders();i++){
+        const collider=body.collider(i);if(collider.isSensor()||collider.friction()===0)continue;
+        this.world.contactPairsWith(collider,other=>{
+          const ob=other.parent();if(other.isSensor()||(ob&&!ob.isFixed()))return;
+          this.world.contactPair(other,collider,(m,flipped)=>{
+            let impulse=0;for(let j=0;j<m.numContacts();j++)impulse+=m.contactImpulse(j);
+            if(impulse<=0||m.friction()<=0)return;
+            const n=m.normal();const normal=new THREE.Vector3(n.x,n.y,n.z).multiplyScalar(flipped?-1:1);
+            const rotation=body.rotation(),translation=body.translation();
+            const inverse=new THREE.Quaternion(rotation.x,rotation.y,rotation.z,rotation.w).invert();
+            for(let j=0;j<m.numSolverContacts();j++){
+              const p=m.solverContactPoint(j);if(!p)continue;
+              const point=new THREE.Vector3(p.x,p.y,p.z);
+              const local=point.clone().sub(new THREE.Vector3(translation.x,translation.y,translation.z)).applyQuaternion(inverse);
+              anchors.push({root:this.componentRoot(tb.tile),body,point,local,normal,weight:impulse/m.numSolverContacts(),friction:m.friction()});
+            }
+          });
+        });
+      }
+    }
+    return anchors;
+  }
+
+  private resolveServoContacts(changedRoots: Set<number>, anchors: ReturnType<PhysicsWorld['servoContactAnchors']>): void {
+    for (const root of changedRoots) {
+      // Resolve the completed commanded pose against static surfaces once, without velocity impulses.
+      // Intermediate poses can penetrate while subsequent joints cancel the motion.
+      const constraints: {normal: THREE.Vector3; depth: number}[] = [];
+      const component = this.tiles.filter(tb => this.componentRoot(tb.tile) === root);
+      for (const tb of component) {
+        if (tb.tile.ghost || !tb.tile.spec.collides) continue;
+        const pose = this.pose(tb);
+        const shape = tb.tile.spec.wheel ? new this.R.Ball(wheelRadius(tb.tile.option)) : new this.R.Cuboid(TILE/2,TILE_T/2,TILE/2);
+        this.world.intersectionsWithShape(pose.position,pose.quaternion,shape,(collider) => {
+          const parent = collider.parent();
+          if (collider.isSensor() || (parent && !parent.isFixed())) return true;
+          const contact = collider.contactShape(shape,pose.position,pose.quaternion,0);
+          if (contact && contact.distance < 0) constraints.push({normal:new THREE.Vector3(contact.normal1.x,contact.normal1.y,contact.normal1.z),depth:-contact.distance});
+          return true;
+        },undefined,MODEL_GROUP);
+      }
+      const correction = new THREE.Vector3();
+      const projectNormal = () => {
+        for (let pass=0;pass<4;pass++) for (const c of constraints) {
+          const missing = c.depth - correction.dot(c.normal);
+          if (missing > 0) correction.addScaledVector(c.normal,missing);
+        }
+      };
+      projectNormal();
+      const tangent = new THREE.Vector3();
+      let weight=0;
+      for(const a of anchors){
+        if(a.root!==root)continue;
+        const r=a.body.rotation(),p=a.body.translation();
+        const point=a.local.clone().applyQuaternion(new THREE.Quaternion(r.x,r.y,r.z,r.w)).add(new THREE.Vector3(p.x,p.y,p.z));
+        const delta=point.sub(a.point).add(correction);const lift=delta.dot(a.normal);
+        if(lift>1e-4)continue;
+        delta.addScaledVector(a.normal,-lift);
+        tangent.addScaledVector(delta,-a.weight*a.friction);weight+=a.weight*a.friction;
+      }
+      if(weight>0)correction.add(tangent.divideScalar(weight));
+      projectNormal();
+      if (correction.lengthSq() > 0) {
+        const moved = new Set<number>();
+        for (const tb of component) if (!moved.has(tb.body.handle)) {
+          moved.add(tb.body.handle);const p=tb.body.translation();
+          tb.body.setTranslation({x:p.x+correction.x,y:p.y+correction.y,z:p.z+correction.z},true);
+        }
+      }
+    }
+  }
+
   /** Drive joints toward attribute values, apply wheel torque, jets and air drag. */
   applyControls(env: ValEnv): void {
     const DEG = Math.PI / 180;
-    this.distributeLoads();
     const seen = new Set<number>();
     for (const tb of this.tiles) {
       if (seen.has(tb.body.handle)) continue;
@@ -1035,14 +1123,11 @@ export class PhysicsWorld {
       tb.body.resetForces(false);
       tb.body.resetTorques(false);
     }
-    const UP = new THREE.Vector3(0, 1, 0);
+    const anchors = ((globalThis as unknown as { __tune?: { servoContactStick?: boolean } }).__tune?.servoContactStick ?? true) ? this.servoContactAnchors() : [];
+    const changedRoots = new Set<number>();
     for (const tb of this.tiles) {
       const { tile, joint, body } = tb;
-      const pose = this.pose(tb);
-      const normal = UP.clone().applyQuaternion(pose.quaternion);
-      if (tile.spec.wheel && tile.parent) {
-        this.driveWheel(tb, pose, normal, env);
-      } else if (joint && tile.parent) {
+      if (joint && tile.parent && !tile.spec.wheel) {
         if (tb.animated) {
           // servo: the commanded angle is reached at a bounded rate (window.__tune.servoRate
           // deg per physics step) instead of instantly — instant jumps of a leg joint pump
@@ -1050,19 +1135,25 @@ export class PhysicsWorld {
           const rate = ((globalThis as unknown as { __tune?: { servoRate?: number } }).__tune?.servoRate ?? SERVO_RATE) * DEG;
           const target = jointSign(tile.spec.joint, tile.dir) * (attr(tile.node, 'angle', env, 0) - tb.restAngle) * DEG;
           const d = target - tb.servoAngle;
+          if (Math.abs(d) > 1e-8) changedRoots.add(this.componentRoot(tile));
           tb.servoAngle += Math.max(-rate, Math.min(rate, d));
           if ((globalThis as unknown as { __tune?: { debugServo?: boolean } }).__tune?.debugServo) console.log('servo', tile.type, tile.chipIndex, 'rate', (rate / DEG).toFixed(1), 'target', (target / DEG).toFixed(1), 'servo', (tb.servoAngle / DEG).toFixed(1));
           const soft = (globalThis as unknown as { __tune?: { softServo?: number } }).__tune?.softServo ?? SOFT_SERVO;
           const accel = (globalThis as unknown as { __tune?: { servoAccel?: number; servoAccelDamp?: number; servoMaxForce?: number } }).__tune;
           const vel = (globalThis as unknown as { __tune?: { servoVel?: number } }).__tune?.servoVel;
           const teleport = (globalThis as unknown as { __tune?: { servoTeleport?: boolean } }).__tune?.servoTeleport ?? SERVO_TELEPORT;
-          if (teleport && tb.jointAxisLocal && tb.jointAnchorLocal && tile.parent) {
+          const revolute = joint as RAPIER.RevoluteImpulseJoint;
+          if (joint.type() === this.R.JointType.Fixed && tb.jointAxisLocal) {
+            // Change the pose only when the command changes; retain the angle with a bilateral constraint.
+            if (teleport && Math.abs(d) > 1e-8) this.servoTeleport(tb);
+            joint.setFrameX1(new THREE.Quaternion().setFromAxisAngle(tb.jointAxisLocal, tb.servoAngle));
+          } else if (teleport && tb.jointAxisLocal && tb.jointAnchorLocal && tile.parent) {
             // the original sets a commanded angle instantly, without giving the moved chips any momentum
             // (a Rudder reaches 60° in one frame, a loaded hinge snaps and the load then swings from rest):
             // rotate the whole subtree rigidly about the hinge by the remaining angle, keep velocities,
             // and let the solver sort out contacts; limits hold the angle afterwards
             this.servoTeleport(tb);
-            joint.setLimits(tb.servoAngle, tb.servoAngle);
+            revolute.setLimits(tb.servoAngle, tb.servoAngle);
           } else if (vel && tb.jointAxisLocal && tile.parent) {
             // velocity motor: ask the solver for the angular velocity that closes the remaining angle in
             // `vel` steps (1 = this step), with a huge force budget; limits hold the target afterwards
@@ -1078,31 +1169,41 @@ export class PhysicsWorld {
             if (cur < -Math.PI) cur += 2 * Math.PI;
             const want = (tb.servoAngle - cur) / (this.dt * vel);
             const tv = (globalThis as unknown as { __tune?: { servoForceBased?: number } }).__tune?.servoForceBased;
-            joint.configureMotorModel(tv ? this.R.MotorModel.ForceBased : this.R.MotorModel.AccelerationBased);
-            joint.setMotorMaxForce(1e12);
-            joint.configureMotorVelocity(want, tv ?? 1.0);
-            if (!(globalThis as unknown as { __tune?: { servoNoLimits?: boolean } }).__tune?.servoNoLimits) joint.setLimits(tb.servoAngle - SERVO_BAND, tb.servoAngle + SERVO_BAND);
-            else joint.setLimits(-1e9, 1e9);
+            revolute.configureMotorModel(tv ? this.R.MotorModel.ForceBased : this.R.MotorModel.AccelerationBased);
+            revolute.setMotorMaxForce(1e12);
+            revolute.configureMotorVelocity(want, tv ?? 1.0);
+            if (!(globalThis as unknown as { __tune?: { servoNoLimits?: boolean } }).__tune?.servoNoLimits) revolute.setLimits(tb.servoAngle - SERVO_BAND, tb.servoAngle + SERVO_BAND);
+            else revolute.setLimits(-1e9, 1e9);
             if ((globalThis as unknown as { __tune?: { debugServo?: boolean } }).__tune?.debugServo) console.log('servoVel', tile.chipIndex, 'cur', (cur / DEG).toFixed(1), 'want', want.toFixed(2));
           } else if (accel?.servoAccel) {
             // acceleration-based position motor: mass-independent, converges within a step or two
             // (the original sets a commanded angle instantly: a Rudder reaches 60° in one frame)
-            joint.configureMotorModel(this.R.MotorModel.AccelerationBased);
-            joint.setMotorMaxForce(accel.servoMaxForce ?? 1e12);
-            joint.configureMotorPosition(tb.servoAngle, accel.servoAccel, accel.servoAccelDamp ?? accel.servoAccel / 10);
-            joint.setLimits(tb.servoAngle - SERVO_BAND, tb.servoAngle + SERVO_BAND);
+            revolute.configureMotorModel(this.R.MotorModel.AccelerationBased);
+            revolute.setMotorMaxForce(accel.servoMaxForce ?? 1e12);
+            revolute.configureMotorPosition(tb.servoAngle, accel.servoAccel, accel.servoAccelDamp ?? accel.servoAccel / 10);
+            revolute.setLimits(tb.servoAngle - SERVO_BAND, tb.servoAngle + SERVO_BAND);
           } else if (soft > 0) {
             // finite-strength servo: a position motor (stiffness ∝ spring) with a safety band of limits
             const spring = tile.node.attrs.spring !== undefined ? Math.max(0.05, attr(tile.node, 'spring', env, 1)) : 1;
-            joint.configureMotorModel(this.R.MotorModel.ForceBased);
-            joint.configureMotorPosition(tb.servoAngle, soft * spring, soft * 0.08);
-            joint.setLimits(tb.servoAngle - SERVO_BAND, tb.servoAngle + SERVO_BAND);
+            revolute.configureMotorModel(this.R.MotorModel.ForceBased);
+            revolute.configureMotorPosition(tb.servoAngle, soft * spring, soft * 0.08);
+            revolute.setLimits(tb.servoAngle - SERVO_BAND, tb.servoAngle + SERVO_BAND);
           } else {
-            joint.setLimits(tb.servoAngle, tb.servoAngle);
+            revolute.setLimits(tb.servoAngle, tb.servoAngle);
           }
         }
       }
 
+    }
+    const tune = (globalThis as unknown as { __tune?: { splitServo?: boolean; finalGroundPose?: boolean } }).__tune;
+    if ((tune?.splitServo ?? true) && (tune?.finalGroundPose ?? true)) this.resolveServoContacts(changedRoots,anchors);
+    this.distributeLoads();
+    const UP = new THREE.Vector3(0, 1, 0);
+    for (const tb of this.tiles) {
+      const { tile, body } = tb;
+      const pose = this.pose(tb);
+      const normal = UP.clone().applyQuaternion(pose.quaternion);
+      if (tile.spec.wheel && tile.parent) this.driveWheel(tb, pose, normal, env);
       if (tile.type === 'arm') this.updateArm(tb, pose, normal, env);
 
       if (tile.spec.jet) {
