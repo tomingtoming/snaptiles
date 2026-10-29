@@ -1620,3 +1620,52 @@ sharing, while making the limits of static inspection explicit. Next: inspect
 construction operations that still require manual source changes, prioritising
 moving or reorganising existing branches over adding more isolated controls.
 No push or deployment.
+
+
+## 2026-10-30 — Relocate an existing named branch (Sprint 55)
+
+Goal: reorganise a model without copy/delete and accidental name duplication.
+The new 接続先 disclosure opens a parent/direction dialog for the selected
+subtree. The operation preserves names, internal comments, attributes, controls
+and scripts, applies one source transaction and selects the moved branch. A
+same-parent direction change edits only its direction character and preserves
+order. A different parent receives the branch as its last child. Local attributes
+are preserved, not world-space pose. Declaration/chip numbers can change, and
+the dialog explicitly states numeric script references are not rewritten.
+
+Core roots cannot move; self/descendant targets are omitted and also rejected by
+the document operation. Occupied destinations are refused without edits/history.
+An unchanged destination adds no document history. Stale source while the modal
+is open is rejected. Names can move safely because this relocates, not duplicates.
+The move operation is placed below common fields rather than adding a toolbar
+row that displaces existing add controls.
+
+Validation: 163 tests in 22 files and production build pass. New cases cover
+forward/backward source moves, leaf-parent brace insertion, same-parent direction,
+no-op history, self/descendant/occupied/root guards, exact Undo/Redo, and transfer
+between separate Core trees. The browser scenario moves a named Frame/Wheel
+subtree under TARGET, checks eligible parents and refusal/cancel, verifies selected
+identity through history, runs with the new parent relationship and exports exact
+bytes. General-editor and selection probes pass. The final move/guide checks
+pass after confining rejected-move errors to the modal; earlier background error
+text identified during image review was removed. Independent 320px review found
+the destination, limitations and buttons readable without clipping.
+
+Retrospective: relocation must be one transaction and preserve identity, while
+being honest about transformed poses and reordered numeric IDs. Reusing copy
+would wrongly reject named parts and create different failure/history semantics.
+The full browser suite was not rerun; default runner now includes 34 scenarios.
+Next: verify branch relocation with live control bindings and shared-link
+round trips, especially numeric versus named script references. No push/deploy.
+
+
+Portability follow-up: Firefox passed the full move scenario. Windows WebKit
+initially timed out waiting for focus after Escape in three runs, while smaller
+state probes observed a closed dialog and correct move-button focus. Timer-based
+polling alone did not resolve it. Adding failure-state logging and a bounded
+focus wait produced two consecutive full WebKit passes; Chromium production
+also passes that probe. The intermittent WebKit focus result is not considered
+root-caused or fixed. Failure diagnostics remain in the test; avoid claiming
+reliable Apple Safari behavior from these results. A future check should capture
+focus/cancel/close event ordering on a failing run rather than assume a rendering
+or application cause from the timeout alone.

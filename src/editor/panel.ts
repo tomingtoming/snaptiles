@@ -27,6 +27,7 @@ export class BuildPanel {
   private clipboard: CopiedBranch | null = null;
   private copy = document.getElementById('copy-branch') as HTMLButtonElement;
   private mirror = document.getElementById('mirror-branch') as HTMLButtonElement;
+  private move = document.getElementById('move-branch') as HTMLButtonElement;
   assembly: Assembly | null = null;
   private panel = document.getElementById('builder')!;
   private toggle = document.getElementById('build') as HTMLButtonElement;
@@ -99,6 +100,7 @@ export class BuildPanel {
       else this.document.bindAngle(this.selected, value);
     });
     document.getElementById('new-model')!.onclick = () => this.edit(() => { this.document.newModel(); this.selected = 0; }, true);
+    this.move.onclick = () => this.openMoveBranch();
     this.mirror.onclick = () => this.edit(() => { this.selected = this.document.mirrorBranch(this.selected); });
     this.copy.onclick = () => {
       try {
@@ -236,7 +238,7 @@ export class BuildPanel {
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = false);
     } catch (e) {
       this.assembly = null; this.tree.replaceChildren(); this.scene.clearModel();
-      this.type.disabled = this.angle.disabled = this.remove.disabled = this.copy.disabled = this.mirror.disabled = true;
+      this.type.disabled = this.angle.disabled = this.remove.disabled = this.copy.disabled = this.mirror.disabled = this.move.disabled = true;
       this.sourceHelp.hidden = true; this.sourceHelp.replaceChildren();
       this.powerRow.hidden = this.angleRow.hidden = true; this.angleSettings.disabled = true; this.angleSettings.setAttribute('aria-expanded','false');
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = true);
@@ -250,6 +252,32 @@ export class BuildPanel {
     const row = option.getBoundingClientRect(), box = this.tree.getBoundingClientRect();
     if (row.bottom > box.bottom - 4) this.tree.scrollTop += row.bottom - box.bottom + 4;
     else if (row.top < box.top + 4) this.tree.scrollTop -= box.top + 4 - row.top;
+  }
+  private openMoveBranch(): void {
+    const dialog = document.getElementById('move-branch-dialog') as HTMLDialogElement;
+    const parent = document.getElementById('move-parent') as HTMLSelectElement;
+    const direction = document.getElementById('move-direction') as HTMLSelectElement;
+    const status = document.getElementById('move-branch-status')!;
+    const index = this.selected, original = this.document.text, nodes = this.document.nodes(), root = nodes[index];
+    const originalStatus = this.status.textContent;
+    if (!root?.dir) return;
+    parent.replaceChildren();
+    nodes.forEach((node,i) => {
+      if (node.source!.start >= root.source!.start && node.source!.start < root.source!.end) return;
+      parent.add(new Option(`${i}: ${node.type}${node.attrs.name ? ' · ' + node.attrs.name : ''}`,String(i)));
+    });
+    parent.value = String(nodes.findIndex(node => node.children.includes(root))); direction.value = root.dir;
+    status.textContent = ''; parent.onchange = direction.onchange = () => { status.textContent = ''; };
+    document.getElementById('move-branch-cancel')!.onclick = () => dialog.close();
+    dialog.onclose = () => this.move.focus();
+    (document.getElementById('move-branch-form') as HTMLFormElement).onsubmit = event => {
+      event.preventDefault();
+      if (this.document.text !== original) { status.textContent = 'モデルが変更されました。閉じて選び直してください。'; return; }
+      let moved = false;
+      this.edit(() => { this.selected = this.document.moveBranch(index,Number(parent.value),direction.value as 'N'|'S'|'E'|'W'); moved = true; });
+      if (moved) dialog.close(); else { status.textContent = this.status.textContent; this.status.textContent = originalStatus; }
+    };
+    dialog.showModal(); parent.focus();
   }
   private openControlKeys(attribute: 'angle' | 'power', held: boolean): void {
     const dialog = document.getElementById('control-key-dialog') as HTMLDialogElement;
@@ -383,7 +411,7 @@ export class BuildPanel {
       this.sourceHelp.append(button);
     }
     this.sourceHelp.hidden = !this.sourceHelp.childElementCount;
-    this.remove.disabled = this.copy.disabled = this.mirror.disabled = !tile.parent;
+    this.remove.disabled = this.copy.disabled = this.mirror.disabled = this.move.disabled = !tile.parent;
     this.remove.textContent = tile.children.length ? '枝ごと削除' : '削除';
   }
 }

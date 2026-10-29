@@ -231,3 +231,11 @@ creates a new control rather than changing every binding of an existing one.
 The custom-key dialog lists existing Key-section assignments for each selected
 key. Reusing a key remains allowed and keeps the original assignments. Script
 input polling and implicit WASD arrow aliases are explicitly outside this list.
+
+
+Under **接続先**, **枝を移動…** relocates the selected subtree to another parent
+and direction in one undoable operation. Names, internal comments and controls
+are retained. Core roots, self/descendant destinations and occupied edges are
+rejected. New parent transforms and declaration order can change poses and chip
+numbers; numeric script references are not rewritten. This preserves local
+attributes, not the branch's previous world-space pose.

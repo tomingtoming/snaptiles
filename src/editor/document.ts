@@ -304,6 +304,25 @@ export class ModelDocument {
     if (s.close !== undefined) this.replace(s.close, s.close, child);
     else this.replace(s.headerEnd, s.headerEnd, ` {${child}}`);
   }
+  moveBranch(index: number, parentIndex: number, dir: 'N' | 'S' | 'E' | 'W'): number {
+    const nodes = this.nodes(), root = nodes[index], target = nodes[parentIndex];
+    if (!root?.dir) throw new Error('Core以外の枝を選んでください');
+    if (!target || !['N','S','E','W'].includes(dir)) throw new Error('移動先を選んでください');
+    const from = root.source!, to = target.source!;
+    if (to.start >= from.start && to.start < from.end) throw new Error('自分自身や子孫へは移動できません');
+    if (target.children.some(child => child !== root && child.dir === dir)) throw new Error('その方向には既に部品があります');
+    if (target.children.includes(root)) { this.replace(from.start, from.start + 1, dir); return index; }
+    const insertion = to.close ?? to.headerEnd;
+    const prefix = to.close === undefined ? ' {\n  ' : '\n  ';
+    const branch = dir + this.text.slice(from.start + 1, from.end);
+    const addition = prefix + branch + (to.close === undefined ? '\n}' : '\n');
+    let next = this.text.slice(0,from.start) + this.text.slice(from.end);
+    const position = insertion > from.end ? insertion - (from.end - from.start) : insertion;
+    next = next.slice(0,position) + addition + next.slice(position);
+    this.replace(0,this.text.length,next);
+    this.selectedOffset = position + prefix.length;
+    return this.nodes().findIndex(node => node.source!.start === this.selectedOffset);
+  }
   remove(index: number): void {
     const n = this.nodes()[index];
     if (!n?.dir) throw new Error('Coreは削除できません');

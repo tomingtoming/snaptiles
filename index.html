@@ -33,6 +33,7 @@
         <div class="edit-row"><label>追加する部品<select id="add-type"></select></label><div class="edges" aria-label="接続方向"><button data-edge="N">N ＋</button><button data-edge="W">W ＋</button><button data-edge="E">E ＋</button><button data-edge="S">S ＋</button></div></div>
         <div id="source-edit-help" hidden aria-label="ソースで編集する項目"></div>
         <details id="appearance"><summary>色</summary><div class="edit-row"><label>部品の色<input id="part-color" type="color" /></label><button id="reset-color" type="button">既定色</button><span id="color-note"></span></div></details>
+        <details id="placement"><summary>接続先</summary><button id="move-branch" type="button">枝を移動…</button></details>
       </section>
       <textarea aria-label="モデルのソース。Tabで字下げ、ShiftとTabで前の操作へ移動" id="source" spellcheck="false" wrap="off"></textarea>
       <footer id="status" tabindex="0" aria-label="読み込み・実行のメッセージ"></footer>
@@ -62,6 +63,16 @@
         <div class="share-actions"><button id="filename-cancel" type="button">キャンセル</button><button type="submit">名前を設定</button></div>
       </form>
     </dialog>
+    <dialog id="move-branch-dialog" aria-labelledby="move-branch-title">
+      <form id="move-branch-form">
+        <h2 id="move-branch-title">枝を移動</h2>
+        <label>接続する親部品<select id="move-parent"></select></label>
+        <label>親からの方向<select id="move-direction"><option>N</option><option>W</option><option>E</option><option>S</option></select></label>
+        <p>子の部品も一緒に移します。位置・姿勢や部品番号が変わる場合があります。スクリプトの番号参照は書き換えません。</p>
+        <p id="move-branch-status" role="status"></p>
+        <div class="share-actions"><button id="move-branch-cancel" type="button">キャンセル</button><button type="submit">移動</button></div>
+      </form>
+    </dialog>
     <dialog id="control-key-dialog" aria-labelledby="control-key-title">
       <form id="control-key-form">
         <h2 id="control-key-title">操作キーを選ぶ</h2>
@@ -84,6 +95,7 @@
         <li><strong>▶ 実行</strong>で試運転。表示されたキーで操縦し、<strong>組む</strong>で編集へ戻ります。</li>
         <li><strong>保存名</strong>で名前を付け、<strong>保存</strong>でファイルへ、<strong>開く</strong>で読込。<strong>共有リンク</strong>は今の編集内容を渡せます。下書きはこのブラウザに最新の1件が保存され、復元後はUndoで戻せます。</li>
       </ol>
+      <p><strong>枝の移動：</strong>部品を選び「接続先」を開いて「枝を移動…」を押すと、子ごと別の親・方向へ移せます。名前は保たれますが、部品番号や姿勢が変わる場合があります。スクリプトの番号参照は自動では直しません。</p>
       <p id="shared-control-help"><strong>強さの共有：</strong>「最大角度（共通）」「最大出力（共通）」を変えると、同じ操作変数を使う部品がまとめて変わります。1つの部品だけ変えるには、その操作の一覧で「この部品用に分ける」を選んでから強さを調整します。キー・逆向き・保持設定は引き継がれ、分けた後も同じキーで動きます。別のキーで動かしたい場合は、そのキーの操作を追加してください。</p>
       <p><strong>スロットル：</strong>出力の操作で「を追加（保持）」を選ぶと、前のキーで増加、後のキーで減少し、離すと値を保ちます。出力は0〜最大出力。再実行で0に戻ります。</p>
       <p><strong>枝のコピー：</strong>部品を選んで「コピー」、接続先の部品を選び、N / W / E / S ＋で貼り付けます。</p>

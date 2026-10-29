@@ -1,0 +1,14 @@
+import {chromium,firefox,webkit} from 'playwright';import assert from 'node:assert/strict';
+const engine=process.argv[3]??'chromium';
+const b=await ({chromium,firefox,webkit}[engine]).launch(engine==='chromium'?{args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']}:{});try{
+ const p=await b.newPage({viewport:{width:390,height:844}});await p.goto(process.argv[2]??'http://127.0.0.1:5175/');await p.waitForFunction(()=>window.__sim);
+ const source='Body {Core(){N:Frame(name=BRANCH){E:Wheel(angle=90,name=TYRE)} W:Chip(name=TARGET)}}';await p.fill('#source',source);await p.click('#build');await p.selectOption('#parts','1');await p.click('#placement summary');await p.click('#move-branch');
+ assert.deepEqual(await p.locator('#move-parent option').evaluateAll(es=>es.map(e=>e.value)),['0','3']);await p.keyboard.press('Escape');await p.waitForFunction(()=>document.activeElement.id==='move-branch',null,{polling:50,timeout:3000}).catch(async error=>{console.log(await p.evaluate(()=>({active:document.activeElement.outerHTML,open:document.querySelector('#move-branch-dialog').open,placement:document.querySelector('#placement').open})));throw error;});assert.equal(await p.inputValue('#source'),source);
+ await p.click('#move-branch');await p.selectOption('#move-direction','W');await p.locator('#move-branch-form button[type=submit]').click();assert.match(await p.locator('#move-branch-status').textContent(),/既に部品/);assert.equal(await p.locator('#status').textContent(),'');assert.equal(await p.inputValue('#source'),source);
+ await p.selectOption('#move-parent','3');await p.selectOption('#move-direction','S');await p.setViewportSize({width:320,height:568});await p.screenshot({path:`.shots/editor-move-dialog-${engine}.png`});await p.locator('#move-branch-form button[type=submit]').click();
+ assert.equal(await p.inputValue('#parts'),'2');assert.match(await p.locator('#parts option:checked').textContent(),/BRANCH/);assert.equal(await p.locator('#parts option').count(),4);const moved=await p.inputValue('#source');
+ await p.click('#edit-undo');assert.equal(await p.inputValue('#source'),source);assert.equal(await p.inputValue('#parts'),'1');await p.click('#edit-redo');assert.equal(await p.inputValue('#source'),moved);assert.equal(await p.inputValue('#parts'),'2');
+ await p.click('#run');await p.waitForFunction(()=>window.__sim?.assembly?.tiles[2]?.name==='BRANCH');assert.equal(await p.evaluate(()=>window.__sim.assembly.tiles[2].parent.name),'TARGET');assert.equal(await p.evaluate(()=>window.__sim.assembly.tiles[3].name),'TYRE');
+ await p.click('#build');const event=p.waitForEvent('download');await p.click('#save-model');let bytes='';for await(const c of await(await event).createReadStream())bytes+=c;assert.equal(bytes,moved);
+ console.log('Move: named subtree, eligible parents, occupied-edge rejection, cancel/focus, selection, Undo/Redo, runtime parent and exact export pass');
+}finally{await b.close()}
