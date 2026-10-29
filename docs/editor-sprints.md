@@ -1669,3 +1669,41 @@ root-caused or fixed. Failure diagnostics remain in the test; avoid claiming
 reliable Apple Safari behavior from these results. A future check should capture
 focus/cancel/close event ordering on a failing run rather than assume a rendering
 or application cause from the timeout alone.
+
+
+## 2026-10-30 — Isolate early Escape delivery in Windows WebKit (Sprint 56)
+
+Goal: resolve the intermittent cancellation observation left by Sprint 55.
+Twelve fresh WebKit pages reproduced seven failures. In instrumented failures,
+Escape keydown/keyup reached move-parent but no cancel or close event fired;
+the dialog remained open. Successful cases emitted cancel, close and then focus
+on move-branch. This contradicts the initial interpretation as wrong focus
+restoration: cancellation itself had not occurred.
+
+A minimal native HTML page containing only a button, dialog and select reproduced
+8/12 failures when Escape followed opening immediately. Waiting two animation
+frames after opening yielded 0/12 failures on that same minimal page. Applying
+that pre-input wait to SnapTiles yielded 12/12 successful cancellation/focus
+checks across fresh pages, half with event logging. This isolates a timing-sensitive
+native WebKit interaction in this environment; it does not prove a universal
+Safari defect or precise browser-internal cause.
+
+Keep the minimal reproducible diagnostic in tools/webkit-dialog-diagnostic.mjs.
+It reports counts rather than asserting that immediate-input failures must occur.
+Move and custom-key probes now wait for presentation before sending Escape.
+Product event handling is unchanged: no forced focus, manual Escape interception,
+retry Escape, or skipped focus assertion was introduced. Failure-state logging
+remains in the move test. The native early-input case still exists; this change
+makes the intended post-presentation user workflow the regression test.
+
+Retrospective: a timeout names the unmet condition, not its cause. Record whether
+the dialog is still open, then remove the application before modifying its event
+handlers. A shorter wait accidentally passing was not a fix; the minimal control
+and repeated settled-input trials provide the useful evidence. Unit/build outputs
+are unchanged from Sprint 55. No push/deployment. Next: return to branch relocation
+with controls and named versus numeric script references through saved/shared
+models, preserving the documented limits on numeric references.
+
+Final validation: complete move and custom-key workflows pass in Windows WebKit
+against the dev server and Chromium against the existing production build with
+the settled-input probes. Full suite was not rerun for this test-only change.
