@@ -133,3 +133,5 @@ AGPL-3.0-or-later.
 Wheel/RLW parts expose three radius choices (0.30/0.45/0.60 m); Weight parts expose mass multipliers up to 8. These edit `option` and support Undo/Redo. Existing option expressions remain source-only. Larger wheels are lifted clear of the ground in the construction preview; simulation spawn behavior is unchanged.
 
 Expand **色** to set a selected part’s fixed RGB color, including Core. **既定色** removes the color override without undoing other edits; changing the part type then uses its default palette. Undo restores the previous color. Variable-driven colors remain source-only; Lua can still override color during simulation.
+
+Cowl parts expose shape options 0–7: plate, outline, disc, two triangles, a rounded end, and the two plate variants retained by the format. Shape changes preserve angle/color and support Undo/Redo.

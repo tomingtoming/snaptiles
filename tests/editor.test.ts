@@ -216,3 +216,14 @@ describe('resetting default colors', () => {
     const before=d.text; expect(()=>d.resetColor(0)).toThrow(); expect(d.text).toBe(before);
   });
 });
+
+
+describe('cowl construction shapes', () => {
+  it.each([0,1,2,3,4,5,6,7])('sets shape %i while preserving angle, color and script', option => {
+    const text = 'Body { Core() { N:Cowl(angle=25,color=#123456,option=0) } }\nLua { -- keep\n }';
+    const d = new ModelDocument(text); d.option(1,option);
+    expect(d.nodes()[1].attrs).toEqual({angle:'25',color:'#123456',option:String(option)});
+    expect(d.text).toContain('Lua { -- keep\n }');
+    if(option!==0) { d.undo(); expect(d.text).toBe(text); }
+  });
+});

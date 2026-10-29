@@ -355,3 +355,28 @@ was at scrollTop 57 with 419px content in 362px, and scrolling back brought the
 entire button into view. This was verified rather than treated as an overlap.
 Corpus success measures parsing/editing, not physics compatibility. Next: assess
 Cowl shape selection, another existing runtime feature missing from construction.
+
+## 2026-10-29 — Choose Cowl shapes and remove self-shadow striping
+
+Goal: shape decorative bodywork in the visual editor. Cowl exposes options
+0–7 using the existing renderer and the observations recorded in measured.md:
+plate, outline, disc, two triangles, rounded end, and plate aliases 6/7.
+Angle/color/script contents survive option edits and Undo/Redo.
+
+Validation: 84 unit tests and typecheck/build pass. The browser probe selects
+all eight values, finds six distinct geometry buffers and confirms 6/7 match
+plate geometry, then checks Undo/Redo and runtime option. Independent image
+review identifies the expected shapes and readable mobile labels. It does not
+establish exact right angles or new original-executable compatibility.
+
+Retrospective: visual review caught diagonal stripes on thin Cowl surfaces.
+Disabling shadow reception removed them, isolating self-shadowing. Small bias
+and shadow-side experiments did not establish a usable fix. After checking
+existing findings and the Three.js shadow-side code, a 0.05 normal bias (about
+one texel over the 80 m shadow frustum) removed the stripes while retaining
+ground shadows. Early snapshots did not explicitly wait for a rendered frame;
+the shape probe now waits two animation frames before every image. Re-review
+confirms smooth plate/disc/rounded-end faces; tiny contact-shadow offsets and
+all lighting/view angles remain unmeasured. Keep striping in visual checklists.
+Next: audit the growing editor as a complete workflow for discoverability and
+keyboard operation, before adding further part parameters.

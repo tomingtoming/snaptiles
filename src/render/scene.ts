@@ -151,6 +151,8 @@ export class SceneView {
     sun.position.set(20, 40, 10);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
+    // About one shadow texel over the 80 m frustum; prevents thin Cowl self-shadow stripes.
+    sun.shadow.normalBias = 0.05;
     sun.shadow.camera.left = -40;
     sun.shadow.camera.right = 40;
     sun.shadow.camera.top = 40;

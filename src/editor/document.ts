@@ -6,6 +6,7 @@ interface DocumentState { text: string; filename?: string }
 export const OPTION_SETTINGS: Record<string, {label: string; choices: [number, string][]}> = {
   wheel: {label: '半径', choices: [[0, '0.30 m'], [1, '0.45 m'], [2, '0.60 m']]},
   rlw: {label: '半径', choices: [[0, '0.30 m'], [1, '0.45 m'], [2, '0.60 m']]},
+  cowl: {label: '形状', choices: [[0, '平板'], [1, '枠'], [2, '円板'], [3, '三角A'], [4, '三角B'], [5, '半円端'], [6, '平板(6)'], [7, '平板(7)']]},
   weight: {label: '重さ倍率', choices: [[0, '1倍（既定）'], ...Array.from({length:8}, (_, i): [number, string] => [i + 1, `${i + 1}倍`])]},
 };
 
