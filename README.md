@@ -42,7 +42,8 @@ ramp, kerbs, a gate, a wall and crates to knock over.
 
 ## Build visually
 
-Press **組む** to pause simulation and edit the assembled model. Click a tile
+Press **組む** to pause simulation and edit the assembled model. **新規** starts
+with a single Core; Undo restores the previous model. Click a tile
 in the 3D view or select it in the part list. Choose a part type and N/S/E/W
 to attach it, change the selected tile's type or numeric angle, or delete
 its branch. Core cannot be deleted. ↶ / ↷ undo and redo edits, including
@@ -55,7 +56,9 @@ read-only in the visual panel; edit their expressions in the source. Manual
 source edits reset visual undo history. Wheel/Jet/Arm power can be fixed, linked to an existing Val, or assigned a new
 ↑/↓ control from the 操作 menu. New controls use the current positive power
 magnitude (1000 when it is zero or an expression), return to zero on release,
-and never overwrite existing variables. Colours, other key mappings and Lua
+and never overwrite existing variables. Select a variable marked （逆） to reverse
+a wheel on the opposite side. Rudder/Trim parts can also receive a new ←/→
+control (±30°, returning to zero on release). Colours, other key mappings and Lua
 still use the text editor; mirroring and multi-selection are not implemented.
 The editor is independently implemented, without RCD/RCM source or assets.
 

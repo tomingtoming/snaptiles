@@ -14,6 +14,8 @@ export class BuildPanel {
   private tree = document.getElementById('parts') as HTMLSelectElement;
   private type = document.getElementById('part-type') as HTMLSelectElement;
   private angle = document.getElementById('part-angle') as HTMLInputElement;
+  private angleControl = document.getElementById('angle-control') as HTMLSelectElement;
+  private angleRow = document.getElementById('angle-control-row')!;
   private power = document.getElementById('part-power') as HTMLInputElement;
   private powerControl = document.getElementById('power-control') as HTMLSelectElement;
   private powerRow = document.getElementById('power-row')!;
@@ -38,12 +40,22 @@ export class BuildPanel {
       if (value === 'new') this.document.addPowerControl(this.selected, Math.abs(Number(this.power.value)) || 1000);
       else this.document.power(this.selected, value === 'constant' ? 0 : value);
     });
+    this.angleControl.onchange = () => this.edit(() => {
+      const value = this.angleControl.value;
+      if (value === 'new') this.document.addSteeringControl(this.selected);
+      else if (value === 'constant') this.document.fixedAngle(this.selected);
+      else this.document.bindAngle(this.selected, value);
+    });
+    document.getElementById('new-model')!.onclick = () => this.edit(() => { this.document.newModel(); this.selected = 0; }, true);
     this.remove.onclick = () => this.edit(() => { this.document.remove(this.selected); this.selected = 0; });
     this.undo.onclick = () => this.edit(() => this.document.undo());
     this.redo.onclick = () => this.edit(() => this.document.redo());
     this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(button => {
       button.onclick = () => this.edit(() => {
+        const parent = this.document.nodes()[this.selected];
+        const next = this.selected + this.document.nodes().filter(n => n.source!.start >= parent.source!.start && n.source!.end <= parent.source!.end).length;
         this.document.add(this.selected, button.dataset.edge as 'N' | 'S' | 'E' | 'W', this.addType.value);
+        this.selected = next;
       });
     });
     source.addEventListener('input', () => { if (this.active) { this.document = new ModelDocument(source.value); this.refresh(); } });
@@ -71,8 +83,8 @@ export class BuildPanel {
     this.toggle.setAttribute('aria-pressed', 'false'); document.body.classList.remove('building');
     this.scene.selectTile(null);
   }
-  private edit(action: () => void): void {
-    try { action(); this.source.value = this.document.text; this.refresh(); }
+  private edit(action: () => void, fit = false): void {
+    try { action(); this.source.value = this.document.text; this.refresh(fit); }
     catch (e) { this.status.textContent = e instanceof Error ? e.message : String(e); }
   }
   private refresh(fit = false): void {
@@ -96,7 +108,7 @@ export class BuildPanel {
     } catch (e) {
       this.assembly = null; this.tree.replaceChildren(); this.scene.selectTile(null);
       this.type.disabled = this.angle.disabled = this.remove.disabled = true;
-      this.powerRow.hidden = true;
+      this.powerRow.hidden = this.angleRow.hidden = true;
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = true);
       this.status.textContent = e instanceof Error ? e.message : String(e);
     }
@@ -111,12 +123,23 @@ export class BuildPanel {
     this.angle.value = angle.replace(/\s/g, '');
     this.angle.disabled = !tile.parent || !Number.isFinite(Number(angle.replace(/\s/g, '')));
     this.angle.title = this.angle.disabled && tile.parent ? `ソースで編集: ${angle}` : '';
+    this.angleRow.hidden = !tile.parent || !['rudder', 'rudderf', 'trim', 'trimf'].includes(tile.type);
+    this.angleControl.replaceChildren(new Option('固定', 'constant'));
+    for (const v of parseRc(this.document.text).vals) this.angleControl.add(new Option(v.name, v.name.toUpperCase()));
+    const angleExpression = angle.replace(/\s/g, '').toUpperCase();
+    const fixedAngle = Number.isFinite(Number(angleExpression));
+    if (!fixedAngle && ![...this.angleControl.options].some(o => o.value === angleExpression)) this.angleControl.add(new Option(angle, angleExpression));
+    this.angleControl.add(new Option('← / → を追加', 'new'));
+    this.angleControl.value = fixedAngle ? 'constant' : angleExpression;
     this.powerRow.hidden = !['wheel', 'rlw', 'jet', 'arm'].includes(tile.type);
     const power = (tile.node.attrs.power ?? '0').replace(/\s/g, '');
     const constant = Number.isFinite(Number(power));
     this.power.value = power; this.power.disabled = !constant;
     this.powerControl.replaceChildren(new Option('固定', 'constant'));
-    for (const v of parseRc(this.document.text).vals) this.powerControl.add(new Option(v.name, v.name.toUpperCase()));
+    for (const v of parseRc(this.document.text).vals) {
+      this.powerControl.add(new Option(v.name, v.name.toUpperCase()));
+      this.powerControl.add(new Option(`${v.name}（逆）`, `-${v.name.toUpperCase()}`));
+    }
     if (!constant && ![...this.powerControl.options].some(o => o.value === power.toUpperCase())) this.powerControl.add(new Option(power, power.toUpperCase()));
     this.powerControl.add(new Option('↑ / ↓ を追加', 'new'));
     this.powerControl.value = constant ? 'constant' : power.toUpperCase();

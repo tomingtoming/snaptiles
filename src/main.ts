@@ -137,6 +137,7 @@ sourceEl.addEventListener('keydown', (e) => {
     const { selectionStart: a, selectionEnd: b, value } = sourceEl;
     sourceEl.value = value.slice(0, a) + '	' + value.slice(b);
     sourceEl.selectionStart = sourceEl.selectionEnd = a + 1;
+    sourceEl.dispatchEvent(new Event('input', { bubbles: true }));
   }
 });
 function saveModel(): void {

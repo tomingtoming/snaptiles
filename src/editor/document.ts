@@ -38,22 +38,32 @@ export class ModelDocument {
     this.replace(...this.attributeEdit(index, 'angle', String(value)));
   }
   power(index: number, value: number | string): void {
-    if (typeof value === 'number' ? !Number.isFinite(value) : !parseRc(this.text).vals.some(v => v.name.toUpperCase() === value.toUpperCase()))
+    if (typeof value === 'number' ? !Number.isFinite(value) : !parseRc(this.text).vals.some(v => v.name.toUpperCase() === value.replace(/^-/, '').toUpperCase()))
       throw new Error('出力には数値か定義済みの変数を指定してください');
     this.replace(...this.attributeEdit(index, 'power', String(value)));
   }
   /** One undoable edit; a fresh variable never overwrites existing controls or scripts. */
-  addPowerControl(index: number, magnitude: number): void {
+  addPowerControl(index: number, magnitude: number): void { this.addControl(index, 'power', magnitude, [0, 1]); }
+  addSteeringControl(index: number, magnitude = 30): void { this.addControl(index, 'angle', magnitude, [2, 3]); }
+  bindAngle(index: number, variable: string): void {
+    if (!parseRc(this.text).vals.some(v => v.name.toUpperCase() === variable.toUpperCase())) throw new Error('定義済みの変数を選んでください');
+    this.replace(...this.attributeEdit(index, 'angle', variable));
+  }
+  fixedAngle(index: number): void { this.replace(...this.attributeEdit(index, 'angle', '0')); }
+  newModel(): void { this.replace(0, this.text.length, 'Body {\n  Core() {\n  }\n}\n'); }
+  private addControl(index: number, attribute: 'power' | 'angle', magnitude: number, keys: [number, number]): void {
     if (!Number.isFinite(magnitude) || magnitude <= 0) throw new Error('出力の大きさは正の数で指定してください');
     const names = new Set(this.text.toUpperCase().match(/[A-Z_][A-Z0-9_]*/g));
-    let suffix = 1; while (names.has(`ST_POWER_${suffix}`)) suffix++;
-    const name = `ST_POWER_${suffix}`;
-    const edits: [number, number, string][] = [this.attributeEdit(index, 'power', name)];
+    const prefixName = attribute === 'power' ? 'ST_POWER' : 'ST_STEER';
+    let suffix = 1; while (names.has(`${prefixName}_${suffix}`)) suffix++;
+    const name = `${prefixName}_${suffix}`;
+    const edits: [number, number, string][] = [this.attributeEdit(index, attribute, name)];
     const blocks = findBlocks(this.text);
+    const delta = attribute === 'angle' ? -magnitude : magnitude;
     let prefix = '';
     for (const [section, content] of [
       ['Val', `  ${name}(default=0, min=-${magnitude}, max=${magnitude}, step=${magnitude})`],
-      ['Key', `  0:${name}(step=${magnitude})\n  1:${name}(step=-${magnitude})`],
+      ['Key', `  ${keys[0]}:${name}(step=${delta})\n  ${keys[1]}:${name}(step=${-delta})`],
     ]) {
       const block = blocks.find(b => b.name.toLowerCase() === section.toLowerCase() || section === 'Val' && b.name.toLowerCase() === 'var');
       if (block) { const end = block.offset + block.inner.length; edits.push([end, end, `\n${content}\n`]); }

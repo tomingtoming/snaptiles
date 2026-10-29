@@ -52,7 +52,7 @@ describe('power controls', () => {
     const d = new ModelDocument('Body { Core(){ E:Wheel() } } Lua { ST_POWER_1=1 }');
     d.addPowerControl(1, 500); expect(d.nodes()[1].attrs.power).toBe('ST_POWER_2');
     expect(parseRc(d.text).keys).toHaveLength(2);
-    d.power(1, 'ST_POWER_2'); d.power(1, -500); expect(d.nodes()[1].attrs.power).toBe('- 500');
+    d.power(1, '-ST_POWER_2'); expect(d.nodes()[1].attrs.power).toBe('- ST_POWER_2'); d.power(1, -500); expect(d.nodes()[1].attrs.power).toBe('- 500');
   });
   it('does not use braces or fake sections in comments or Lua strings as insertion points', () => {
     const text = '// Val { fake }\nBody { Core(){ E:Wheel() } }\nLua { local s="} Val {"; local x=[=[ } Key { ]=] --[[ } ]]\n }';
@@ -60,5 +60,20 @@ describe('power controls', () => {
     expect(parseRc(d.text).vals).toHaveLength(1);
     expect(parseRc(d.text).script?.source).toBe(parseRc(text).script?.source);
     expect(() => new ModelDocument('Body { Core()').nodes()).toThrow();
+  });
+});
+
+describe('blank vehicles and steering', () => {
+  it('creates a blank Core and restores all original contents with Undo', () => {
+    const d = new ModelDocument(source); d.newModel(); expect(d.nodes().map(n => n.type)).toEqual(['Core']);
+    d.undo(); expect(d.text).toBe(source);
+  });
+  it('creates steering independently from throttle and permits sharing it with another joint', () => {
+    const d = new ModelDocument('Body{Core(){N:Rudder(){N:Wheel()} S:Trim()}}');
+    d.addPowerControl(2, 800); d.addSteeringControl(1);
+    expect(parseRc(d.text).keys.slice(-2)).toEqual([{key:2,var:'ST_STEER_1',step:-30},{key:3,var:'ST_STEER_1',step:30}]);
+    d.bindAngle(3, 'ST_STEER_1'); expect(d.nodes()[3].attrs.angle).toBe('ST_STEER_1');
+    d.fixedAngle(3); expect(d.nodes()[3].attrs.angle).toBe('0');
+    expect(d.nodes()[1].attrs.angle).toBe('ST_STEER_1');
   });
 });

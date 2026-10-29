@@ -42,7 +42,7 @@ body { display: grid; grid-template-columns: 380px 1fr; }
 }
 
 #builder[hidden] { display: none; }
-#builder { padding: 8px 12px; border-bottom: 1px solid #39424c; max-height: 42vh; overflow: auto; }
+#builder { padding: 8px 12px; border-bottom: 1px solid #39424c; max-height: calc(100dvh - 220px); overflow: auto; }
 #builder label { display: grid; gap: 4px; color: var(--dim); font-size: 12px; min-width: 0; }
 #builder select, #builder input { width: 100%; background: #15181c; color: var(--ink); border: 1px solid #46515c; border-radius: 4px; padding: 5px; }
 #parts { font-family: var(--mono); }
@@ -68,7 +68,7 @@ button:disabled { opacity: .4; cursor: default !important; }
   .edges button:nth-child(n) { grid-row: auto; grid-column: auto; padding: 5px; }
 }
 
-#power-row[hidden] { display: none; }
+#angle-control-row[hidden], #power-row[hidden] { display: none; }
 @media(max-width: 800px) {
   .building { grid-template-rows: 40vh 60vh; }
   #builder { max-height: 43vh; }
