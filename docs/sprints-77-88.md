@@ -117,3 +117,12 @@ model data is included in the repository changes.
 **Retro:** preserve the failed trials and their limitations, but ship the tested
 mechanism and regressions. Original transient angular-velocity equivalence remains
 unproven; the earlier blanket “no momentum” interpretation is superseded.
+
+
+### Production verification
+
+Deployed 2026-10-29 to the existing snaptiles Worker/custom domain.
+Version: `56bfc376-5e9a-4341-bfa0-a80e45ccf9e0`.
+Bundle: `/assets/index-DtXWpyea.js` (5,066,795 bytes).
+SHA-256: `292a55f92355115f99b7d5cfff77f0a51546f8d2c136ffa94c83b423fa328785`.
+Fresh remote HTML names this bundle, and downloaded bytes match the local build.
