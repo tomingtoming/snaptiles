@@ -25,7 +25,7 @@ bun run dev
 
 Paste a model into the editor and press ▶ (or Ctrl+Enter). `R` resets the
 model in place, `U` reloads it, Space pauses, Ctrl+S saves the editor as a
-`.rcd` file, and a `.rcd`/`.txt` can be dropped onto the editor. Views: `1`
+`.rcd` file, and **開く** reopens a `.rc`/`.rcd`/`.txt` file (including on mobile). Files can also be dropped onto the editor. Views: `1`
 chase, `2` free orbit, `3` top, `4` onboard (the model's `_ZOOM` sets its field
 of view), or the ◎ button. Drag to orbit, wheel or pinch to zoom. The keycaps
 at the bottom are the model's keys and work by touch; W/A/S/D double as the

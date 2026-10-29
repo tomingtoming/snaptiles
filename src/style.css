@@ -48,7 +48,7 @@ body { display: grid; grid-template-columns: 380px 1fr; }
 #parts { font-family: var(--mono); }
 .edit-row { display: flex; align-items: end; gap: 8px; margin: 6px 0; }
 .edit-row label { flex: 1; }
-#builder button, #build { background: #303840; color: var(--ink); border: 1px solid #59636e; border-radius: 4px; padding: 5px 8px; cursor: pointer; white-space: nowrap; }
+#builder button, #build, #open-model { background: #303840; color: var(--ink); border: 1px solid #59636e; border-radius: 4px; padding: 5px 8px; cursor: pointer; white-space: nowrap; }
 #build[aria-pressed=true] { color: var(--accent); border-color: var(--accent); }
 button:disabled { opacity: .4; cursor: default !important; }
 .edges { display: grid; grid-template-columns: repeat(3, auto); gap: 3px; }

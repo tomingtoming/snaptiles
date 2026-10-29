@@ -167,3 +167,25 @@ A reproducible reversed completion order is stronger evidence than repeated
 fast clicks. Cleanup call counts establish ownership, not a claim of constant
 browser memory usage. Next: audit reopening saved work and file-import failure
 paths. Public push/deployment remains pending the requested scope decision.
+
+## 2026-10-29 — Reopen saved models through a file picker
+
+Goal: complete the saved-file round trip on devices without drag and drop.
+Added an always-visible Open button backed by the native file picker; picker
+and existing drop now share loading and error handling. Reading failures leave
+source and the current editor intact and show an error. Resetting the input
+allows selecting the same file again. UTF-8 and Shift-JIS decoding are retained.
+
+Validation: typecheck/build passed. A new browser probe downloads a GUI-built
+model, reopens those exact bytes, selects the same file again, reads a Shift-JIS
+comment, injects a read failure and recovers through another selection. Mobile
+screenshot review found the new header controls, existing editing controls,
+source and error message visible without clipping or overlap. Native OS picker
+appearance and actual touch ergonomics are not established by browser automation.
+
+Retrospective: drag-and-drop support alone left mobile users without an obvious
+reopen action. The initial repeat-selection assertion accidentally observed the
+previous paused simulation; waiting for editing to close as well as the new
+assembly avoids that false failure. Independent visual review flagged small,
+closely spaced direction buttons as a possible touch issue. Next: measure and
+improve mobile touch targets while preserving usable model preview space.

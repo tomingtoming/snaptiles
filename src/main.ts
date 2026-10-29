@@ -361,20 +361,33 @@ new ResizeObserver(() => scene.resize()).observe(canvas);
 requestAnimationFrame(frame);
 
 // ---- files in, links out ----
-// Drop a .rc/.txt onto the editor to load it; the model travels in the URL hash so a link is a share.
-sourceEl.addEventListener('dragover', (e) => e.preventDefault());
-sourceEl.addEventListener('drop', async (e) => {
-  e.preventDefault();
-  const f = e.dataTransfer?.files?.[0];
-  if (!f) return;
-  const request = ++loadGeneration;
-  const text = await readModelFile(f);
-  if (request !== loadGeneration) return;
-  sourceEl.value = text;
-  current = -1;
-  refreshSampleButtons();
-  void loadAndShare(text, request);
+// Both picker and drop use the same latest-request and read-error handling.
+const fileInput = $<HTMLInputElement>('model-file');
+$('open-model').addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files?.[0];
+  fileInput.value = ''; // Selecting the same file again must also reload it.
+  if (file) void openModelFile(file);
 });
+sourceEl.addEventListener('dragover', (e) => e.preventDefault());
+sourceEl.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const file = e.dataTransfer?.files?.[0];
+  if (file) void openModelFile(file);
+});
+async function openModelFile(file: File): Promise<void> {
+  const request = ++loadGeneration;
+  try {
+    const text = await readModelFile(file);
+    if (request !== loadGeneration) return;
+    sourceEl.value = text;
+    current = -1;
+    refreshSampleButtons();
+    await loadAndShare(text, request);
+  } catch (error) {
+    if (request === loadGeneration) statusEl.textContent = `ファイルを開けませんでした: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
 async function readModelFile(f: File): Promise<string> {
   const buf = await f.arrayBuffer();
   const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(buf);
