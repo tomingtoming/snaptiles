@@ -1195,3 +1195,44 @@ field at 1280x720 and timed out on visibility; importing the fixture at 1280x100
 made measurement possible. That timeout is not evidence of parsing cost. Next:
 inspect source-editor reachability at shorter viewport heights and distinguish
 intentional collapsed state from actual layout obstruction.
+
+
+## 2026-10-30 — Keep source text readable in short viewports (Sprint 43)
+
+Goal: investigate the source-fill timeout encountered during Sprint 42. A fresh
+1280x720 session has a 192.6px source field and accepts real clicks; 1280x600 has
+121px. The previous desktop timeout was not reproduced and its cause remains
+unresolved. Do not attribute it to the mobile issue found in this investigation.
+
+At 320x568 the source field was only 20px high, entirely occupied by vertical
+padding: an element could be clickable while exposing no readable text area.
+The editor grid now reserves 58px (two 18.85px text lines plus padding) for source
+and lets the builder track shrink and scroll. Narrow edit-row margins decrease
+from 6px to 3px to retain the existing no-scroll power/add controls at 390x844.
+The first reservation failed that existing assertion; a 4px margin attempt still
+left the add selector 3px below the builder. Measured actual rectangles before
+choosing 3px, rather than assuming all adjacent margins add independently.
+
+A permanent Chromium scenario covers 1280x720, 1280x600, 390x844 and 320x568:
+readable line area, viewport/hit-test bounds, real click/typing/Undo, source
+visibility during parse errors, recovery and adding another part through the
+scrolled builder. Added it to the default editor runner (now 24 scenarios).
+The same scenario passes Firefox and Windows WebKit against the dev server.
+Production build and targeted Chromium short-height/general/source-history/
+draft-recovery probes pass; no unit logic changed. Full 24-scenario execution
+and actual mobile software-keyboard behavior were not tested in this sprint.
+
+Retrospective: visibility and clickability are insufficient evidence of readable
+editing space. Reserve space for text content and verify neighboring workflows;
+retain the regression test when it exposes a real layout tradeoff. The test's
+first Undo expectation also incorrectly grouped Enter and later typing; removed
+the unnecessary Enter from this visibility scenario, preserving existing history
+semantics. Next: examine where imported models still force source editing and
+whether the UI explains those boundaries accurately. No push or deployment.
+
+Independent final image review found no overlap or clipping of the add/power
+controls at 320x568 and 390x844. At 320 the visible source lines are complete;
+at 390 a third line is partially visible below the two-line reserved area and
+long unwrapped lines extend horizontally. Source remains a scrolling textarea;
+this change guarantees readable content space, not that every visible fragment
+or complete model fits without scrolling.

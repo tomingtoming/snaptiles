@@ -60,10 +60,12 @@ button:disabled { opacity: .4; cursor: default !important; }
 .building #vals, .building #out, .building #keys, .building #hud { display: none; }
 @media(max-width: 800px) { .building { grid-template-rows: 45vh 55vh; } #builder { max-height: 36vh; } }
 
-.building #side { grid-template-rows: auto auto 1fr auto; }
+.building #side { grid-template-rows: auto minmax(0, auto) minmax(58px, 1fr) auto; }
+.building #builder { min-height: 0; }
 
 @media(max-width: 800px) {
   #builder { padding: 4px 12px; }
+  #builder .edit-row { margin: 3px 0; }
   #parts { height: 76px; }
   .edges { grid-template-columns: repeat(4, auto); gap: 6px; }
   .edges button:nth-child(n) { grid-row: auto; grid-column: auto; padding: 5px; min-width: 44px; min-height: 44px; }
