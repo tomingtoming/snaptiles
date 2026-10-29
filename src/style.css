@@ -12,7 +12,7 @@
 html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-serif; }
 body { display: grid; grid-template-columns: 380px 1fr; }
 
-#side { display: grid; grid-template-rows: auto 1fr auto; min-height: 0; background: var(--panel); border-right: 1px solid #000; }
+#side { min-width: 0; display: grid; grid-template-rows: auto 1fr auto; min-height: 0; background: var(--panel); border-right: 1px solid #000; }
 #bar { display: flex; align-items: center; gap: 6px; padding: 8px; }
 #samples { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
 #samples button { background: transparent; color: var(--dim); border: 1px solid #333a42; border-radius: 6px; padding: 3px 8px; font: 13px system-ui, sans-serif; cursor: pointer; }
@@ -22,8 +22,8 @@ body { display: grid; grid-template-columns: 380px 1fr; }
 #mute { background: transparent; color: var(--dim); border: 1px solid #333a42; border-radius: 6px; width: 34px; height: 30px; font-size: 14px; cursor: pointer; }
 #mute[aria-pressed='true'] { opacity: 0.6; }
 #source { width: 100%; height: 100%; min-height: 0; resize: none; border: 0; outline: 0; padding: 10px 12px; background: #15181c; color: var(--ink); font: 13px/1.45 var(--mono); tab-size: 2; }
-#status { min-height: 28px; padding: 6px 12px; font: 12px/1.3 var(--mono); color: var(--err); white-space: pre-wrap; }
-#status:empty { padding: 0; min-height: 0; }
+#status { min-height: 28px; padding: 6px 12px; font: 12px/1.3 var(--mono); color: var(--err); white-space: pre-wrap; overflow-wrap: anywhere; max-height: min(15dvh, 160px); overflow: auto; }
+#status:empty { padding: 0; min-height: 0; visibility: hidden; }
 
 #stage { position: relative; min-width: 0; min-height: 0; }
 #view { width: 100%; height: 100%; display: block; outline: 0; touch-action: none; }
@@ -123,3 +123,5 @@ button:disabled { opacity: .4; cursor: default !important; }
 #source-edit-help { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
 #source-edit-help[hidden] { display: none; }
 #source-edit-help button { min-height: 44px; }
+
+#status:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }

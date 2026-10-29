@@ -15,7 +15,7 @@ jobs:
       - run: bun run test:editor:scale
         timeout-minutes: 2
       - run: bun run test:editor
-        timeout-minutes: 5
+        timeout-minutes: 7
       - run: bun run test:editor:firefox
         timeout-minutes: 3
       - run: bun run test:editor:webkit

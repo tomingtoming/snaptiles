@@ -1307,3 +1307,42 @@ completed successfully, including the new combined branch workflow and recent
 short-height/source-help additions. The production build is the successful
 Sprint 44 build; Sprint 45 changes only probes/documentation. This local full run
 does not establish remote CI or Firefox/WebKit full-suite coverage.
+
+
+## 2026-10-30 — Recover from long Lua errors without losing the UI (Sprint 46)
+
+Goal: verify repair/restart after import and runtime failures. A real OnFrame
+Lua error containing a long unbroken token exposed a layout defect: at 320x568,
+a 952-character diagnostic expanded the document and source to 6,211.5px wide.
+The side grid's intrinsic width and unbreakable diagnostic displaced controls.
+
+Allow the side panel to shrink, wrap diagnostic tokens anywhere, and cap its
+height at min(15dvh,160px) with internal scrolling. The error footer is keyboard
+focusable with a visible outline and an accessible label; when empty it is
+invisible and absent from keyboard navigation. The same error now leaves the
+viewport/document at 320px, with a 62px source field and 85.2px diagnostic region.
+No diagnostic text is truncated in storage or DOM.
+
+A permanent browser scenario triggers long OnInit and OnFrame errors, checks
+viewport bounds and full message retention, scrolls using PageDown and returns
+to the beginning using Home, repairs source through the builder and reruns.
+It also verifies restart clears held input and a missing-Body load failure can
+be repaired. Chromium production-preview, Firefox and Windows WebKit dev-server
+runs pass. Production build, load-lifecycle and short-height regression checks
+pass. No simulation/unit logic changed; the previous 141-unit baseline was not
+rerun for this CSS/HTML change. Full default suite is now 27 scenarios; only the
+relevant scenarios were rerun this sprint. Increased its CI allowance from five
+to seven minutes because the preceding 26-scenario local run approached five
+minutes; individual scenario timeout remains 120 seconds. Remote CI not run.
+
+Retrospective: successfully displaying an error is insufficient if its content
+can displace the recovery controls. Use actual script errors and measure the
+whole viewport, then prove repair through the normal UI. Mid-scroll screenshots
+naturally show partial first/last lines; distinguish this from inaccessible text
+by testing keyboard return to the beginning. Next: inspect whether failure
+messages distinguish unsupported model content from malformed source rather
+than silently accepting content the simulator cannot represent. No push/deploy.
+
+Independent final image review confirmed the diagnostic beginning is readable
+after Home, wraps within the viewport, and the focus outline does not overlap
+text. Source and top controls remain in separate visible regions.
