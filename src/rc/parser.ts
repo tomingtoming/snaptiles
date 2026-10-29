@@ -31,7 +31,7 @@ export interface ChipNode {
   attrs: Record<string, string>; // raw expressions
   children: ChipNode[];
   line: number;
-  source?: { start: number; end: number; typeStart: number; typeEnd: number; headerEnd: number; close?: number; argsEnd?: number; attributes: Record<string, [number, number]> };
+  source?: { start: number; end: number; typeStart: number; typeEnd: number; headerEnd: number; close?: number; argsEnd?: number; attributes: Record<string, [number, number]>; attributeTokens: Record<string, [number, number][]> };
 }
 
 export interface RcModel {
@@ -174,6 +174,7 @@ export function findBlocks(src: string): { name: string; inner: string; line: nu
 class P {
   i = 0;
   ranges: Record<string, [number, number]> = {};
+  attributeTokens: Record<string, [number, number][]> = {};
   constructor(public toks: Tok[], public baseLine: number, public offset = 0) {}
   peek(o = 0): Tok | undefined { return this.toks[this.i + o]; }
   next(): Tok {
@@ -215,10 +216,11 @@ class P {
   /** parses `( a=expr, b=expr )`; bare values are stored positionally as `_0`, `_1`... */
   args(): Record<string, string> {
     const out: Record<string, string> = {};
-    this.ranges = {};
+    this.ranges = {}; this.attributeTokens = {};
     this.expect('(');
     let pos = 0;
     while (!this.accept(')')) {
+      const entryStart = this.i;
       const t0 = this.peek();
       const t1 = this.peek(1);
       if (t0?.t === 'id' && t1?.t === 'sym' && t1.v === '=') {
@@ -226,6 +228,10 @@ class P {
         const start = this.peek()!.start + this.offset;
         out[t0.v.toLowerCase()] = this.expr();
         this.ranges[t0.v.toLowerCase()] = [start, this.toks[this.i - 1].end + this.offset];
+        const spans = this.attributeTokens[t0.v.toLowerCase()] ??= [];
+        for (const token of this.toks.slice(entryStart, this.i)) spans.push([token.start + this.offset, token.end + this.offset]);
+        const separator = this.peek()?.v === ',' ? this.peek() : this.toks[entryStart - 1]?.v === ',' ? this.toks[entryStart - 1] : undefined;
+        if (separator) spans.push([separator.start + this.offset, separator.end + this.offset]);
       } else {
         out[`_${pos++}`] = this.expr();
       }
@@ -308,7 +314,7 @@ function parseNode(p: P): ChipNode {
   const hasArgs = p.peek()?.v === '(';
   const attrs = p.peek()?.v === '(' ? p.args() : {};
   const headerEnd = p.toks[p.i - 1].end + p.offset;
-  const node: ChipNode = { type: name, dir, attrs, children: [], line, source: { start, end: headerEnd, headerEnd, typeStart: typeToken.start + p.offset, typeEnd: typeToken.end + p.offset, argsEnd: hasArgs ? headerEnd - 1 : undefined, attributes: hasArgs ? { ...p.ranges } : {} } };
+  const node: ChipNode = { type: name, dir, attrs, children: [], line, source: { start, end: headerEnd, headerEnd, typeStart: typeToken.start + p.offset, typeEnd: typeToken.end + p.offset, argsEnd: hasArgs ? headerEnd - 1 : undefined, attributes: hasArgs ? { ...p.ranges } : {}, attributeTokens: hasArgs ? { ...p.attributeTokens } : {} } };
   if (p.accept('{')) {
     while (!p.accept('}')) {
       if (p.accept(',') || p.accept(';')) continue;

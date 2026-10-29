@@ -192,3 +192,27 @@ describe('part colors', () => {
     expect(d.text).toBe(before);
   });
 });
+
+
+describe('resetting default colors', () => {
+  it.each([
+    'color=#112233',
+    'color=#112233, angle=20',
+    'angle=20, color=#112233',
+    'angle=20, color=#112233, power=10',
+    'color=#334455, color=#112233',
+    'color /* keep A */ = /* keep B */ #112233, angle=20',
+    'angle=20, color=#112233 /* keep C */, power=10',
+  ])('removes only color tokens from %s', attrs => {
+    const text = `Body { Core() { N:Chip(${attrs}) } }\nLua { -- keep script\n }`;
+    const d = new ModelDocument(text); const before = {...d.nodes()[1].attrs}; delete before.color;
+    d.resetColor(1); expect(d.nodes()[1].attrs).toEqual(before);
+    for (const comment of text.match(/\/\*.*?\*\//g) ?? []) expect(d.text).toContain(comment);
+    expect(d.text).toContain('Lua { -- keep script\n }');
+    d.undo(); expect(d.text).toBe(text); d.redo(); expect(d.nodes()[1].attrs.color).toBeUndefined();
+  });
+  it('does not erase dynamic color control', () => {
+    const d = new ModelDocument('Val { C(default=1) } Body { Core(color=C) }');
+    const before=d.text; expect(()=>d.resetColor(0)).toThrow(); expect(d.text).toBe(before);
+  });
+});

@@ -26,8 +26,27 @@ try {
  await receiver.goto(link); await receiver.waitForFunction(()=>window.__sim?.assembly?.tiles[0]?.color===0x2255ff);
  assert.equal(await receiver.inputValue('#source'),source); assert.equal(await receiver.evaluate(()=>window.__scene.tileColorHex(1)),'#ff2255'); await receiver.close();
  await page.keyboard.press('Escape');
+ await page.selectOption('#parts','1');
+ await page.fill('#part-angle','20'); await page.locator('#part-angle').press('Tab');
+ await page.click('#reset-color');
+ assert.equal(await page.evaluate(()=>window.__scene.tileColorHex(1)),'#e8e8e8');
+ assert.equal(await page.inputValue('#part-angle'),'20');
+ assert.equal(await page.locator('#reset-color').isDisabled(),true);
+ await page.selectOption('#part-type','Frame');
+ assert.equal(await page.evaluate(()=>window.__scene.tileColorHex(1)),'#9aa4ad');
+ await page.locator('#part-color').scrollIntoViewIfNeeded();
+ await page.screenshot({path:fileURLToPath(new URL('../.shots/editor-color-default-mobile.png',import.meta.url))});
+ const scrollState = await page.locator('#builder').evaluate(el=>({scrollTop:el.scrollTop,height:el.clientHeight,content:el.scrollHeight}));
+ await page.locator('#copy-branch').scrollIntoViewIfNeeded();
+ assert.equal(await page.locator('#copy-branch').evaluate(el=>{const b=el.getBoundingClientRect(), p=document.querySelector('#builder').getBoundingClientRect();return b.top>=p.top&&b.bottom<=p.bottom;}),true);
+ console.log('Color panel scroll:',scrollState);
+
+ await page.click('#edit-undo'); await page.click('#edit-undo');
+ assert.equal(await page.evaluate(()=>window.__scene.tileColorHex(1)),'#ff2255');
+ assert.equal(await page.inputValue('#part-angle'),'20');
  await page.fill('#source','Val { C(default=255) } Body { Core(color=C) }');
  assert.equal(await page.locator('#part-color').isDisabled(),true);
+ assert.equal(await page.locator('#reset-color').isDisabled(),true);
  assert.ok((await page.locator('#color-note').textContent()).includes('C'));
  console.log('Colors: rendered RGB, undo/redo, Core, runtime, share round-trip and variable protection pass');
 } finally {await browser.close();}

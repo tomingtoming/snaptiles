@@ -331,3 +331,27 @@ Removed that tint and retained the yellow outline/list marker; a new no-tint
 assertion and re-review confirm the blue face remains blue while selected.
 Next: check how builders return from a custom color to the type's default,
 without undoing later unrelated construction edits.
+
+## 2026-10-29 — Restore a type's default color without undoing construction
+
+Goal: remove a color override while retaining later angle/structure edits.
+Added Default Color beside the picker. It removes the color attribute rather
+than baking in a palette number, so a subsequent type change adopts that type's
+default. The parser records attribute token spans and separators; removal keeps
+intervening whitespace/comments, handles first/middle/last attributes and removes
+duplicate color declarations together. One Undo restores the exact source.
+Dynamic colors remain protected, and already-default colors disable the action.
+
+Validation: 76 unit tests, typecheck/build, all seven production browser probes
+and the 90-model external editing corpus pass. Browser checks preserve a later
+20-degree angle while resetting color, change Chip to Frame and verify Frame's
+palette, then undo the type/reset and recover the custom color. Mobile review
+confirms the added control is readable and fits beside the picker.
+
+Retrospective: resetting to a copied RGB number would have lost the meaning of
+'default'. Token-level deletion preserves that meaning and unrelated comments.
+The screenshot's clipped Copy button was a scroll-state observation: the panel
+was at scrollTop 57 with 419px content in 362px, and scrolling back brought the
+entire button into view. This was verified rather than treated as an overlap.
+Corpus success measures parsing/editing, not physics compatibility. Next: assess
+Cowl shape selection, another existing runtime feature missing from construction.

@@ -22,6 +22,7 @@ export class BuildPanel {
   private angle = document.getElementById('part-angle') as HTMLInputElement;
   private angleControl = document.getElementById('angle-control') as HTMLSelectElement;
   private angleRow = document.getElementById('angle-control-row')!;
+  private resetColor = document.getElementById('reset-color') as HTMLButtonElement;
   private color = document.getElementById('part-color') as HTMLInputElement;
   private option = document.getElementById('part-option') as HTMLSelectElement;
   private optionField = document.getElementById('option-field')!;
@@ -51,6 +52,7 @@ export class BuildPanel {
     this.tree.onchange = () => { this.selected = Number(this.tree.value); this.paintSelection(); };
     this.type.onchange = () => this.edit(() => this.document.type(this.selected, this.type.value));
     this.angle.onchange = () => this.edit(() => { if (!this.angle.value.trim()) throw new Error('角度には数値を入力してください'); const expression = this.document.nodes()[this.selected].attrs.angle ?? '0'; if (this.document.controlStrength(expression) !== null) this.document.setControlStrength(expression, Number(this.angle.value)); else this.document.angle(this.selected, Number(this.angle.value)); });
+    this.resetColor.onclick = () => this.edit(() => this.document.resetColor(this.selected));
     this.color.onchange = () => this.edit(() => this.document.color(this.selected, this.color.value));
     this.option.onchange = () => this.edit(() => this.document.option(this.selected, Number(this.option.value)), true);
     this.power.onchange = () => this.edit(() => {
@@ -179,6 +181,7 @@ export class BuildPanel {
     this.type.disabled = !tile.parent;
     this.color.value = this.scene.tileColorHex(tile.id);
     this.color.disabled = !!tile.node.attrs.color && !exprIsConstant(tile.node.attrs.color);
+    this.resetColor.disabled = this.color.disabled || !tile.node.attrs.color;
     document.getElementById('color-note')!.textContent = this.color.disabled ? `ソースで編集: ${tile.node.attrs.color}` : '';
     const settings = OPTION_SETTINGS[tile.type];
     this.optionField.hidden = !settings;

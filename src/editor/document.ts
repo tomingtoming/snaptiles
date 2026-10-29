@@ -54,6 +54,18 @@ export class ModelDocument {
     if (node.attrs.color && !exprIsConstant(node.attrs.color)) throw new Error('変数で制御する色はソースで編集してください');
     this.replace(...this.attributeEdit(index, 'color', value.toLowerCase()));
   }
+  resetColor(index: number): void {
+    const node = this.nodes()[index];
+    if (!node.attrs.color) return;
+    if (!exprIsConstant(node.attrs.color)) throw new Error('変数で制御する色はソースで編集してください');
+    const ranges = node.source!.attributeTokens.color ?? [];
+    // Delete tokens, not the intervening comments/whitespace. Duplicate attributes
+    // can share a delimiter, so each source span is removed only once.
+    const unique = [...new Map(ranges.map(range => [range.join(':'), range])).values()];
+    let next = this.text;
+    for (const [start, end] of unique.sort((a,b) => b[0]-a[0])) next = next.slice(0,start)+next.slice(end);
+    this.replace(0, this.text.length, next);
+  }
   option(index: number, value: number): void {
     const node = this.nodes()[index], settings = OPTION_SETTINGS[node.type.toLowerCase()];
     if (!settings?.choices.some(([choice]) => choice === value)) throw new Error('この部品では使えない設定値です');
