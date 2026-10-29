@@ -121,32 +121,50 @@ function tokenize(src: string): Tok[] {
   return toks;
 }
 
-/** Find top-level `Name { ... }` blocks, returning raw inner text (brace-balanced). */
-function findBlocks(src: string): { name: string; inner: string; line: number; offset: number }[] {
+/** Skip quoted text or comments without treating their braces as section delimiters. */
+function literalEnd(src: string, i: number): number | null {
+  const quote = src[i];
+  if (quote === '"' || quote === "'") {
+    let j = i + 1;
+    while (j < src.length) { if (src[j] === '\\') { j += 2; continue; } if (src[j++] === quote) return j; }
+    return src.length;
+  }
+  const comment = src.startsWith('--', i);
+  const start = comment ? i + 2 : i;
+  const long = /^\[(=*)\[/.exec(src.slice(start));
+  if (long) {
+    const end = src.indexOf(`]${long[1]}]`, start + long[0].length);
+    return end < 0 ? src.length : end + long[0].length;
+  }
+  if (comment || src.startsWith('//', i)) { const end = src.indexOf('\n', i); return end < 0 ? src.length : end; }
+  if (src.startsWith('/*', i)) { const end = src.indexOf('*/', i + 2); return end < 0 ? src.length : end + 2; }
+  return null;
+}
+
+/** Top-level section spans are also used by the visual editor to preserve unrelated text. */
+export function findBlocks(src: string): { name: string; inner: string; line: number; offset: number }[] {
   const blocks: { name: string; inner: string; line: number; offset: number }[] = [];
-  const re = /(^|[\s}])([A-Za-z_][A-Za-z0-9_]*)\s*\{/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(src))) {
-    const name = m[2];
-    const open = m.index + m[0].length - 1;
-    let depth = 0;
-    let i = open;
-    for (; i < src.length; i++) {
-      const c = src[i];
-      // braces inside line comments (// or Lua --) do not count
-      if ((c === '/' && src[i + 1] === '/') || (c === '-' && src[i + 1] === '-')) {
-        while (i < src.length && src[i] !== '\n') i++;
-        continue;
-      }
-      if (c === '{') depth++;
-      else if (c === '}') {
-        depth--;
-        if (depth === 0) break;
-      }
+  let i = 0;
+  while (i < src.length) {
+    const skipped = literalEnd(src, i);
+    if (skipped !== null) { i = skipped; continue; }
+    if (!/[A-Za-z_]/.test(src[i])) { i++; continue; }
+    const start = i;
+    while (i < src.length && /[A-Za-z0-9_]/.test(src[i])) i++;
+    const name = src.slice(start, i);
+    while (i < src.length && /\s/.test(src[i])) i++;
+    if (src[i] !== '{') continue;
+    const open = i++, line = src.slice(0, start).split('\n').length;
+    let depth = 1;
+    while (i < src.length && depth) {
+      const skip = literalEnd(src, i);
+      if (skip !== null) { i = skip; continue; }
+      if (src[i] === '{') depth++;
+      if (src[i] === '}') depth--;
+      i++;
     }
-    const line = src.slice(0, m.index).split('\n').length;
-    blocks.push({ name, inner: src.slice(open + 1, i), line, offset: open + 1 });
-    re.lastIndex = i + 1;
+    if (depth) throw new RcParseError(`unclosed ${name} section`, line);
+    blocks.push({ name, inner: src.slice(open + 1, i - 1), line, offset: open + 1 });
   }
   return blocks;
 }

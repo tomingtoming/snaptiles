@@ -14,6 +14,9 @@ export class BuildPanel {
   private tree = document.getElementById('parts') as HTMLSelectElement;
   private type = document.getElementById('part-type') as HTMLSelectElement;
   private angle = document.getElementById('part-angle') as HTMLInputElement;
+  private power = document.getElementById('part-power') as HTMLInputElement;
+  private powerControl = document.getElementById('power-control') as HTMLSelectElement;
+  private powerRow = document.getElementById('power-row')!;
   private addType = document.getElementById('add-type') as HTMLSelectElement;
   private undo = document.getElementById('edit-undo') as HTMLButtonElement;
   private redo = document.getElementById('edit-redo') as HTMLButtonElement;
@@ -26,6 +29,15 @@ export class BuildPanel {
     this.tree.onchange = () => { this.selected = Number(this.tree.value); this.paintSelection(); };
     this.type.onchange = () => this.edit(() => this.document.type(this.selected, this.type.value));
     this.angle.onchange = () => this.edit(() => { if (!this.angle.value.trim()) throw new Error('角度には数値を入力してください'); this.document.angle(this.selected, Number(this.angle.value)); });
+    this.power.onchange = () => this.edit(() => {
+      if (!this.power.value.trim()) throw new Error('出力には数値を入力してください');
+      this.document.power(this.selected, Number(this.power.value));
+    });
+    this.powerControl.onchange = () => this.edit(() => {
+      const value = this.powerControl.value;
+      if (value === 'new') this.document.addPowerControl(this.selected, Math.abs(Number(this.power.value)) || 1000);
+      else this.document.power(this.selected, value === 'constant' ? 0 : value);
+    });
     this.remove.onclick = () => this.edit(() => { this.document.remove(this.selected); this.selected = 0; });
     this.undo.onclick = () => this.edit(() => this.document.undo());
     this.redo.onclick = () => this.edit(() => this.document.redo());
@@ -84,6 +96,7 @@ export class BuildPanel {
     } catch (e) {
       this.assembly = null; this.tree.replaceChildren(); this.scene.selectTile(null);
       this.type.disabled = this.angle.disabled = this.remove.disabled = true;
+      this.powerRow.hidden = true;
       this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = true);
       this.status.textContent = e instanceof Error ? e.message : String(e);
     }
@@ -98,6 +111,15 @@ export class BuildPanel {
     this.angle.value = angle.replace(/\s/g, '');
     this.angle.disabled = !tile.parent || !Number.isFinite(Number(angle.replace(/\s/g, '')));
     this.angle.title = this.angle.disabled && tile.parent ? `ソースで編集: ${angle}` : '';
+    this.powerRow.hidden = !['wheel', 'rlw', 'jet', 'arm'].includes(tile.type);
+    const power = (tile.node.attrs.power ?? '0').replace(/\s/g, '');
+    const constant = Number.isFinite(Number(power));
+    this.power.value = power; this.power.disabled = !constant;
+    this.powerControl.replaceChildren(new Option('固定', 'constant'));
+    for (const v of parseRc(this.document.text).vals) this.powerControl.add(new Option(v.name, v.name.toUpperCase()));
+    if (!constant && ![...this.powerControl.options].some(o => o.value === power.toUpperCase())) this.powerControl.add(new Option(power, power.toUpperCase()));
+    this.powerControl.add(new Option('↑ / ↓ を追加', 'new'));
+    this.powerControl.value = constant ? 'constant' : power.toUpperCase();
     this.remove.disabled = !tile.parent;
     this.remove.textContent = tile.children.length ? '枝ごと削除' : '削除';
   }

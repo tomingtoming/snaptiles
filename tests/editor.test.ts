@@ -37,3 +37,28 @@ describe('visual model edits', () => {
     expect(d.text).toContain('/*keep*/');
   });
 });
+
+describe('power controls', () => {
+  it('creates one undoable control without altering existing script or bindings', () => {
+    const d = new ModelDocument(source); d.addPowerControl(2, 1500);
+    const model = parseRc(d.text);
+    expect(d.nodes()[2].attrs.power).toBe('ST_POWER_1');
+    expect(model.vals.at(-1)?.max).toBe(1500);
+    expect(model.keys.at(-2)).toEqual({key: 0, var: 'ST_POWER_1', step: 1500});
+    expect(model.script?.source).toBe(parseRc(source).script?.source);
+    d.undo(); expect(d.text).toBe(source);
+  });
+  it('creates missing sections and avoids variable names found in scripts', () => {
+    const d = new ModelDocument('Body { Core(){ E:Wheel() } } Lua { ST_POWER_1=1 }');
+    d.addPowerControl(1, 500); expect(d.nodes()[1].attrs.power).toBe('ST_POWER_2');
+    expect(parseRc(d.text).keys).toHaveLength(2);
+    d.power(1, 'ST_POWER_2'); d.power(1, -500); expect(d.nodes()[1].attrs.power).toBe('- 500');
+  });
+  it('does not use braces or fake sections in comments or Lua strings as insertion points', () => {
+    const text = '// Val { fake }\nBody { Core(){ E:Wheel() } }\nLua { local s="} Val {"; local x=[=[ } Key { ]=] --[[ } ]]\n }';
+    const d = new ModelDocument(text); d.addPowerControl(1, 700);
+    expect(parseRc(d.text).vals).toHaveLength(1);
+    expect(parseRc(d.text).script?.source).toBe(parseRc(text).script?.source);
+    expect(() => new ModelDocument('Body { Core()').nodes()).toThrow();
+  });
+});

@@ -52,7 +52,10 @@ the shareable URL, then **組む** to return to its construction pose.
 Edits patch only the affected source ranges. Other attributes, comments,
 Val/Key definitions and scripts are retained. Variable-driven angles remain
 read-only in the visual panel; edit their expressions in the source. Manual
-source edits reset visual undo history. Power, key bindings, colours and Lua
+source edits reset visual undo history. Wheel/Jet/Arm power can be fixed, linked to an existing Val, or assigned a new
+↑/↓ control from the 操作 menu. New controls use the current positive power
+magnitude (1000 when it is zero or an expression), return to zero on release,
+and never overwrite existing variables. Colours, other key mappings and Lua
 still use the text editor; mirroring and multi-selection are not implemented.
 The editor is independently implemented, without RCD/RCM source or assets.
 

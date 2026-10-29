@@ -47,6 +47,25 @@ try {
  await page.fill('#source', 'Body { Core(){ N:Chip(angle=');
  assert.equal(await page.locator('[data-edge="N"]').isDisabled(), true);
  await page.fill('#source', before); assert.equal(await page.locator('[data-edge="N"]').isEnabled(), true);
+ // Configure a new motor without writing Val/Key code, then exercise the real input loop.
+ await page.setViewportSize({ width: 1280, height: 800 });
+ await page.fill('#source', 'Body { Core(){ E:Jet(angle=0) } }');
+ await page.selectOption('#parts', '1');
+ await page.fill('#part-power', '1200'); await page.locator('#part-power').press('Tab');
+ await page.selectOption('#power-control', 'new');
+ assert.equal(await page.inputValue('#power-control'), 'ST_POWER_1');
+ await page.click('#run');
+ await page.waitForFunction(() => window.__sim?.model.vals.some(v => v.name === 'ST_POWER_1'));
+ await page.focus('#view'); await page.keyboard.down('ArrowUp');
+ await page.waitForFunction(() => window.__sim.env('ST_POWER_1') === 1200);
+ await page.keyboard.up('ArrowUp'); await page.waitForFunction(() => window.__sim.env('ST_POWER_1') === 0);
+ await page.keyboard.down('ArrowDown'); await page.waitForFunction(() => window.__sim.env('ST_POWER_1') === -1200); await page.keyboard.up('ArrowDown');
+ await page.click('#build'); await page.selectOption('#parts', '1');
+ await page.setViewportSize({width: 390, height: 844});
+ await page.screenshot({path: `${out}/editor-power-mobile.png`});
+ for (const selector of ['#part-power', '#power-control', '#add-type', '[data-edge="S"]']) {
+   assert.equal(await page.locator(selector).evaluate(el => { const b = el.getBoundingClientRect(), p = document.querySelector('#builder').getBoundingClientRect(); return b.top >= p.top && b.bottom <= p.bottom; }), true, `${selector} must fit with power controls`);
+ }
  assert.deepEqual(errors, []);
  console.log(JSON.stringify({ result: 'pass', count, checks: ['add', 'angle', 'undo-redo', '3D pick', 'save contents', 'run', 'history after run', 'URL reload', 'mobile overflow', 'invalid source recovery'], errors }));
 } finally { await browser.close(); }

@@ -67,3 +67,9 @@ button:disabled { opacity: .4; cursor: default !important; }
   .edges { grid-template-columns: repeat(4, auto); }
   .edges button:nth-child(n) { grid-row: auto; grid-column: auto; padding: 5px; }
 }
+
+#power-row[hidden] { display: none; }
+@media(max-width: 800px) {
+  .building { grid-template-rows: 40vh 60vh; }
+  #builder { max-height: 43vh; }
+}
