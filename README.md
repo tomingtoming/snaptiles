@@ -97,8 +97,13 @@ in CI with an OS-assigned port and uploads screenshots on failure.
 The separate Firefox creation-loop check is `bun run test:editor:firefox`
 (install its browser with `bun x playwright install firefox`). It covers GUI
 construction, driving, source Undo, named download, share/re-edit and file reopen.
-CI is configured to run it too. Narrow desktop windows do not establish physical
-mobile-device support; Safari/WebKit remains unverified.
+The same core-loop scenario runs in WebKit via `bun run test:editor:webkit`
+(install with `bun x playwright install webkit`). CI is configured for both.
+These automated engines and narrow desktop windows do not establish physical
+mobile-device or Safari-on-Apple-device support. Windows WebKit visual acceptance
+is still open: its captured 3D canvas is blank and native controls need contrast
+corrections, even though the workflow state assertions pass. Audio is optional: when its API
+is unavailable, the sound button is disabled and editing/driving remain usable.
 
 Optional external-model edit regression (models stay outside this repository):
 `bun run tools/editor-corpus.ts <model-directory>`. This checks parsing,

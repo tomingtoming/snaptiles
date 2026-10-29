@@ -3,6 +3,9 @@
 // with the Web Audio API and starts on the first user gesture (autoplay policy).
 
 export class Sfx {
+  private Audio = globalThis.AudioContext ?? (globalThis as typeof globalThis & {webkitAudioContext?: typeof AudioContext}).webkitAudioContext;
+  private failed = false;
+  get available(): boolean { return typeof this.Audio === 'function' && !this.failed; }
   private ctx: AudioContext | null = null;
   private master!: GainNode;
   private engineOsc!: OscillatorNode;
@@ -12,54 +15,66 @@ export class Sfx {
   private jetFilter!: BiquadFilterNode;
   private noise!: AudioBufferSourceNode;
   private armed = false;
-  muted = localStorage.getItem('snaptiles.muted') === '1';
+  muted = false;
+  constructor() {
+    try { this.muted = localStorage.getItem('snaptiles.muted') === '1'; } catch { /* optional preference storage */ }
+  }
 
   /** call from a pointerdown / keydown handler */
   unlock(): void {
+    if (!this.available) return;
     if (this.ctx) {
-      if (this.ctx.state === 'suspended') void this.ctx.resume();
+      if (this.ctx.state === 'suspended') {
+        try { void this.ctx.resume().catch(() => {}); } catch { /* retry on a later gesture */ }
+      }
       return;
     }
-    const ctx = new AudioContext();
-    this.ctx = ctx;
-    this.master = ctx.createGain();
-    this.master.gain.value = this.muted ? 0 : 0.5;
-    this.master.connect(ctx.destination);
+    let ctx: AudioContext | null = null;
+    try {
+      ctx = new this.Audio!();
+      this.ctx = ctx;
+      this.master = ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      this.master.connect(ctx.destination);
 
-    // engine: a sawtooth through a low-pass, pitch follows wheel speed
-    this.engineOsc = ctx.createOscillator();
-    this.engineOsc.type = 'sawtooth';
-    this.engineOsc.frequency.value = 40;
-    this.engineFilter = ctx.createBiquadFilter();
-    this.engineFilter.type = 'lowpass';
-    this.engineFilter.frequency.value = 400;
-    this.engineGain = ctx.createGain();
-    this.engineGain.gain.value = 0;
-    this.engineOsc.connect(this.engineFilter).connect(this.engineGain).connect(this.master);
-    this.engineOsc.start();
+      // engine: a sawtooth through a low-pass, pitch follows wheel speed
+      this.engineOsc = ctx.createOscillator();
+      this.engineOsc.type = 'sawtooth';
+      this.engineOsc.frequency.value = 40;
+      this.engineFilter = ctx.createBiquadFilter();
+      this.engineFilter.type = 'lowpass';
+      this.engineFilter.frequency.value = 400;
+      this.engineGain = ctx.createGain();
+      this.engineGain.gain.value = 0;
+      this.engineOsc.connect(this.engineFilter).connect(this.engineGain).connect(this.master);
+      this.engineOsc.start();
 
-    // jet: looped white noise through a band-pass
-    const seconds = 2;
-    const buf = ctx.createBuffer(1, ctx.sampleRate * seconds, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-    this.noise = ctx.createBufferSource();
-    this.noise.buffer = buf;
-    this.noise.loop = true;
-    this.jetFilter = ctx.createBiquadFilter();
-    this.jetFilter.type = 'bandpass';
-    this.jetFilter.frequency.value = 600;
-    this.jetFilter.Q.value = 0.7;
-    this.jetGain = ctx.createGain();
-    this.jetGain.gain.value = 0;
-    this.noise.connect(this.jetFilter).connect(this.jetGain).connect(this.master);
-    this.noise.start();
-    this.armed = true;
+      // jet: looped white noise through a band-pass
+      const seconds = 2;
+      const buf = ctx.createBuffer(1, ctx.sampleRate * seconds, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      this.noise = ctx.createBufferSource();
+      this.noise.buffer = buf;
+      this.noise.loop = true;
+      this.jetFilter = ctx.createBiquadFilter();
+      this.jetFilter.type = 'bandpass';
+      this.jetFilter.frequency.value = 600;
+      this.jetFilter.Q.value = 0.7;
+      this.jetGain = ctx.createGain();
+      this.jetGain.gain.value = 0;
+      this.noise.connect(this.jetFilter).connect(this.jetGain).connect(this.master);
+      this.noise.start();
+      this.armed = true;
+    } catch {
+      this.failed = true; this.armed = false; this.ctx = null;
+      try { void ctx?.close().catch(() => {}); } catch { /* already unavailable */ }
+    }
   }
 
   setMuted(m: boolean): void {
     this.muted = m;
-    localStorage.setItem('snaptiles.muted', m ? '1' : '0');
+    try { localStorage.setItem('snaptiles.muted', m ? '1' : '0'); } catch { /* keep this session's setting */ }
     if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : 0.5, this.ctx.currentTime, 0.05);
   }
 

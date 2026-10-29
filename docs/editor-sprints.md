@@ -811,3 +811,43 @@ engine, not checking that the canvas starts. Separate commands make the smaller
 portability scope explicit and repeatable. Next: test the same core loop with
 WebKit where available, while retaining the distinction from Safari on an
 actual Apple device.
+
+## 2026-10-30 — Make optional audio failures safe and exercise WebKit
+
+Goal: execute the same independent-editor creation loop in WebKit. The first
+Windows WebKit 27.2 run completed model operations but emitted page errors because
+AudioContext was absent. Audio now detects the standard or prefixed constructor,
+handles initialization failure, safely retries rejected resume requests on later
+gestures, and tolerates denied localStorage access. Unavailable audio disables
+the sound button with an explanatory accessible name; physics/editing remain
+independent of sound. Seven new audio tests bring the unit total to 105.
+
+Firefox and WebKit now share one portability scenario, with separate commands
+and CI steps. The scenario checks GUI construction, source Undo, driving/release,
+named exact-byte download, fresh-context sharing, narrow editing and file reopen.
+The WebKit development run traveled 4.027m without page errors. This is workflow
+state evidence, not proof of visible rendering or Safari on Apple hardware.
+
+Independent visual review rejected the WebKit image: the 3D canvas is blank,
+selected tree text is dark on dark, select values have poor contrast, and the
+right end of the toolbar is clipped. These findings remain open. A diagnostic
+control renders a red WebGL canvas successfully with preserveDrawingBuffer;
+the application returns a nonblank ground pixel immediately after rendering,
+72 draw calls, no context loss and GL error 0, but its screenshot remains blank.
+This narrows the next investigation toward buffer/compositing/capture behavior;
+it does not yet establish the cause or a product fix.
+
+Retrospective: exception-free interactions and changing simulation state can
+pass while the captured interface is unusable. Keep independent visual review
+as a separate acceptance check. Next sprint: distinguish the Windows WebKit
+render/capture path from application behavior, repair native-control contrast
+and toolbar bounds, then repeat visual review. Publication remains pending;
+no push or deployment was performed.
+
+Final validation: typecheck/build, all 20 Chromium probes and the Firefox/WebKit
+production workflow probes pass (audio available true/false respectively). The
+105 unit tests passed earlier in this sprint. Visual acceptance remains rejected
+as described above. Additional minimal controls capture animated red WebGL with
+both preserveDrawingBuffer false and true; removing overlays or forcing a CSS
+canvas layer does not restore the application screenshot. Neither buffer
+retention alone nor overlay presence alone explains the result.

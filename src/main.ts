@@ -20,10 +20,16 @@ const runBtn = $<HTMLButtonElement>('run');
 
 const keys = new KeyState(window);
 const sfx = new Sfx();
-window.addEventListener('pointerdown', () => sfx.unlock(), { capture: true });
-window.addEventListener('keydown', () => sfx.unlock(), { capture: true });
+window.addEventListener('pointerdown', () => { sfx.unlock(); paintMute(); }, { capture: true });
+window.addEventListener('keydown', () => { sfx.unlock(); paintMute(); }, { capture: true });
 const muteBtn = $<HTMLButtonElement>('mute');
-const paintMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; muteBtn.setAttribute('aria-pressed', String(sfx.muted)); muteBtn.title = sfx.muted ? '音を出す' : '消音'; };
+const paintMute = () => {
+  muteBtn.disabled = !sfx.available;
+  muteBtn.textContent = !sfx.available || sfx.muted ? '🔇' : '🔊';
+  muteBtn.setAttribute('aria-pressed', String(sfx.muted));
+  muteBtn.title = !sfx.available ? 'この環境では音声を利用できません' : sfx.muted ? '音を出す' : '消音';
+  muteBtn.setAttribute('aria-label', muteBtn.title);
+};
 muteBtn.addEventListener('click', () => { sfx.setMuted(!sfx.muted); paintMute(); });
 paintMute();
 (window as unknown as { __sfx: Sfx }).__sfx = sfx; // probe hook
