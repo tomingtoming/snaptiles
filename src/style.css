@@ -106,3 +106,10 @@ button:disabled { opacity: .4; cursor: default !important; }
 
 #filename-preview { overflow-wrap: anywhere; color: var(--dim); }
 #filename-dialog { max-height: calc(100dvh - 32px); overflow: auto; }
+
+#draft-recovery { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px; margin-bottom: 8px; border: 1px solid #59636e; border-radius: 6px; }
+#draft-recovery[hidden] { display: none; }
+#draft-description { flex: 1 1 170px; min-width: 0; font-size: 12px; }
+#draft-filename, #draft-saved { display: block; overflow-wrap: anywhere; }
+#draft-saved { color: var(--dim); }
+#builder #restore-draft { min-height: 44px; }

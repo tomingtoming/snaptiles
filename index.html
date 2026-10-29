@@ -21,7 +21,11 @@
         <button id="run" type="button" aria-label="実行" title="実行（ソース欄ではCtrl / ⌘ + Enter）">▶</button>
       </header>
       <section id="builder" hidden aria-label="モデル編集">
-        <div class="edit-row"><button id="new-model">新規</button><button id="frame-model">全体</button><button id="focus-part">選択へ</button><button id="restore-draft" hidden>下書きを復元</button><button id="save-model">保存</button><button id="share-model">共有リンク</button><button id="copy-branch">コピー</button><button id="rename-model" type="button">保存名</button><button id="edit-undo" aria-label="取り消し">↶</button><button id="edit-redo" aria-label="やり直し">↷</button></div>
+        <div id="draft-recovery" hidden>
+          <div id="draft-description"><strong id="draft-filename"></strong><span id="draft-saved"></span></div>
+          <button id="restore-draft" type="button" aria-describedby="draft-description">下書きを復元</button>
+        </div>
+        <div class="edit-row"><button id="new-model">新規</button><button id="frame-model">全体</button><button id="focus-part">選択へ</button><button id="save-model">保存</button><button id="share-model">共有リンク</button><button id="copy-branch">コピー</button><button id="rename-model" type="button">保存名</button><button id="edit-undo" aria-label="取り消し">↶</button><button id="edit-redo" aria-label="やり直し">↷</button></div>
         <label>部品<select id="parts" size="5"></select></label>
         <div class="edit-row"><label>種類<select id="part-type"></select></label><label><span id="angle-label">角度</span><input id="part-angle" type="text" inputmode="decimal" /></label><label id="option-field" hidden><span id="option-label">設定</span><select id="part-option"></select></label><button id="part-delete">削除</button></div>
         <div id="angle-control-row" class="edit-row" hidden><label>角度の操作<select id="angle-control"></select></label></div>
@@ -64,7 +68,7 @@
         <li>画面の部品か一覧を選び、種類・角度を調整。<strong>N / W / E / S ＋</strong>で選んだ部品の辺に追加します。画面の黄色いN/W/E/Sと丸印が、その部品の接続方向と接続点です。「全体」「選択へ」で見やすい距離へ移動できます。</li>
         <li>WheelやJetの<strong>操作</strong>から↑ / ↓を追加。RudderやTrimの<strong>角度の操作</strong>から← / →を追加できます。車輪が互いに逆向きに回る場合は、片側の操作を「（逆）」へ切り替えます。</li>
         <li><strong>▶ 実行</strong>で試運転。表示されたキーで操縦し、<strong>組む</strong>で編集へ戻ります。</li>
-        <li><strong>保存名</strong>で名前を付け、<strong>保存</strong>でファイルへ、<strong>開く</strong>で読込。<strong>共有リンク</strong>は今の編集内容を渡せます。下書きはこのブラウザに保存されます。</li>
+        <li><strong>保存名</strong>で名前を付け、<strong>保存</strong>でファイルへ、<strong>開く</strong>で読込。<strong>共有リンク</strong>は今の編集内容を渡せます。下書きはこのブラウザに最新の1件が保存され、復元後はUndoで戻せます。</li>
       </ol>
       <p><strong>枝のコピー：</strong>部品を選んで「コピー」、接続先の部品を選び、N / W / E / S ＋で貼り付けます。</p>
       <p><strong>画面操作：</strong>ドラッグで回転、ホイールで拡大縮小。タッチでは1本指で回転、2本指で拡大縮小。視点ボタンで追従・周回・上空・車載を切り替えます。</p>

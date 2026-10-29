@@ -1,5 +1,5 @@
 import { exprIsConstant } from '../rc/expr';
-import { DraftStore } from './draft';
+import { DraftStore, type Draft } from './draft';
 import { OPTION_SETTINGS, ModelDocument, type CopiedBranch } from './document';
 import { parseRc } from '../rc/parser';
 import { assemble, type Assembly } from '../model/assemble';
@@ -12,6 +12,7 @@ export class BuildPanel {
   private sourceComposing = false;
   private sourceEditGroup: { type: string; time: number; end: number } | null = null;
   private drafts = new DraftStore({ getItem: key => localStorage.getItem(key), setItem: (key, value) => localStorage.setItem(key, value) });
+  private recoveryDraft: Draft | null = null;
   private restoreButton = document.getElementById('restore-draft') as HTMLButtonElement;
   document: ModelDocument;
   get selected(): number {
@@ -47,7 +48,10 @@ export class BuildPanel {
     this.document = new ModelDocument(source.value);
     this.type.add(new Option('Core', 'Core'));
     for (const type of TYPES) { this.type.add(new Option(type, type)); this.addType.add(new Option(type, type)); }
-    this.restoreButton.onclick = () => { const draft = this.drafts.read(); if (draft) this.edit(() => { this.document.restore(draft.text, draft.filename); this.selected = 0; }, true); };
+    this.restoreButton.onclick = () => { const draft = this.recoveryDraft; if (draft) this.edit(() => { this.document.restore(draft.text, draft.filename); this.selected = 0; }, true); };
+    window.addEventListener('storage', event => {
+      if (this.active && (event.key === null || event.key === 'snaptiles.editor.draft.v1')) this.paintDraft();
+    });
     document.getElementById('focus-part')!.onclick = () => { if (this.assembly) this.scene.focusTile(this.selected); };
     window.addEventListener('keydown', event => {
       const target = event.target as HTMLElement | null;
@@ -177,7 +181,15 @@ export class BuildPanel {
   }
   private paintDraft(): void {
     const draft = this.drafts.read();
-    this.restoreButton.hidden = !draft || (draft.text === this.source.value && draft.filename === this.document.filename);
+    const same = draft?.text === this.source.value && draft?.filename === this.document.filename;
+    this.recoveryDraft = draft && !same ? draft : null;
+    document.getElementById('draft-recovery')!.hidden = !this.recoveryDraft;
+    if (!this.recoveryDraft) return;
+    document.getElementById('draft-filename')!.textContent = draft!.filename || '名前未設定のモデル';
+    const saved = new Date(draft!.savedAt);
+    document.getElementById('draft-saved')!.textContent = Number.isFinite(saved.getTime())
+      ? `保存: ${saved.toLocaleString('ja-JP', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'})}`
+      : '保存時刻不明';
   }
   private saveDraft(): void {
     if (!this.drafts.save(this.source.value, this.document.filename)) this.status.textContent ||= '下書きを保存できません。保存ボタンでファイルに残してください。';

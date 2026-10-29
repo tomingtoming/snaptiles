@@ -709,3 +709,31 @@ model format or adding a library. Names and source-only links have different
 lifetimes, so the UI must state that distinction. Next: check whether the saved
 variant remains understandable when imported beside an existing unsaved draft,
 and whether recovery offers enough context to choose the intended document.
+
+
+## 2026-10-30 — Identify the draft before restoring it
+
+Goal: distinguish a recoverable draft from the currently open imported/shared
+model before taking the existing one-click restore action. A compact recovery
+card now groups the saved filename, local date/time and restore button. Unnamed
+models and invalid timestamps have explicit fallback labels. The card disappears
+when its source and filename match the current document.
+
+The restore action uses the displayed draft snapshot rather than reading a
+possibly different value at click time. Other tabs' storage events refresh the
+candidate while the builder is open. This remains the existing single latest
+browser draft, not a multi-document library or a conflict-resolution system.
+The guide now states the one-draft scope and that Undo reverses restoration.
+
+Validation: 97 unit tests, typecheck/build and all 20 browser probes pass.
+Browser coverage checks named/time display in Asia/Tokyo, source and filename
+restoration, Undo, an intervening same-document storage change, cross-tab updates,
+unnamed drafts, invalid timestamps and incomplete-source recovery. Independent
+visual review passes 390px and 320px captures: name, timestamp and button form
+one readable group without overlap or horizontal clipping.
+
+Retrospective: recovery needs enough context to identify its target, and the
+executed target must agree with what the user saw. Existing saved metadata was
+enough; no new persistence schema or confirmation step was needed. Next: audit
+remaining gaps against the full build/control/test/save/share workflow and the
+independent-implementation scope before adding more local UI features.
