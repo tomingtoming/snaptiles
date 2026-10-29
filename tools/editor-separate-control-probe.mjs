@@ -1,0 +1,14 @@
+import {chromium} from 'playwright';import assert from 'node:assert/strict';
+const b=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});try{
+ const p=await b.newPage();await p.goto(process.argv[2]??'http://127.0.0.1:5175/');await p.waitForFunction(()=>window.__sim);
+ const source='Val {ST_STEER_1(default=0,min=-30,max=30,step=30) ST_THROTTLE_1(default=0,min=0,max=1000,step=0)} Key {7:ST_STEER_1(step=-30) 9:ST_STEER_1(step=30) 4:ST_THROTTLE_1(step=10) 5:ST_THROTTLE_1(step=-10)} Body {Core(){E:Trim(angle=ST_STEER_1) W:Trim(angle=-ST_STEER_1) N:Jet(power=ST_THROTTLE_1) S:Jet(power=-ST_THROTTLE_1)}}';
+ await p.fill('#source',source);await p.click('#build');await p.selectOption('#parts','2');await p.selectOption('#angle-control','separate');assert.equal(await p.inputValue('#angle-control'),'-ST_STEER_2');assert.equal(await p.inputValue('#part-angle'),'30');
+ const split=await p.inputValue('#source');await p.click('#edit-undo');assert.equal(await p.inputValue('#source'),source);await p.click('#edit-redo');assert.equal(await p.inputValue('#source'),split);
+ await p.fill('#part-angle','15');await p.locator('#part-angle').press('Tab');await p.selectOption('#parts','1');assert.equal(await p.inputValue('#part-angle'),'30');
+ await p.selectOption('#parts','4');await p.selectOption('#power-control','separate');assert.equal(await p.inputValue('#power-control'),'-ST_THROTTLE_2');await p.fill('#part-power','500');await p.locator('#part-power').press('Tab');await p.selectOption('#parts','3');assert.equal(await p.inputValue('#part-power'),'1000');
+ const final=await p.inputValue('#source');await p.click('#run');await p.waitForFunction(()=>window.__sim?.model.vals.length===4);
+ await p.focus('#view');await p.keyboard.down('a');await p.waitForFunction(()=>window.__sim.env('ST_STEER_1')===-30&&window.__sim.env('ST_STEER_2')===-15);await p.keyboard.up('a');await p.waitForFunction(()=>window.__sim.env('ST_STEER_2')===0);
+ await p.keyboard.down('z');await p.waitForFunction(()=>window.__sim.env('ST_THROTTLE_1')===1000&&window.__sim.env('ST_THROTTLE_2')===500);await p.keyboard.up('z');await p.waitForTimeout(150);assert.equal(await p.evaluate(()=>window.__sim.env('ST_THROTTLE_2')),500);
+ await p.click('#build');const e=p.waitForEvent('download');await p.click('#save-model');let bytes='';for await(const c of await(await e).createReadStream())bytes+=c;assert.equal(bytes,final);
+ console.log('Separate controls: reversed angle/held power retain keys and sign, independent strength, Undo/Redo, live return/hold and exact export pass');
+}finally{await b.close()}

@@ -215,3 +215,9 @@ Unknown top-level sections are preserved but produce a non-blocking warning with
 name and line number, since their contents are not executed. Attribute presence
 alone is not treated as unsupported: scripts can read attributes through _GET.
 Warnings coexist with script errors and draft-storage failures.
+
+For recognised generated angle/power controls, choose 「この部品用に分ける」
+to copy the control for that field. Its key pair, reversed binding, magnitude and
+return/hold behavior are preserved, while later strength edits are independent.
+The original definition remains for other parts/scripts; separation retains the
+same physical keys. Custom definitions remain source-edited.

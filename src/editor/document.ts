@@ -164,6 +164,16 @@ export class ModelDocument {
     for (const [start, end, value] of edits.sort((a,b) => b[0] - a[0])) next = next.slice(0,start) + value + next.slice(end);
     this.replace(0, this.text.length, next);
   }
+  separateControl(index: number, attribute: 'angle' | 'power'): void {
+    const expression = (this.nodes()[index].attrs[attribute] ?? '').replace(/\s/g, '').toUpperCase();
+    const magnitude = this.controlStrength(expression);
+    if (magnitude === null) throw new Error('変更済みの操作はソースで編集してください');
+    const name = expression.replace(/^-/, ''), keys = parseRc(this.text).keys.filter(k => k.var.toUpperCase() === name);
+    const pair = (Object.keys(CONTROL_KEYS) as ControlKeys[]).find(p => CONTROL_KEYS[p].keys.every(n => keys.some(k => k.key === n)))!;
+    this.addControl(index, attribute, magnitude, pair, name.startsWith('ST_THROTTLE'), {
+      prefix: name.replace(/_\d+$/, ''), delta: keys.find(k => k.key === CONTROL_KEYS[pair].keys[0])!.step, reverse: expression.startsWith('-'),
+    });
+  }
   addPowerControl(index: number, magnitude: number, pair: ControlKeys = 'vertical'): void { this.addControl(index, 'power', magnitude, pair); }
   addThrottleControl(index: number, magnitude: number, pair: ControlKeys = 'zx'): void { this.addControl(index, 'power', magnitude, pair, true); }
   addSteeringControl(index: number, magnitude = 30, pair: ControlKeys = 'horizontal'): void { this.addControl(index, 'angle', magnitude, pair); }
@@ -203,18 +213,18 @@ export class ModelDocument {
     this.undoStack.push(this.snapshot()); this.redoStack = []; this.filename = next;
   }
   newModel(): void { this.restore('Body {\n  Core() {\n  }\n}\n'); }
-  private addControl(index: number, attribute: 'power' | 'angle', magnitude: number, pair: ControlKeys, held = false): void {
+  private addControl(index: number, attribute: 'power' | 'angle', magnitude: number, pair: ControlKeys, held = false, template?: {prefix: string; delta: number; reverse: boolean}): void {
     const binding = CONTROL_KEYS[pair];
     if (!binding) throw new Error('操作に使うキーを選んでください');
     const keys = binding.keys;
     if (!Number.isFinite(magnitude) || magnitude <= 0) throw new Error('出力の大きさは正の数で指定してください');
     const names = new Set(this.text.toUpperCase().match(/[A-Z_][A-Z0-9_]*/g));
-    const prefixName = held ? 'ST_THROTTLE' : attribute === 'power' ? 'ST_POWER' : 'ST_STEER';
+    const prefixName = template?.prefix ?? (held ? 'ST_THROTTLE' : attribute === 'power' ? 'ST_POWER' : 'ST_STEER');
     let suffix = 1; while (names.has(`${prefixName}_${suffix}`)) suffix++;
     const name = `${prefixName}_${suffix}`;
-    const edits: [number, number, string][] = [this.attributeEdit(index, attribute, name)];
+    const edits: [number, number, string][] = [this.attributeEdit(index, attribute, (template?.reverse ? '-' : '') + name)];
     const blocks = findBlocks(this.text);
-    const delta = held ? magnitude / 100 : attribute === 'angle' ? -magnitude : magnitude;
+    const delta = template?.delta ?? (held ? magnitude / 100 : attribute === 'angle' ? -magnitude : magnitude);
     let prefix = '';
     for (const [section, content] of [
       ['Val', `  ${name}(default=0, min=${held ? 0 : -magnitude}, max=${magnitude}, step=${held ? 0 : magnitude})`],

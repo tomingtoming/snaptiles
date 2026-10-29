@@ -83,13 +83,15 @@ export class BuildPanel {
     });
     this.powerControl.onchange = () => this.edit(() => {
       const value = this.powerControl.value;
-      if (value.startsWith('hold:')) this.document.addThrottleControl(this.selected, Math.abs(Number(this.power.value)) || 1000, value.slice(5) as ControlKeys);
+      if (value === 'separate') this.document.separateControl(this.selected, 'power');
+      else if (value.startsWith('hold:')) this.document.addThrottleControl(this.selected, Math.abs(Number(this.power.value)) || 1000, value.slice(5) as ControlKeys);
       else if (value === 'new' || value.startsWith('new:')) this.document.addPowerControl(this.selected, Math.abs(Number(this.power.value)) || 1000, value === 'new' ? 'vertical' : value.slice(4) as ControlKeys);
       else this.document.power(this.selected, value === 'constant' ? 0 : value);
     });
     this.angleControl.onchange = () => this.edit(() => {
       const value = this.angleControl.value;
-      if (value === 'new' || value.startsWith('new:')) this.document.addSteeringControl(this.selected, 30, value === 'new' ? 'horizontal' : value.slice(4) as ControlKeys);
+      if (value === 'separate') this.document.separateControl(this.selected, 'angle');
+      else if (value === 'new' || value.startsWith('new:')) this.document.addSteeringControl(this.selected, 30, value === 'new' ? 'horizontal' : value.slice(4) as ControlKeys);
       else if (value === 'constant') this.document.fixedAngle(this.selected);
       else this.document.bindAngle(this.selected, value);
     });
@@ -297,6 +299,7 @@ export class BuildPanel {
     const fixedAngle = Number.isFinite(Number(angleExpression));
     if (!fixedAngle && ![...this.angleControl.options].some(o => o.value === angleExpression)) this.angleControl.add(new Option(angle, angleExpression));
     for (const [key,pair] of Object.entries(CONTROL_KEYS)) this.angleControl.add(new Option(`${pair.label} を追加`, key === 'horizontal' ? 'new' : `new:${key}`));
+    if (angleStrength !== null) this.angleControl.add(new Option('この部品用に分ける', 'separate'));
     this.angleControl.value = fixedAngle ? 'constant' : angleExpression;
     this.powerRow.hidden = !['wheel', 'rlw', 'jet', 'arm'].includes(tile.type);
     const power = (tile.node.attrs.power ?? '0').replace(/\s/g, '');
@@ -314,6 +317,7 @@ export class BuildPanel {
     if (!constant && ![...this.powerControl.options].some(o => o.value === power.toUpperCase())) this.powerControl.add(new Option(power, power.toUpperCase()));
     for (const [key,pair] of Object.entries(CONTROL_KEYS)) this.powerControl.add(new Option(`${pair.label} を追加`, key === 'vertical' ? 'new' : `new:${key}`));
     for (const [key,pair] of Object.entries(CONTROL_KEYS)) this.powerControl.add(new Option(`${pair.label} を追加（保持）`, `hold:${key}`));
+    if (powerStrength !== null) this.powerControl.add(new Option('この部品用に分ける', 'separate'));
     this.powerControl.value = constant ? 'constant' : power.toUpperCase();
     this.sourceHelp.replaceChildren();
     const sourceFields: [string, string, boolean][] = [

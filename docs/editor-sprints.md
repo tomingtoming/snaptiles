@@ -1451,3 +1451,39 @@ Independent image review confirms both Metadata warning and Lua failure are
 readable within the 390px footer without overlapping controls. The unwrapped
 source is horizontally scrolled in this capture; full source-line visibility is
 not claimed by the diagnostic review.
+
+
+## 2026-10-30 — Separate one field from a shared generated control (Sprint 50)
+
+Goal: adjust one part's strength without manually rebuilding its shared control.
+Adding a new control could achieve independence but required reselecting keys,
+reversal and hold mode. Recognised generated controls now offer
+「この部品用に分ける」in the angle/power selector. It creates a fresh definition,
+changes only the selected field's binding, preserves key pair, initial strength,
+sign and return/hold semantics, and creates one Undo step. Original definitions
+remain because other parts or scripts may use them. It keeps the same physical
+keys; it does not assign independent keys or rewrite script references.
+
+The shared insertion routine accepts a validated template for this operation.
+This preserves even cross-bindings (e.g. a generated power variable bound to
+angle), rather than assuming control kind from the target field. Arbitrary or
+modified controls still require source editing.
+
+Validation: 155 tests in 20 files and production build pass. New cases cover
+steering/momentary power/held power bound to either field, positive/reversed
+bindings, exact definition/key copying, original strength preservation, one-step
+history and refusal of custom expressions. A production-browser flow separates
+reversed angle and held-power bindings, edits strengths, exercises Undo/Redo,
+runs real A and Z input, verifies independent 30/15 angle magnitudes and 1000/500
+held values, and exports exact source. The default suite now has 31 scenarios.
+
+Retrospective: creating a new control and separating an existing one have
+different preservation requirements. The latter must inherit current semantics,
+including reversal and held behavior, rather than reset to UI defaults. Existing
+references prevent automatic cleanup of old definitions. Next: verify control
+configuration discoverability and keyboard operation in the complete builder,
+including how users learn that strength is shared before choosing separation.
+No push or deployment.
+
+Existing independent-control-key and held-throttle browser probes also pass.
+Full default suite and non-Chromium runs were not repeated this sprint.
