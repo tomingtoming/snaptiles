@@ -243,7 +243,7 @@ Not measured: F/G with detached chips, the CCD inset's own pose, what decides A'
 mouse input works in other views, and the vertical lag of A (height over bumps varied 1.2–3.4 m). SnapTiles currently uses its own camera (chase/orbit/top/onboard on
 1–4 and a button, mouse drag/wheel/pinch); none of the above is implemented yet.
 
-## 2026-10-31: kerb strike below the tyre radius (not yet fixed)
+## 2026-10-31: kerb strike below the tyre radius
 
 Probe: `tools/orig-harness/rc_step.sh` swaps `Resources/Land.x` for a generated land
 (`make_step_land.py`: 4 m ground cells at y = 50, a box h m tall over x −10…10, z 6…36) and drives the
@@ -261,3 +261,20 @@ Land notes: the 4th material row (Emissive) is the original's rolling/static/dyn
 The original's wheel rolls up a kerb lower than its radius with a moderate speed loss. SnapTiles' tyre (a
 frictionless load sphere plus ray grip) takes the edge as a stiff collision: an upward/backward kick
 instead of a climb. Raw logs: `D:\snaptiles-models\quarantine\original\runs\step\`.
+
+Fixed the same day (`kerbSprings()` in `world.ts`, `TYRE_SOFT_KERB`): a tyre whose ground contact is an edge
+(normal more than 30° from vertical), or that has sunk more than 3 cm climbing one, gets a spring-damper along
+the edge normal instead of the rigid contact (a contact-pair hook switches that pair off; rapier only runs hooks
+when an event queue is passed). Stiffness sags the wheel's static load 2 cm, damping 0.3 of critical, chosen by
+sweeping against the three runs. The spring counts toward the tyre's load. Result (original → SnapTiles):
+
+| step | speed loss | max pitch | all wheels past the edge |
+|---|---|---|---|
+| 0.10 m | 17% → 18% | 0.12 → 0.13 rad | 0.7 → 0.5 s |
+| 0.20 m | 60% → 56% | 0.40 → 0.34 rad | 0.8 → 0.7 s |
+| 0.25 m | 79% → 84% | 0.53 → 0.49 rad | 1.1 → 1.0 s |
+
+Flat ground never triggers it: eight steady-turn references and three straight runs replay byte-identical
+with the kerb spring on and off. `tests/kerb.test.ts` keeps the three runs within 15 points of the original's
+speed loss. Two dead ends worth remembering: forces added inside a rapier query callback are silently lost
+(apply them after the query), and finer substeps alone fixed only the 0.10 m kerb.
