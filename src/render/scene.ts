@@ -2,8 +2,11 @@ import * as THREE from 'three';
 import { TILE, TILE_T, type TileInstance, type ValEnv } from '../model/assemble';
 import { evalExpr, exprIsConstant } from '../rc/expr';
 import { wheelRadius, type PhysicsWorld } from '../physics/world';
-const SPIN_AXIS = new THREE.Vector3(0, 1, 0);
 import { COURSE, CRATES } from '../model/course';
+const SPIN_AXIS = new THREE.Vector3(0, 1, 0);
+const UP_AXIS = new THREE.Vector3(0, 1, 0);
+/** the original's built-in views: F8–F12 select A–E, Ctrl+F8–F12 select F–J */
+export type ViewId = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J';
 
 const PALETTE: Record<string, number> = {
   core: 0xffb000,
@@ -140,18 +143,56 @@ export class SceneView {
   camPitch = 0.35;
   camDist = 12;
   private zoomLimit = 60;
+  /** wheel / pinch: the editor's orbit distance, or the leash length of views A and F (a SnapTiles extra) */
   zoomBy(factor: number, editing = false): void {
-    this.camDist = Math.max(editing ? 0.5 : 3, Math.min(this.zoomLimit, this.camDist * factor));
+    if (editing || this.viewMode === 'orbit') this.camDist = Math.max(editing ? 0.5 : 3, Math.min(this.zoomLimit, this.camDist * factor));
+    else if (this.viewMode === 'A' || this.viewMode === 'F') this.leashDist = Math.max(2, Math.min(200, this.leashDist * factor));
   }
-  /** chase: orbit eased behind the model; orbit: free; top: straight down; onboard: from the core, FOV via _ZOOM */
-  viewMode: 'chase' | 'orbit' | 'top' | 'onboard' = 'chase';
+  /** runtime views A–J as measured on the original (docs/measured.md, camera); 'orbit' is the editor's camera */
+  viewMode: ViewId | 'orbit' = 'A';
   private baseFov = 50;
+  /** the original's I/O zoom, one value for every runtime view: 45° default, ×0.8 / ×1.25, 9.44–87.89° */
+  viewFov = 45;
+  /** the model's _ZOOM (the original's CCD camera); view H uses it */
   onboardFov = 17.19;
-  setView(mode: 'chase' | 'orbit' | 'top' | 'onboard'): void {
+  setView(mode: ViewId | 'orbit'): void {
     this.viewMode = mode;
     this.camera.up.set(0, 1, 0);
-    if (mode !== 'onboard') { this.camera.fov = this.baseFov; this.camera.updateProjectionMatrix(); }
+    // B/G start where the camera is; H freezes the current eye and direction
+    if (mode === 'B' || mode === 'G') { this.spectatorEye.copy(this.camera.position); this.spectatorTime = 0; }
+    if (mode === 'H') { this.fixedEye.copy(this.camera.position); this.camera.getWorldDirection(this.fixedDir); }
+    if (mode === 'J') this.orbitAngle = Math.atan2(this.camera.position.x - this.camTarget.x, this.camera.position.z - this.camTarget.z);
+    this.applyFov();
   }
+  /** I (−1) / O (+1): steps that would leave 9.44–87.89° are refused, as on the original */
+  zoomStep(dir: -1 | 1): void {
+    const next = this.viewFov * (dir < 0 ? 0.8 : 1.25);
+    if (next >= 9.4 && next <= 88) this.viewFov = next;
+    this.applyFov();
+  }
+  private applyFov(): void {
+    const fov = this.viewMode === 'orbit' ? this.baseFov : this.viewMode === 'H' ? this.onboardFov : this.viewFov;
+    if (this.camera.fov !== fov) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
+  }
+  /** mouse drag: the editor orbit, or (SnapTiles extra) swing the leash of views A and F */
+  orbitBy(dx: number, dy: number): void {
+    if (this.viewMode === 'A' || this.viewMode === 'F') {
+      this.leashEye.sub(this.camTarget).applyAxisAngle(UP_AXIS, -dx * 0.006).add(this.camTarget);
+      this.leashPitch = Math.max(0.05, Math.min(1.4, this.leashPitch + dy * 0.006));
+    } else {
+      this.camYaw -= dx * 0.006;
+      this.camPitch = Math.max(0.05, Math.min(1.4, this.camPitch + dy * 0.006));
+    }
+  }
+  // view A/F leash: 8.0 m from the model centre, 2.0 m above it (a 14.5° pitch)
+  private leashEye = new THREE.Vector3();
+  private leashDist = 8.0;
+  private leashPitch = Math.asin(2.0 / 8.0);
+  private spectatorEye = new THREE.Vector3();
+  private spectatorTime = 0;
+  private fixedEye = new THREE.Vector3();
+  private fixedDir = new THREE.Vector3(0, 0, -1);
+  private orbitAngle = 0;
   private camTarget = new THREE.Vector3();
   private sun: THREE.DirectionalLight;
   private tmpPose = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
@@ -480,11 +521,61 @@ export class SceneView {
     this.lines.visible = n > 0;
   }
 
-  /** chase: ease the orbit yaw toward the model's heading (set by main when not dragging) */
-  chaseYaw(headingYaw: number, rate = 0.03): void {
-    let d = headingYaw - this.camYaw;
-    d = Math.atan2(Math.sin(d), Math.cos(d));
-    this.camYaw += d * rate;
+  /** place view A's leash where the original starts it (after load / reset): 7.75 m out at world bearing
+   *  −111.5° in the original's frame (x mirrored here), 2.0 m up */
+  snapModel(center: THREE.Vector3): void {
+    this.camTarget.copy(center);
+    const horiz = this.leashDist * Math.cos(this.leashPitch);
+    this.leashEye.copy(center).add(new THREE.Vector3(0.930 * horiz, this.leashDist * Math.sin(this.leashPitch), -0.367 * horiz));
+    this.spectatorEye.copy(this.leashEye); this.spectatorTime = 0;
+    if (this.viewMode === 'A' || this.viewMode === 'F') { this.camera.position.copy(this.leashEye); this.camera.lookAt(center); }
+  }
+
+  /** runtime camera, once per rendered frame. Laws from the original (docs/measured.md, camera):
+   *  A/F a leash that ignores heading and closes 31% of the gap per 1/30 s frame; B/G a spectator re-placed
+   *  25 m ahead along the velocity every 5 s or beyond 76 m; C/D/I fixed to the core; E 29.9 m overhead;
+   *  H frozen; J an orbit at 90°/s. F and G only differ from A and B with detached chips (not modelled). */
+  followModel(s: { center: THREE.Vector3; core: THREE.Vector3; quat: THREE.Quaternion; velocity: THREE.Vector3 }, dt: number): void {
+    const center = s.center;
+    this.camTarget.copy(center);
+    const k = 1 - Math.pow(1 - 0.31, dt * 30);
+    const flat = this.leashEye.clone().sub(center).setY(0);
+    if (flat.lengthSq() < 1e-8) flat.set(0.930, 0, -0.367);
+    const desired = center.clone().addScaledVector(flat.normalize(), this.leashDist * Math.cos(this.leashPitch));
+    desired.y += this.leashDist * Math.sin(this.leashPitch);
+    this.leashEye.lerp(desired, k);
+    const cam = this.camera;
+    cam.up.set(0, 1, 0);
+    const fixed = (eye: [number, number, number], look: [number, number, number]) => {
+      cam.position.set(...eye).applyQuaternion(s.quat).add(s.core);
+      cam.lookAt(new THREE.Vector3(...look).applyQuaternion(s.quat).add(s.core));
+    };
+    switch (this.viewMode) {
+      case 'A': case 'F': cam.position.copy(this.leashEye); cam.lookAt(center); break;
+      case 'B': case 'G': {
+        this.spectatorTime += dt;
+        if (this.spectatorTime >= 5 || this.spectatorEye.distanceTo(center) > 76) {
+          if (s.velocity.lengthSq() > 0.25) this.spectatorEye.copy(center).addScaledVector(s.velocity.clone().normalize(), 25);
+          this.spectatorTime = 0;
+        }
+        cam.position.copy(this.spectatorEye); cam.lookAt(center); break;
+      }
+      // core-relative offsets measured in the original's model frame (its x mirrored)
+      case 'C': fixed([0.4, 0.8, 2.3], [0.6, 0.8, -5.6]); break;
+      case 'D': fixed([0.16, 0.0, 7.4], [0.3, -0.15, -1.2]); break;
+      case 'I': fixed([0.8, 0.0, 0.8], [0.42, -0.15, -1.7]); break;
+      case 'E': cam.position.copy(center).add(new THREE.Vector3(0, 29.9, 0.001)); cam.up.set(0, 0, -1); cam.lookAt(center); break;
+      case 'H': cam.position.copy(this.fixedEye); cam.lookAt(this.fixedEye.clone().add(this.fixedDir)); break;
+      case 'J': {
+        this.orbitAngle += dt * Math.PI / 2;
+        cam.position.copy(center).add(new THREE.Vector3(Math.sin(this.orbitAngle) * 4.5, 0.75 + 2.45 * Math.sin(this.orbitAngle), Math.cos(this.orbitAngle) * 4.5));
+        cam.lookAt(center); break;
+      }
+    }
+    this.applyFov();
+    this.sun.target.position.copy(center);
+    this.sun.position.copy(center).add(new THREE.Vector3(20, 40, 10));
+    this.sun.target.updateMatrixWorld();
   }
 
   /** jump the chase camera onto the model (after load / reset) instead of easing from afar */
@@ -497,31 +588,17 @@ export class SceneView {
     this.camera.lookAt(target);
   }
 
-  follow(target: THREE.Vector3, smooth = 0.08, coreQuat?: THREE.Quaternion): void {
+  /** the editor's free orbit */
+  follow(target: THREE.Vector3, smooth = 0.08): void {
     this.camTarget.lerp(target, smooth);
-    if (this.viewMode === 'onboard' && coreQuat) {
-      // the CCD camera: sits just above the core and looks along the model's N edge
-      const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(coreQuat);
-      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(coreQuat);
-      this.camera.position.copy(target).addScaledVector(up, 0.25).addScaledVector(fwd, 0.2);
-      this.camera.up.copy(up);
-      this.camera.lookAt(target.clone().addScaledVector(up, 0.25).addScaledVector(fwd, 10));
-      if (this.camera.fov !== this.onboardFov) { this.camera.fov = this.onboardFov; this.camera.updateProjectionMatrix(); }
-    } else if (this.viewMode === 'top') {
-      const eye = this.camTarget.clone().add(new THREE.Vector3(0, this.camDist * 1.6, 0.001));
-      this.camera.position.lerp(eye, 0.15);
-      this.camera.up.set(0, 0, -1);
-      this.camera.lookAt(this.camTarget);
-    } else {
-      const cp = this.camPitch;
-      const cy = this.camYaw;
-      const off = new THREE.Vector3(Math.cos(cp) * Math.sin(cy), Math.sin(cp), Math.cos(cp) * Math.cos(cy)).multiplyScalar(this.camDist);
-      const eye = this.camTarget.clone().add(off);
-      eye.y = Math.max(eye.y, 0.4);
-      this.camera.position.lerp(eye, 0.15);
-      this.camera.up.set(0, 1, 0);
-      this.camera.lookAt(this.camTarget);
-    }
+    const cp = this.camPitch;
+    const cy = this.camYaw;
+    const off = new THREE.Vector3(Math.cos(cp) * Math.sin(cy), Math.sin(cp), Math.cos(cp) * Math.cos(cy)).multiplyScalar(this.camDist);
+    const eye = this.camTarget.clone().add(off);
+    eye.y = Math.max(eye.y, 0.4);
+    this.camera.position.lerp(eye, 0.15);
+    this.camera.up.set(0, 1, 0);
+    this.camera.lookAt(this.camTarget);
     this.sun.target.position.copy(this.camTarget);
     this.sun.position.copy(this.camTarget).add(new THREE.Vector3(20, 40, 10));
     this.sun.target.updateMatrixWorld();

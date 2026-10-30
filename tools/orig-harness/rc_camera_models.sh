@@ -20,3 +20,8 @@ end
 }
 M2
 grep -c HANDLE=0 "$M/cam_straight.txt"; grep -o "Engine(default=[0-9]*" "$M/cam_fast.txt"
+# size dependence of view A: the parked car with a 10-chip N boom (about 6 m longer), and a lone core
+# (keeps the Basic Val/Key blocks; a model without Key{} crashed the exe).
+sed 's/Body { Core(){ N:Chip(){/Body { Core(){ W:Chip(){ W:Chip(){ W:Chip(){ W:Chip(){ W:Chip(){ W:Chip(){ W:Chip(){ W:Chip(){ W:Chip(){ W:Chip(){ } } } } } } } } } } N:Chip(){/' "$M/cam_parked.txt" > "$M/cam_big.txt"
+sed -n '1,/^Body/p' "$M/cam_parked.txt" | sed '$d' > "$M/cam_core.txt"; echo 'Body { Core(){ } }' >> "$M/cam_core.txt"
+grep -c "W:Chip(){ W:Chip()" "$M/cam_big.txt"; tail -2 "$M/cam_core.txt"

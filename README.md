@@ -27,9 +27,12 @@ bun run dev
 
 Paste a model into the editor and press ▶ (or Ctrl+Enter). `R` resets the
 model in place, `U` reloads it, Space pauses, Ctrl+S saves the editor as a
-`.rcd` file, and **開く** reopens a `.rc`/`.rcd`/`.txt` file (including on mobile). Files can also be dropped onto the editor. Views: `1`
-chase, `2` free orbit, `3` top, `4` onboard (the model's `_ZOOM` sets its field
-of view), or the ◎ button. Drag to orbit, wheel or pinch to zoom. The keycaps
+`.rcd` file, and **開く** reopens a `.rc`/`.rcd`/`.txt` file (including on mobile). Files can also be dropped onto the editor. Views are the
+original's A–J (F8–F12 = A–E, Ctrl+F8–F12 = F–J; also `1`–`9`, `0` and the view
+button, since browsers may keep F11/F12). A, the default, is the original's leash
+chase that follows the model's motion, not its heading; I/O zoom every view. See
+`docs/measured.md` (camera). Dragging, the wheel and pinching swing or lengthen
+view A's leash, a SnapTiles extra; H uses the model's `_ZOOM` field of view. The keycaps
 at the bottom are the model's keys and work by touch; W/A/S/D double as the
 arrows when the model does not bind key numbers 7/8/9/15 of its own, and a
 gamepad's stick/d-pad and buttons press the arrows and Z X C A S D V B. Sound
@@ -88,8 +91,8 @@ Ctrl/Cmd+Shift+Z use this history in the source or construction controls;
 other text/number fields retain native editing Undo.
 
 **全体** fits the model; **選択へ** focuses the selected part. Drag and zoom also
-work while editing. Loaded models get an initial driving distance based on
-their size; ordinary driving preserves manual zoom. **?** opens the in-app guide.
+work while editing. While driving, view A keeps the original's fixed 8 m leash
+whatever the model's size (wheel/pinch lengthens it). **?** opens the in-app guide.
 
 **保存名** names a variant and previews its actual .rcd filename; **保存** downloads
 it. Imported/assigned names survive edits and draft recovery. New clears the

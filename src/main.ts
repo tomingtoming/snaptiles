@@ -77,6 +77,7 @@ async function load(source: string, request: number): Promise<boolean> {
     scene.camYaw = 0.7;
     scene.sync(next.physics);
     scene.frameSimulation(next.corePosition());
+    scene.snapModel(next.modelCenter());
     acc = 0; last = performance.now(); lastCoreVel = null; lastShells = 0; crateVel.length = 0;
     buildKeyCaps(next);
     if (document.activeElement === focusBeforeLoad) canvas.focus({preventScroll: true});
@@ -145,20 +146,26 @@ function refreshSampleButtons(): void {
 sourceEl.addEventListener('input', refreshSampleButtons);
 sourceEl.addEventListener('modelchange', refreshSampleButtons);
 runBtn.addEventListener('click', () => void loadAndShare(sourceEl.value));
-// ---- view modes (1-4 or the button; those digits carry no key number in the original) ----
+// ---- the original's views A–J (F8–F12, Ctrl+F8–F12; also 1–9, 0 and the button, since browsers may keep F11/F12) ----
 const VIEWS = [
-  { mode: 'chase', glyph: '◎', label: '追従' },
-  { mode: 'orbit', glyph: '✥', label: '周回' },
-  { mode: 'top', glyph: '⬒', label: '上空' },
-  { mode: 'onboard', glyph: '◉', label: '車載' },
+  { mode: 'A', label: '追従' },
+  { mode: 'B', label: '観客席' },
+  { mode: 'C', label: '後方固定' },
+  { mode: 'D', label: '前方固定' },
+  { mode: 'E', label: '真上' },
+  { mode: 'F', label: '追従（切り離し用）' },
+  { mode: 'G', label: '観客席（切り離し用）' },
+  { mode: 'H', label: '定点（CCD）' },
+  { mode: 'I', label: '車載' },
+  { mode: 'J', label: '周回' },
 ] as const;
 const viewBtn = $<HTMLButtonElement>('viewmode');
 let viewIndex = 0;
 function setView(i: number): void {
   viewIndex = (i + VIEWS.length) % VIEWS.length;
-  scene.setView(VIEWS[viewIndex].mode);
-  viewBtn.textContent = VIEWS[viewIndex].glyph;
-  viewBtn.title = `視点: ${VIEWS[viewIndex].label}（クリックで切替）`;
+  if (!builder?.active) scene.setView(VIEWS[viewIndex].mode);
+  viewBtn.textContent = VIEWS[viewIndex].mode;
+  viewBtn.title = `視点 ${VIEWS[viewIndex].mode}: ${VIEWS[viewIndex].label}（クリックで切替）`;
   viewBtn.setAttribute('aria-label', viewBtn.title);
 }
 viewBtn.addEventListener('click', () => setView(viewIndex + 1));
@@ -225,14 +232,16 @@ window.addEventListener('keydown', (e) => {
   // the original's default scenario: H drops a ball (r 0.6, specific gravity 0.3) 6 m up at x = 2, J cycles the wind
   if (e.code === 'KeyH' && sim) { const n = sim.physics.balls.length; sim.physics.addBall(0.6, 2, 6 + n, n / 10, 0.3); }
   if (e.code === 'KeyJ' && sim) { windLevel = (windLevel + 1) % 4; sim.physics.wind.set([0, 5, 16, 50][windLevel], 0, 0); }
-  if (e.code >= 'Digit1' && e.code <= 'Digit4') setView(Number(e.code.slice(5)) - 1);
-  if (e.code === 'KeyR' && sim) { sim.reset(); scene.snap(sim.corePosition()); } // R: reset in place (OnReset)
+  if (e.code >= 'Digit0' && e.code <= 'Digit9') setView((Number(e.code.slice(5)) + 9) % 10);
+  const fkey = /^F(8|9|1[012])$/.exec(e.code);
+  if (fkey) { e.preventDefault(); setView(Number(fkey[1]) - 8 + (e.ctrlKey ? 5 : 0)); }
+  if (e.code === 'KeyI' || e.code === 'KeyO') scene.zoomStep(e.code === 'KeyI' ? -1 : 1); // the original's view zoom
+  if (e.code === 'KeyR' && sim) { sim.reset(); scene.snapModel(sim.modelCenter()); } // R: reset in place (OnReset)
   if (e.code === 'KeyU') void loadAndShare(sourceEl.value); // U: reload from source (OnInit)
 });
 
 // ---- camera orbit ----
 let dragging = false;
-let lastDrag = -1e9;
 let lastX = 0;
 let lastY = 0;
 // one finger orbits, two fingers pinch to zoom
@@ -264,7 +273,6 @@ canvas.addEventListener('pointerdown', (e) => {
 canvas.addEventListener('pointermove', (e) => {
   if (!touches.has(e.pointerId)) return;
   touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  lastDrag = performance.now();
   if (touches.size >= 2) {
     const [a, b] = [...touches.values()];
     const d = Math.hypot(a.x - b.x, a.y - b.y);
@@ -273,8 +281,7 @@ canvas.addEventListener('pointermove', (e) => {
     return;
   }
   if (!dragging) return;
-  scene.camYaw -= (e.clientX - lastX) * 0.006;
-  scene.camPitch = Math.max(0.05, Math.min(1.4, scene.camPitch + (e.clientY - lastY) * 0.006));
+  scene.orbitBy(e.clientX - lastX, e.clientY - lastY);
   lastX = e.clientX;
   lastY = e.clientY;
 });
@@ -304,7 +311,8 @@ let acc = 0;
 let last = performance.now();
 function frame(now: number): void {
   requestAnimationFrame(frame);
-  acc += Math.min(0.1, (now - last) / 1000);
+  const frameSeconds = Math.min(0.1, (now - last) / 1000);
+  acc += frameSeconds;
   last = now;
   if (sim && !builder?.active) {
     keys.pollGamepad();
@@ -322,9 +330,10 @@ function frame(now: number): void {
     scene.setLines3d(sim.lines3d);
     scene.syncProjectiles(sim.physics.projectiles);
     drawHud(sim.lines2d, sim);
-    if (scene.viewMode === 'chase' && !dragging && performance.now() - lastDrag > 3000) scene.chaseYaw(sim.coreHeading());
     scene.onboardFov = sim.zoomFov;
-    scene.follow(sim.corePosition(), 0.08, sim.physics.tiles[0] ? sim.physics.pose(sim.physics.tiles[0]).quaternion : undefined);
+    if (scene.viewMode === 'orbit') scene.setView(VIEWS[viewIndex].mode); // back from the editor
+    const core = sim.physics.tiles[0] ? sim.physics.pose(sim.physics.tiles[0]) : undefined;
+    if (core) scene.followModel({ center: sim.modelCenter(), core: core.position, quat: core.quaternion, velocity: sim.coreVelocity() }, frameSeconds);
     updateOverlay(sim);
     updateSound(sim);
   }
@@ -545,6 +554,6 @@ async function boot(): Promise<void> {
   refreshSampleButtons();
   await loadAndShare(SAMPLES[idx].source, request);
 }
-builder = new BuildPanel(sourceEl, scene, statusEl, () => { ++loadGeneration; paused = true; sfx.update(0, 0); setView(1); });
+builder = new BuildPanel(sourceEl, scene, statusEl, () => { ++loadGeneration; paused = true; sfx.update(0, 0); });
 void boot();
 window.addEventListener('hashchange', () => void boot()); // #car / #plane / #m=... links switch models

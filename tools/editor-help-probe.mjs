@@ -6,9 +6,10 @@ try {
  const page=await browser.newPage({viewport:{width:390,height:844}});
  await page.goto(process.argv[2]??'http://127.0.0.1:5175/'); await page.waitForFunction(()=>window.__sim);
  assert.equal(await page.locator('#run').getAttribute('aria-label'),'実行');
- assert.ok((await page.locator('#viewmode').getAttribute('aria-label')).includes('追従'));
- await page.click('#build'); assert.ok((await page.locator('#viewmode').getAttribute('aria-label')).includes('周回'));
- await page.click('#viewmode'); assert.ok((await page.locator('#viewmode').getAttribute('aria-label')).includes('上空'));
+ assert.ok((await page.locator('#viewmode').getAttribute('aria-label')).includes('視点 A: 追従'));
+ // the editor keeps its own orbit; the button still picks the runtime view used after ▶
+ await page.click('#build'); assert.equal(await page.evaluate(()=>window.__scene.viewMode),'orbit');
+ await page.click('#viewmode'); assert.ok((await page.locator('#viewmode').getAttribute('aria-label')).includes('視点 B: 観客席')); assert.equal(await page.evaluate(()=>window.__scene.viewMode),'orbit');
  const text=await page.inputValue('#source');
  await page.getByRole('button',{name:'使い方',exact:true}).click();
  assert.equal(await page.getByRole('dialog',{name:'作って、走らせる'}).isVisible(),true);

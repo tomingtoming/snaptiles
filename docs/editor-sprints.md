@@ -2109,3 +2109,31 @@ owner's request (2026-10-30).
 Not done: landing is not tested; staying on the ground at full speed without
 taking off still veers; the GUI-built aircraft probe builds the old
 Lua-free design and only checks takeoff.
+
+
+## 2026-10-30 — The original's camera views A–J (Sprint 70)
+
+Goal: replace SnapTiles' own runtime camera (chase/orbit/top/onboard on 1–4) with the original's views,
+following the owner's choices: original keys plus digits, view A as the default, keep mouse/touch
+as an extra, implement every measured view. Measurements: docs/measured.md (camera).
+
+Views A–J now follow the measured laws: A/F a leash that ignores heading (8.0 m from the model's
+mass centre, 2.0 m up, closing 31% of the gap per 1/30 s, starting at the original's bearing);
+B/G a spectator that starts at the current eye and is re-placed 25 m ahead along the velocity every
+5 s or beyond 76 m; C, D and I fixed to the core at the measured offsets (x mirrored from the
+original's left-handed frame); E 29.9 m overhead; H frozen at the moment of selection with the
+model's `_ZOOM` field of view; J an orbit at 90°/s. Keys: F8–F12 = A–E, Ctrl+F8–F12 = F–J (default
+browser actions are prevented where the browser allows), 1–9/0 = A–J, and the view button cycles.
+I/O zoom every view by ×0.8/×1.25 within 9.44–87.89° from 45°. Mouse drag and wheel/pinch swing and
+lengthen view A's leash (the original's mouse moved nothing). The editor keeps its own orbit.
+
+The size-fitted runtime framing (runtime-framing-probe) contradicted the original, which keeps 8 m
+for any model, and was replaced by runtime-camera-probe: A's distance/height/bearing, I/O floor,
+ceiling and sharing, key mapping, E height, J motion, H and B staying put, and the wheel. A
+side-by-side screenshot of the measurement car (original view A vs SnapTiles) shows the same side
+and the same on-screen size.
+
+Approximations: F/G ignore detached chips; J's height swing (0.75 ± 2.45 m) is shaped from one
+3-second log; C/D/I use the core's full rotation although only a level car was measured; H starts
+from the current camera instead of the original's CCD pose. Validation: build, 177 unit tests, all
+41 default editor/runtime Chromium scenarios and both plane probes pass locally.

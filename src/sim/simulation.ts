@@ -216,7 +216,7 @@ export class Simulation {
     return 1 / ((globalThis as unknown as { __tune?: { fps?: number } }).__tune?.fps ?? FRAME_RATE);
   }
 
-  /** yaw of the core's forward (-Z) axis, for the chase camera */
+  /** yaw of the core's forward (-Z) axis */
   coreHeading(): number {
     const tb = this.physics.tiles[0];
     if (!tb) return 0;
@@ -228,6 +228,24 @@ export class Simulation {
   corePosition(): THREE.Vector3 {
     const tb = this.physics.tiles[0];
     return tb ? this.physics.pose(tb).position : new THREE.Vector3();
+  }
+
+  /** mass-weighted centre of every tile: the original's chase camera aims here, not at the core
+   *  (a 6 m boom on one side moved its target 1.24 m that way at the same 8 m eye distance) */
+  modelCenter(): THREE.Vector3 {
+    const c = new THREE.Vector3();
+    let m = 0;
+    for (const tb of this.physics.tiles) {
+      const w = tb.tile.mass || 1;
+      c.addScaledVector(this.physics.pose(tb).position, w);
+      m += w;
+    }
+    return m > 0 ? c.divideScalar(m) : this.corePosition();
+  }
+
+  coreVelocity(): THREE.Vector3 {
+    const v = this.physics.tiles[0]?.body.linvel();
+    return v ? new THREE.Vector3(v.x, v.y, v.z) : new THREE.Vector3();
   }
 
   private tileOf(n: number): TileInstance | undefined {
