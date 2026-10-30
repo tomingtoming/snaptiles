@@ -209,3 +209,35 @@ S_SP=20 despite max=10). Four community walkers pass 300 seconds of held input;
 zrobo stops when its own energy expires. Original 2walk path length is 170.155 m
 in 60 seconds despite net displacement of 22.408 m. Numeric stability is not
 bit-identical trajectory or transient-velocity equivalence.
+
+## 2026-10-30: camera (views A–J, keys, zoom)
+
+Measured on 1.5B26 under wine with `tools/orig-harness/harness_camera.rcs` (scenario logs
+`_GETVIEWTYPE`, `_GETVIEW` eye/target, `_GETVIEWZOOM` and the core every frame) and `rc_camera.sh`
+(xdotool key presses, a screenshot every 3 s; the on-screen frame counter syncs presses to log frames).
+Probe models from `rc_camera_models.sh`: the Basic-layout car circling at Engine 2500 / Handle 15, and
+the same car parked. The Basic car drives toward **S**, so "behind travel" is in front of its N edge.
+Raw logs/shots: `D:\snaptiles-models\quarantine\original\runs\camera\`. Views are the scenario API's
+0–9 = A–J (bundled function list v1.2: `_SETVIEWTYPE`, `_GETVIEW`, `_SETVIEWZOOM`, `_SETVIEW`, `_SETVIEWUP`).
+
+| item | original | evidence |
+|---|---|---|
+| keys | **F8–F12 = views A–E, Ctrl+F8–F12 = views F–J**. F2 opens the render-device dialog and F3 Configure Input (both pause the game); F4–F7 change no view; Escape quits the program | fkeys, ctrlf, plainf3, verify |
+| default | view A, field of view 45° | every log, frame 1 |
+| I / O | zoom: each press multiplies the field of view by 0.8 (I) or 1.25 (O); it stops at 9.44° and 87.89° (the next step, 7.55° or 109.9°, is refused). Applies to the current view | verify, zoomrange |
+| A | 3/4 chase: eye ~7.9 m horizontally and +1.85–1.93 m above the core, at a model-relative bearing (local ≈ (−7.5, +1.9, −2.5)) that lags while the model yaws; distance grows with speed (7.9 m at rest → 8.5 m at 11 m/s). Target ≈ the core | circle frames 1–119 |
+| B | fixed spectator point (+1.9 m over the core when placed); does not move in 90 frames out to 35 m | circle 120–209 |
+| C | body-fixed: local eye ≈ (−0.4, +0.8, +2.3), looking along local −z (≈ 8 m ahead of the eye) | circle 210–299 |
+| D | body-fixed at core height: local eye ≈ (−0.16, 0.0, +7.4), looking back at the core (target ≈ (−0.3, −0.15, −1.2)) | circle 300–389 |
+| E | top-down: eye 29.9 m straight above the target, which follows the core | circle 390–479 |
+| F | chase from directly behind the direction of travel: 10.05–10.2 m horizontally, +1.85 m, looking forward (−177°/+5° to travel). Bundled readme: F and G focus detached chips | circle 480–569 |
+| G | fixed spectator like B; re-placed once the model is ~93 m away (readme: B/G switch timing depends on speed) | circle 570–659 |
+| H | fixed eye and fixed direction (target − eye constant). Readme: "VIEW H is the CCD camera" | circle 660–749 |
+| I | onboard, body-fixed: local eye ≈ (−0.8, 0.0, +0.8), 1.1 m from the core, looking along local −z | circle 750–839 |
+| J | automatic orbit around the model at ~90°/s, 3–6 m, height swinging −1.7…+3.2 m | circle 840–940 |
+| `_ZOOM` | separate from the view zoom: the bundled readme calls it the CCD camera's field of view (the small monitor in the HUD; Ctrl+F10 view H uses it). Default 17.19 | readme 15B15, earlier `_ZOOM` readout |
+
+Not measured: mouse input on the view (the readme says scenarios only see the mouse while Ctrl is held),
+whether zoom is kept per view, the exact lag law of A, F/G with detached chips, B's re-placement
+distance, and the CCD inset's own pose. SnapTiles currently uses its own camera (chase/orbit/top/onboard on
+1–4 and a button, mouse drag/wheel/pinch); none of the above is implemented yet.

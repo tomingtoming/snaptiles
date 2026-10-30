@@ -1,0 +1,43 @@
+-- Camera probe: cycles the original's built-in views A..J (_SETVIEWTYPE 0..9) and logs, every frame,
+-- the view type, eye and target (_GETVIEW), field of view (_GETVIEWZOOM), the core position/velocity
+-- and heading. VIEWSET=0 leaves the view alone (for key-press runs); log written once at LAST.
+n=0
+buf=""
+wrote=-9
+lasterr="none"
+PHASE=90
+START=30
+VIEWSET=1
+LAST=940
+function OnInit()
+	n=0
+	buf="frame,view,eyex,eyey,eyez,tgtx,tgty,tgtz,zoom,x,y,z,vx,vy,vz,ex,ey,ez\n"
+end
+
+function step()
+	if VIEWSET==1 and n>=START then
+		local v=math.floor((n-START)/PHASE)
+		if v<=9 and n-START==v*PHASE then _SETVIEWTYPE(v) end
+	end
+	if n<=LAST then
+		local a,b,c,d,e,f=_GETVIEW()
+		buf=buf..n..",".._GETVIEWTYPE()..","..a..","..b..","..c..","..d..","..e..","..f..",".._GETVIEWZOOM()..","..
+			_X(0)..",".._Y(0)..",".._Z(0)..",".._VX(0)..",".._VY(0)..",".._VZ(0)..","..
+			_EX(0)..",".._EY(0)..",".._EZ(0).."\n"
+	end
+	if n==LAST then
+		local h=_FOPEN("log.txt","w")
+		if h>=0 then _FPUTS(h,buf) _FCLOSE(h) wrote=h else wrote=-1 end
+	end
+end
+
+function OnFrame()
+	n=n+1
+	local ok,err=pcall(step)
+	if not ok then lasterr=tostring(err) end
+	out(0,"frame ",n," view ",_GETVIEWTYPE()," wrote ",wrote)
+	out(1,"err ",lasterr)
+end
+
+function OnReset()
+end
