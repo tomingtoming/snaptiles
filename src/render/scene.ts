@@ -115,10 +115,16 @@ export class SceneView {
   private directionMarks = ['N', 'W', 'E', 'S'].map((dir) => {
     const group = document.createElementNS(this.directionOverlay.namespaceURI, 'g');
     group.setAttribute('data-direction', dir);
-    group.innerHTML = `<line stroke="#785f00" stroke-width="2"/><circle r="12" fill="#242a30" stroke="#ffd900"/><text text-anchor="middle" dominant-baseline="central" fill="#ffe76b" font-size="12" font-family="sans-serif">${dir}</text><circle class="anchor" r="3" fill="#ffe76b" stroke="#242a30"/>`;
+    group.innerHTML = `<line stroke="#785f00" stroke-width="2"/><circle r="12" fill="#242a30" stroke="#ffd900"/><text text-anchor="middle" dominant-baseline="central" fill="#ffe76b" font-size="12" font-family="sans-serif">${dir}</text><circle class="anchor" r="3" fill="#ffe76b" stroke="#242a30"/><circle class="hit" r="20" fill="transparent" style="pointer-events:all;cursor:pointer"/>`;
+    // Only the enlarged hit circle takes pointers; the rest of the overlay stays transparent to orbit and pick.
+    const hit = group.querySelector('.hit')!;
+    hit.addEventListener('pointerdown', e => e.stopPropagation());
+    hit.addEventListener('click', e => { e.stopPropagation(); this.onDirectionPick?.(dir as 'N' | 'W' | 'E' | 'S'); });
     this.directionOverlay.append(group);
     return group;
   });
+  /** Set by the editor: clicking an N/W/E/S mark adds there, like the panel's edge buttons. */
+  onDirectionPick?: (dir: 'N' | 'W' | 'E' | 'S') => void;
   private selectionBox: THREE.BoxHelper | null = null;
   private views = new Map<number, TileView>();
   private plateGeo = new THREE.BoxGeometry(TILE, TILE_T, TILE);
@@ -558,6 +564,8 @@ export class SceneView {
       line.setAttribute('x2', String(x)); line.setAttribute('y2', String(y));
       circle.setAttribute('cx', String(x)); circle.setAttribute('cy', String(y));
       text.setAttribute('x', String(x)); text.setAttribute('y', String(y));
+      const hit = mark.querySelector('.hit')!;
+      hit.setAttribute('cx', String(x)); hit.setAttribute('cy', String(y));
       const dot = mark.querySelector('.anchor')!;
       dot.setAttribute('cx', String(edge.x)); dot.setAttribute('cy', String(edge.y));
     });

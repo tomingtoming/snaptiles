@@ -278,6 +278,11 @@ supported; equal angles can overlap visually. These are connectivity counts,
 not geometric collision detection. Move and mirror retain their separate
 occupied-destination guards.
 
+The N/W/E/S marks drawn around the selected part in the 3D view are also
+clickable (or tappable) and act exactly like the matching panel button,
+including paste mode and the disabled state for invalid source. They are hidden
+while running. Keyboard users keep the panel buttons; the marks are pointer-only.
+
 
 Opening another file, sample or in-page model link preserves the prior editor
 state as one Undo step. Return to **組む** and undo to recover source, filename,

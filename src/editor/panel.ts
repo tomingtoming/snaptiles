@@ -127,6 +127,11 @@ export class BuildPanel {
         this.selected = next;
       });
     });
+    // The view's direction marks reuse the panel buttons, so disabled states and paste mode match.
+    this.scene.onDirectionPick = dir => {
+      const button = this.panel.querySelector<HTMLButtonElement>(`[data-edge="${dir}"]`);
+      if (this.active && button && !button.disabled) button.click();
+    };
     source.addEventListener('compositionstart', () => { this.sourceComposing = true; this.sourceEditGroup = null; });
     source.addEventListener('compositionend', () => { this.sourceComposing = false; });
     source.addEventListener('beforeinput', event => {

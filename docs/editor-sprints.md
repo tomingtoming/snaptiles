@@ -2055,3 +2055,24 @@ on a usage limit before validation; this session took over without changing
 them. Validation: production build; unit tests 176/25 files; Chromium probes
 for load history, filename, general editor, guide, draft recovery, source
 history and share pass. No full-suite rerun yet.
+
+
+## 2026-10-30 — Add from the 3D view's direction marks (Sprint 68)
+
+Goal: let builders add where they are looking. The N/W/E/S marks around the
+selected part were display-only; adding required moving to the panel buttons.
+
+Each mark now has a transparent 40px hit circle (the rest of the overlay stays
+pointer-transparent, so orbit and tile picking are unchanged). A click or tap
+calls the matching panel edge button, so selection-after-add, paste mode, Undo
+grouping and the invalid-source disabled state are shared rather than
+reimplemented. Pointerdown on a mark does not start an orbit drag; dragging off
+a mark adds nothing. Marks remain hidden while running. The overlay stays
+aria-hidden: keyboard and screen-reader users keep the panel buttons.
+
+Validation: production build; new Chromium probe (desktop click, shared paste
+mode, Undo/Redo, drag-off, invalid source, hidden while running, mobile tap).
+General editor, edge-count, touch, guide, selection, direction-marker and
+mixed-input probes pass. Probe note: hit-circle boxes measure 39.99px and the
+editor camera eases after selection changes, so the probe allows 39.5px and
+waits before reading mark positions.
