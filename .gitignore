@@ -6,3 +6,4 @@ dist/
 .shots/
 .dev.log
 .dev.pid
+tools/orig-harness/lands/

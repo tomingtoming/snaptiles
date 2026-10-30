@@ -242,3 +242,22 @@ Raw logs/shots: `D:\snaptiles-models\quarantine\original\runs\camera\`. Views ar
 Not measured: F/G with detached chips, the CCD inset's own pose, what decides A's spawn bearing, whether
 mouse input works in other views, and the vertical lag of A (height over bumps varied 1.2–3.4 m). SnapTiles currently uses its own camera (chase/orbit/top/onboard on
 1–4 and a button, mouse drag/wheel/pinch); none of the above is implemented yet.
+
+## 2026-10-31: kerb strike below the tyre radius (not yet fixed)
+
+Probe: `tools/orig-harness/rc_step.sh` swaps `Resources/Land.x` for a generated land
+(`make_step_land.py`: 4 m ground cells at y = 50, a box h m tall over x −10…10, z 6…36) and drives the
+default Basic car with Val Engine 2500 (`basic_drive_2500.txt`) into it; `harness_step.rcs` logs core
+and wheel heights. SnapTiles replays the same with `bun tools/step-compare.ts`; `stepdiff.py` compares.
+Land notes: the 4th material row (Emissive) is the original's rolling/static/dynamic friction (readme
+15B11): an Emissive of 0.2 held the car to 0.5 m/s. Tyre radius 0.30 m; impact at 6.6–6.9 m/s.
+
+| step | original | SnapTiles |
+|---|---|---|
+| 0.10 m | climbs in 3 frames, speed −17% (6.93→5.78), pitch ≤ 0.12 rad, all wheels past the edge 0.7 s after impact | the leading wheels are thrown 2 m up, the car pitches to 1.54 rad (near vertical), stalls to 0.08 m/s; past the edge after 1.7 s |
+| 0.20 m | speed −60%, pitch ≤ 0.40 rad, past after 0.8 s | stalls (−99%), pitch 0.92 rad, past after 4.7 s |
+| 0.25 m | speed −79%, pitch ≤ 0.53 rad, past after 1.1 s | bounced back at −3 m/s and never climbs (15 s) |
+
+The original's wheel rolls up a kerb lower than its radius with a moderate speed loss. SnapTiles' tyre (a
+frictionless load sphere plus ray grip) takes the edge as a stiff collision: an upward/backward kick
+instead of a climb. Raw logs: `D:\snaptiles-models\quarantine\original\runs\step\`.

@@ -1,0 +1,42 @@
+-- Step probe: log only (the model drives itself). Core pose/velocity/Euler, then for each of up to four
+-- Wheel/RLW chips its world y, z and _WY. Written once at frame LAST.
+n=0
+buf=""
+wrote=-9
+lasterr="none"
+LAST=450
+function OnInit()
+	n=0
+	buf="frame,x,y,z,vx,vy,vz,ex,ey,ez,w0y,w0z,w0wy,w1y,w1z,w1wy,w2y,w2z,w2wy,w3y,w3z,w3wy\n"
+end
+
+function step()
+	local ws={}
+	for c=0,_CHIPS()-1 do
+		local t=_TYPE(c)
+		if (t==4 or t==5) and table.getn(ws)<4 then table.insert(ws,c) end
+	end
+	if n<=LAST then
+		local row=n..",".._X(0)..",".._Y(0)..",".._Z(0)..",".._VX(0)..",".._VY(0)..",".._VZ(0)..",".._EX(0)..",".._EY(0)..",".._EZ(0)
+		for i=1,4 do
+			local c=ws[i]
+			if c then row=row..",".._Y(c)..",".._Z(c)..",".._WY(c) else row=row..",0,0,0" end
+		end
+		buf=buf..row.."\n"
+	end
+	if n==LAST then
+		local h=_FOPEN("log.txt","w")
+		if h>=0 then _FPUTS(h,buf) _FCLOSE(h) wrote=h else wrote=-1 end
+	end
+end
+
+function OnFrame()
+	n=n+1
+	local ok,err=pcall(step)
+	if not ok then lasterr=tostring(err) end
+	out(0,"frame ",n," wrote ",wrote)
+	out(1,"err ",lasterr)
+end
+
+function OnReset()
+end
