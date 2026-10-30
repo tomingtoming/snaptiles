@@ -46,6 +46,8 @@ export interface TileBody {
   /** the tyre collider (wheels) and the smoothed normal force it measured in the last steps */
   collider: import('@dimforge/rapier3d-compat').Collider | null;
   contactForce: number;
+  /** soft kerb force the tyre carried this step (counts toward its load) */
+  kerbForce: number;
   /** the wheel's static share of the weight (lever rule), kept for capping the grip load */
   staticLoad: number;
   /** steps since this tyre last (re)gained ground contact: a touchdown may use the full impact load for a while */
@@ -99,6 +101,15 @@ export const WHEEL_REACTION = true;
 export const WHEEL_SPIN_DRAG = 0;
 /** the tyre still grips this far above the ground (the unsprung front lifts a few cm under power) */
 export const TYRE_CONTACT_MARGIN = 0.1;
+/** a kerb edge (the contact normal tilted more than 30° from vertical) is a spring-damper, not a rigid contact:
+ *  the rigid frictionless sphere either kicked the car into a wheelie or stopped it dead, while the original
+ *  rolls up 0.10–0.25 m kerbs losing 17–79% of 6.9 m/s (measured 2026-10-31, docs/measured.md kerb section) */
+export const TYRE_SOFT_KERB = true;
+/** soft kerb stiffness: the wheel's static load sags it this far; damping as a ratio of critical */
+export const KERB_SAG = 0.02;
+export const KERB_DAMPING = 0.3;
+const KERB_COS = Math.cos(30 * Math.PI / 180);
+const KERB_DEEP = 0.03;
 /** load the tyre forces may transmit: μ × (model weight / number of wheels) */
 export const TYRE_LOAD_SHARE = 1;
 /** per-wheel load from the static lever rule about the centre of mass (false: total mass / wheel count);
@@ -583,6 +594,7 @@ export class PhysicsWorld {
         cd.setFrictionCombineRule(R.CoefficientCombineRule.Min);
         cd.setTranslation(relPos.x, relPos.y, relPos.z).setRotation({ x: relQuat.x, y: relQuat.y, z: relQuat.z, w: relQuat.w });
         if (tile.ghost || !tile.spec.collides) cd.setSensor(true);
+        if (tile.spec.wheel) cd.setActiveHooks(R.ActiveHooks.FILTER_CONTACT_PAIRS); // soft kerbs (kerbSprings)
         const col = this.world.createCollider(cd, body);
         if (tile.spec.wheel) tyreColliders.set(tile.id, col);
       }
@@ -621,7 +633,7 @@ export class PhysicsWorld {
         }
       }
       const restAngle = angleAnimated ? attr(tile.node, 'angle', env, 0) : 0;
-      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0, servoAngle: 0, spin: 0, spinAngle: 0, contactPoint: null, load: 0, collider: null, contactForce: 0, staticLoad: 0, contactAge: 0, slipping: false, jointAxisLocal, jointAnchorLocal };
+      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0, servoAngle: 0, spin: 0, spinAngle: 0, contactPoint: null, load: 0, collider: null, contactForce: 0, kerbForce: 0, staticLoad: 0, contactAge: 0, slipping: false, jointAxisLocal, jointAnchorLocal };
       tb.collider = tyreColliders.get(tile.id) ?? null;
       this.tiles.push(tb);
       this.byId.set(tile.id, tb);
@@ -1031,7 +1043,7 @@ export class PhysicsWorld {
           for (let i = 0; i < m.numContacts(); i++) impulse += Math.abs(m.contactImpulse(i));
         });
       });
-      const f = impulse / this.dt;
+      const f = impulse / this.dt + tb.kerbForce;
       tb.contactForce = f > 0 ? (tb.contactForce > 0 ? tb.contactForce + TYRE_LOAD_SMOOTH * (f - tb.contactForce) : f) : 0;
     }
   }
@@ -1335,8 +1347,68 @@ export class PhysicsWorld {
     }
   }
 
+  /** tyre/ground pairs this step handles as soft kerbs (key: tyre handle:ground handle) */
+  private kerbPairs = new Set<string>();
+  private events: RAPIER.EventQueue | null = null;
+  private hooks = {
+    filterContactPair: (c1: number, c2: number) => this.kerbPairs.has(`${c1}:${c2}`) || this.kerbPairs.has(`${c2}:${c1}`) ? this.R.SolverFlags.EMPTY : this.R.SolverFlags.COMPUTE_IMPULSE,
+    filterIntersectionPair: () => true,
+  };
+
+  /** Push each tyre off kerb edges with a spring-damper along the edge normal, and switch that pair's rigid
+   *  contact off. Ground under the tyre (normal within 30° of vertical) stays a rigid contact. */
+  private kerbSprings(): void {
+    this.kerbPairs.clear();
+    const soft = (globalThis as unknown as { __tune?: { softKerb?: boolean } }).__tune?.softKerb ?? TYRE_SOFT_KERB;
+    for (const tb of this.tiles) {
+      tb.kerbForce = 0;
+      const col = tb.collider;
+      if (!soft || !col || col.isSensor()) continue;
+      // like driveWheel: a wheel on a folding rim pushes the chassis the rim hangs from
+      const body = tb.rim && tb.tile.parent ? (this.byId.get(tb.tile.parent.id)?.body ?? tb.body) : tb.body;
+      const r = wheelRadius(tb.tile.option);
+      const t = col.translation();
+      const kt = (globalThis as unknown as { __tune?: { kerbSag?: number; kerbDamping?: number } }).__tune;
+      const k = Math.max(tb.staticLoad, 50) / (kt?.kerbSag ?? KERB_SAG);
+      const c = 2 * (kt?.kerbDamping ?? KERB_DAMPING) * Math.sqrt(k * Math.max(tb.staticLoad, 50) / 9.8);
+      // rapier solves contacts it predicts for the coming step, so take kerbs over before the tyre touches them
+      const lv0 = body.linvel();
+      const reach = r + Math.max(0.05, 2 * this.dt * Math.hypot(lv0.x, lv0.y, lv0.z));
+      const hits: { e: THREE.Vector3; P: THREE.Vector3; depth: number; other: RAPIER.Collider }[] = [];
+      this.world.intersectionsWithShape(t, { x: 0, y: 0, z: 0, w: 1 }, new this.R.Ball(reach), (other) => {
+        const proj = other.projectPoint(t, true);
+        if (!proj) return true;
+        const e = new THREE.Vector3(t.x - proj.point.x, t.y - proj.point.y, t.z - proj.point.z);
+        const dist = e.length();
+        if (dist < 1e-6) return true;
+        e.divideScalar(dist);
+        // ground under the tyre stays rigid unless the tyre has sunk into it climbing a kerb: a rigid contact would
+        // pop that depth out in one step, with no loss of speed
+        if (e.y >= KERB_COS && r - dist < KERB_DEEP) return true;
+        this.kerbPairs.add(`${col.handle}:${other.handle}`);
+        if (dist < r) hits.push({ e, P: new THREE.Vector3(proj.point.x, proj.point.y, proj.point.z), depth: r - dist, other });
+        return true;
+      }, undefined, MODEL_GROUP, undefined, tb.body);
+      // forces only after the query: touching a body inside its callback throws and rapier swallows it
+      for (const { e, P, depth, other } of hits) {
+        const com = body.translation(), lv = body.linvel(), av = body.angvel();
+        const vP = new THREE.Vector3(lv.x, lv.y, lv.z).add(new THREE.Vector3(av.x, av.y, av.z).cross(P.clone().sub(new THREE.Vector3(com.x, com.y, com.z))));
+        const F = Math.max(0, k * depth - c * vP.dot(e));
+        if ((globalThis as unknown as { __tune?: { debugKerb?: boolean } }).__tune?.debugKerb) console.log('kerb', tb.tile.chipIndex, 'pen', depth.toFixed(3), 'e', e.toArray().map((x) => x.toFixed(2)).join(','), 'vn', vP.dot(e).toFixed(2), 'F', F.toFixed(0));
+        body.addForceAtPoint({ x: e.x * F, y: e.y * F, z: e.z * F }, P, true);
+        const ob = other.parent();
+        if (ob && ob.isDynamic()) ob.addForceAtPoint({ x: -e.x * F, y: -e.y * F, z: -e.z * F }, P, true); // crates, balls
+        tb.kerbForce += F;
+      }
+    }
+  }
+
   step(): void {
-    this.world.step();
+    this.kerbSprings();
+    // rapier only consults the hooks when an event queue is passed
+    this.events ??= new this.R.EventQueue(false);
+    this.world.step(this.events, this.hooks);
+    this.events.clear();
     this.measureTyreLoads();
     this.tick++;
     if (this.projectiles.length) this.cullProjectiles();

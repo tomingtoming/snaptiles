@@ -1,5 +1,5 @@
 // Replay the original's step probe (tools/orig-harness/rc_step.sh) in SnapTiles, headless:
-//   bun tools/step-compare.ts <model.txt> <out.csv> --h=0.10 [--frames=450]
+//   bun tools/step-compare.ts <model.txt> <out.csv> --h=0.10 [--frames=450] [--tune='{"tyreLoadCap":1}']
 // Bare ground plus a static box h m tall spanning x −10..10, z 6..36 (the probe land, without its 50 m
 // base height). The model drives itself (Val defaults). Columns match harness_step.rcs: core pose,
 // velocity, Euler, then y, z and _WY of the first four Wheel/RLW chips.
@@ -11,7 +11,8 @@ import { KeyState } from '../src/input/keys';
 const args = process.argv.slice(2);
 const opt = (k: string, d: number) => Number(args.find((x) => x.startsWith(`--${k}=`))?.split('=')[1] ?? d);
 const H = opt('h', 0.1), FRAMES = opt('frames', 450);
-(globalThis as unknown as { __tune?: unknown }).__tune = { noCourse: true };
+const tuneArg = args.find((x) => x.startsWith('--tune='));
+(globalThis as unknown as { __tune?: unknown }).__tune = { noCourse: true, ...(tuneArg ? JSON.parse(tuneArg.slice(7)) : {}) };
 
 const R = await initRapier();
 const sim = new Simulation(R, readFileSync(args[0], 'utf8'), new KeyState(new EventTarget()));

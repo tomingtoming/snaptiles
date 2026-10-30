@@ -2137,3 +2137,15 @@ Approximations: F/G ignore detached chips; J's height swing (0.75 ± 2.45 m) is 
 3-second log; C/D/I use the core's full rotation although only a level car was measured; H starts
 from the current camera instead of the original's CCD pose. Validation: build, 177 unit tests, all
 41 default editor/runtime Chromium scenarios and both plane probes pass locally.
+
+
+## 2026-10-31 — Kerbs lower than the tyre radius (Sprint 71)
+
+Owner question: does the default car hitting a kerb lower than its tyre radius behave like the original?
+Measured it (docs/measured.md, kerb section): the original rolls up 0.10/0.20/0.25 m kerbs losing 17/60/79%
+of 6.9 m/s; SnapTiles threw the car into a near-vertical wheelie, stalled it, or bounced it back. Cause:
+the tyre is a rigid frictionless sphere, and rapier's predicted contact against the kerb edge kicked the
+car with more than twice the vertical speed an inelastic impact allows. Kerb edges (and kerbs the tyre
+has sunk into) are now a spring-damper along the edge normal; flat-ground behaviour is byte-identical.
+Validation: 180 unit tests including the new kerb test, all 41 editor/runtime Chromium scenarios and
+both plane probes pass locally. Remote CI is disabled.
