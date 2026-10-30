@@ -167,7 +167,14 @@ export class BuildPanel {
   renameFile(filename: string): void { this.edit(() => this.document.renameFile(filename)); }
   loadSource(text: string, filename?: string): void {
     this.sourceEditGroup = null;
-    this.source.value = text; this.document = new ModelDocument(this.source.value, filename);
+    this.captureSourceView();
+    if (this.document.text !== this.source.value.replace(/\r\n?/g, '\n')) this.document.editSource(this.source.value);
+    const normalized = text.replace(/\r\n?/g, '\n');
+    // Initial boot has no prior document. Later switches preserve even incomplete
+    // work, filename, selection and source view as one undoable transition.
+    if (!this.document.text && !this.document.undoStack.length && this.document.filename === undefined) this.document = new ModelDocument(normalized,filename);
+    else if (normalized !== this.document.text || filename !== this.document.filename) this.document.restore(normalized,filename);
+    this.source.value = this.document.text;
     this.source.dispatchEvent(new Event('modelchange'));
   }
   open(): void {

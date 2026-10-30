@@ -277,3 +277,11 @@ removal and Undo/Redo. Adding/pasting multiple children on one edge remains
 supported; equal angles can overlap visually. These are connectivity counts,
 not geometric collision detection. Move and mirror retain their separate
 occupied-destination guards.
+
+
+Opening another file, sample or in-page model link preserves the prior editor
+state as one Undo step. Return to **組む** and undo to recover source, filename,
+selection and source caret, including incomplete text. Earlier editing history
+is retained; reloading identical source with the same filename adds no redundant
+step. This history lives only in the current page and does not replace saving
+files. Undo restores editor content; press Run to simulate that restored model.

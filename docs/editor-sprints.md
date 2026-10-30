@@ -2034,3 +2034,24 @@ attachment counts from world-space overlap and avoid claiming more detection
 than was implemented. Next: check recovery when opening a different model file,
 including whether the previous in-progress construction can be restored.
 No push or deployment.
+
+
+## 2026-10-30 — Undo across opening another model (Sprint 67)
+
+Goal: recover in-progress construction after opening a different file, sample
+or in-page model link (Sprint 66 follow-up). Previously loadSource replaced the
+ModelDocument, so opening another model discarded the prior source, filename and
+editing history with no way back.
+
+Opening a model now records the prior editor state as one undoable step:
+source (including incomplete/invalid text), filename, selection and source
+caret. Earlier history is kept. Initial boot adds no empty step, and reopening
+identical source with the same filename adds none. Undo restores editor content
+only; Run is still required to simulate the restored model. This is in-page
+history, not a model library; saved files remain the durable copy.
+
+Implementation and probe were written by the previous session, which stopped
+on a usage limit before validation; this session took over without changing
+them. Validation: production build; unit tests 176/25 files; Chromium probes
+for load history, filename, general editor, guide, draft recovery, source
+history and share pass. No full-suite rerun yet.
