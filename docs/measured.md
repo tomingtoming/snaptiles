@@ -278,3 +278,27 @@ Flat ground never triggers it: eight steady-turn references and three straight r
 with the kerb spring on and off. `tests/kerb.test.ts` keeps the three runs within 15 points of the original's
 speed loss. Two dead ends worth remembering: forces added inside a rapier query callback are silently lost
 (apply them after the query), and finer substeps alone fixed only the 0.10 m kerb.
+
+## 2026-10-31: difference hunt, tiers 1–2 (terrain probes, corpus geometry)
+
+**Tier 1, terrain** (`tools/orig-harness/terrains.json`, `rc_terrain.sh` / `tools/terrain-compare.ts`,
+ranked by `terraindiff.py`): the Basic car at Engine 2500 over 12 generated lands. Lessons for the probe
+itself: below about y = 49 the original's sea starts (a 1 m drop and the 30° ramp's far side were
+underwater at a 50 m base; `LAND_BASE=150` re-runs), and its land stops colliding near z = 210 (compare
+before z = 200). Remaining differences, largest first:
+
+| scene | original | SnapTiles | status |
+|---|---|---|---|
+| wall 2 m, hit at 10.5 m/s | stops dead at the wall | thrown back at −7.6 m/s, then wanders off | open. The reversal happens inside rapier's step and needs the jointed pair: a one-body car rebounds −1.5, plain rapier boxes −0.2, two rapier bodies on a locked revolute −2 |
+| drop 1.0 m (both bases) | stops at z ≈ 9, its leading wheels at the edge, and jitters there | drives off | original quirk, cause unknown (a 0.5 m drop is fine in both) |
+| ramps 10/20/30°, ditch 1 m | reaches z = 199 by the cut-off | 163–177; tips on the 20° ramp; the leading wheels drop into the ditch (pitch 0.75 vs 0.08–0.13) | open: speed on slopes and ditch crossing |
+| steps, bump, 0.5 m drop, flat | — | within a few metres (flat: SnapTiles accelerates ~3% slower, as known) | fine |
+
+**Tier 2, corpus geometry** (`rc_geom_corpus.sh` dumps every chip at frames 1 and 30 for 97 corpus models;
+`tools/geom-compare.ts`, `geomrank.py`): the assembled poses agree for almost all models (frame-1 error
+≤ 0.01 m). The original numbers each Wheel/RLW as two chips (a type-3 rim, then the tyre); SnapTiles leaves
+that index free, so chip numbers agree, only the rim chip itself is absent from SnapTiles' list. Frame-1
+outliers are models whose scripts set joint angles on the first frame (mukade's leg IK runs before the
+original's first dump but after SnapTiles') and a few still unexplained (dragon wing tips 1.05 m, Talon,
+boidbit, ender, DUCKER ≤ 0.3 m). Frame-30 differences up to 27 m (satellite, Vic viper, qb-xt, ender,
+prin) come from what the models do in their first second and belong to tier 3 (driving runs).

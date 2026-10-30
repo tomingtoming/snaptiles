@@ -1,0 +1,20 @@
+-- Static geometry probe: every chip's type, parent, world position and Euler angles at frame 1 (as assembled)
+-- and at frame 30 (settled), written to geom1.txt and geom30.txt. No inputs.
+n=0
+function dump(name)
+	local g="chip,type,dir,parent,x,y,z,ex,ey,ez\n"
+	for c=0,_CHIPS()-1 do
+		g=g..c..",".._TYPE(c)..",".._GET(c,"DIR")..",".._GET(c,"PARENT")..","..
+			_X(c)..",".._Y(c)..",".._Z(c)..",".._EX(c)..",".._EY(c)..",".._EZ(c).."\n"
+	end
+	local h=_FOPEN(name,"w")
+	if h>=0 then _FPUTS(h,g) _FCLOSE(h) end
+end
+function OnInit() n=0 end
+function OnFrame()
+	n=n+1
+	if n==1 then pcall(dump,"geom1.txt") end
+	if n==30 then pcall(dump,"geom30.txt") end
+	out(0,"frame ",n)
+end
+function OnReset() end
