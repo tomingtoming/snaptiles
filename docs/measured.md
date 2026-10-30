@@ -224,20 +224,21 @@ Raw logs/shots: `D:\snaptiles-models\quarantine\original\runs\camera\`. Views ar
 |---|---|---|
 | keys | **F8–F12 = views A–E, Ctrl+F8–F12 = views F–J**. F2 opens the render-device dialog and F3 Configure Input (both pause the game); F4–F7 change no view; Escape quits the program | fkeys, ctrlf, plainf3, verify |
 | default | view A, field of view 45° | every log, frame 1 |
-| I / O | zoom: each press multiplies the field of view by 0.8 (I) or 1.25 (O); it stops at 9.44° and 87.89° (the next step, 7.55° or 109.9°, is refused). Applies to the current view | verify, zoomrange |
-| A | 3/4 chase: eye ~7.9 m horizontally and +1.85–1.93 m above the core, at a model-relative bearing (local ≈ (−7.5, +1.9, −2.5)) that lags while the model yaws; distance grows with speed (7.9 m at rest → 8.5 m at 11 m/s). Target ≈ the core | circle frames 1–119 |
-| B | fixed spectator point (+1.9 m over the core when placed); does not move in 90 frames out to 35 m | circle 120–209 |
+| I / O | zoom: each press multiplies the field of view by 0.8 (I) or 1.25 (O); it stops at 9.44° and 87.89° (the next step, 7.55° or 109.9°, is refused). **One zoom for all views**: 28.8° set in A stayed through B, A and E | verify, zoomrange, zoomper |
+| A | **leash chase that ignores the model's heading**: the eye keeps +1.85 m over the core and is pulled toward 7.86 m horizontal distance along its current bearing, closing ≈31% of the gap per frame. A turntable yawing 23° left the eye bearing at −113.5° (world) throughout; the eye swings behind only as the model travels. Straight runs: horizontal distance 8.01/8.75/9.20/9.57 m at 2.9/11.0/17.8/23.7 m/s = 7.86 + 0.073·v, which is that per-frame closing (lag v·dt·(1−k)/k with k = 0.31). Starts at world bearing −113.5° (eye toward −x, −z) from spawn. Target ≈ the core | circle 1–119, spinA, straightA |
+| B | spectator: starts at the current eye when selected, then stays put. It is re-placed every 150 frames (5 s), or sooner once the model is ~76 m away (max eye distance seen 75.9 m), to a point ~20–32 m **ahead along the model's 3D velocity** (sideways ≤ 3 m; climbs with a climbing model). Same at Engine 2500 and 6000 | circle 120–209, zoomper, straightB, fastB |
 | C | body-fixed: local eye ≈ (−0.4, +0.8, +2.3), looking along local −z (≈ 8 m ahead of the eye) | circle 210–299 |
 | D | body-fixed at core height: local eye ≈ (−0.16, 0.0, +7.4), looking back at the core (target ≈ (−0.3, −0.15, −1.2)) | circle 300–389 |
 | E | top-down: eye 29.9 m straight above the target, which follows the core | circle 390–479 |
-| F | chase from directly behind the direction of travel: 10.05–10.2 m horizontally, +1.85 m, looking forward (−177°/+5° to travel). Bundled readme: F and G focus detached chips | circle 480–569 |
-| G | fixed spectator like B; re-placed once the model is ~93 m away (readme: B/G switch timing depends on speed) | circle 570–659 |
+| F | identical to A for an intact model (turntable and straight logs match A to the printed digits; the 10 m seen in the circle run is A's speed lag at 31 m/s). Bundled readme: F and G focus detached chips | circle 480–569, spinF, straightF |
+| G | identical to B for an intact model (logs match). The 93 m seen in the circle run was before a 150-frame re-placement | circle 570–659, straightG, fastG |
 | H | fixed eye and fixed direction (target − eye constant). Readme: "VIEW H is the CCD camera" | circle 660–749 |
 | I | onboard, body-fixed: local eye ≈ (−0.8, 0.0, +0.8), 1.1 m from the core, looking along local −z | circle 750–839 |
 | J | automatic orbit around the model at ~90°/s, 3–6 m, height swinging −1.7…+3.2 m | circle 840–940 |
 | `_ZOOM` | separate from the view zoom: the bundled readme calls it the CCD camera's field of view (the small monitor in the HUD; Ctrl+F10 view H uses it). Default 17.19 | readme 15B15, earlier `_ZOOM` readout |
 
-Not measured: mouse input on the view (the readme says scenarios only see the mouse while Ctrl is held),
-whether zoom is kept per view, the exact lag law of A, F/G with detached chips, B's re-placement
-distance, and the CCD inset's own pose. SnapTiles currently uses its own camera (chase/orbit/top/onboard on
+| mouse | left/right drags (200 px sideways, 120 px down) and wheel up/down on the view moved nothing in view A | mouseA |
+
+Not measured: F/G with detached chips, the CCD inset's own pose, what decides A's spawn bearing, whether
+mouse input works in other views, and the vertical lag of A (height over bumps varied 1.2–3.4 m). SnapTiles currently uses its own camera (chase/orbit/top/onboard on
 1–4 and a button, mouse drag/wheel/pinch); none of the above is implemented yet.

@@ -1,6 +1,7 @@
 -- Camera probe: cycles the original's built-in views A..J (_SETVIEWTYPE 0..9) and logs, every frame,
 -- the view type, eye and target (_GETVIEW), field of view (_GETVIEWZOOM), the core position/velocity
--- and heading. VIEWSET=0 leaves the view alone (for key-press runs); log written once at LAST.
+-- and heading. VIEWSET=0 leaves the view alone (for key-press runs), VIEWSET=2 sets FIXVIEW at START;
+-- log written once at LAST.
 n=0
 buf=""
 wrote=-9
@@ -8,6 +9,7 @@ lasterr="none"
 PHASE=90
 START=30
 VIEWSET=1
+FIXVIEW=0
 LAST=940
 function OnInit()
 	n=0
@@ -15,6 +17,7 @@ function OnInit()
 end
 
 function step()
+	if VIEWSET==2 and n==START then _SETVIEWTYPE(FIXVIEW) end
 	if VIEWSET==1 and n>=START then
 		local v=math.floor((n-START)/PHASE)
 		if v<=9 and n-START==v*PHASE then _SETVIEWTYPE(v) end
