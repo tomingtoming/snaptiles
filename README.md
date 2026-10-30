@@ -37,7 +37,8 @@ is synthesized (engine, jets, shots, impacts); 🔊 mutes it. Fuel is consumed
 only when a script turns regulation E off (`_SETREG("E", 0)`), as in the
 original.
 
-Samples: `car` (↑↓ drive, ←→ steer), `plane` (Z/X throttle, ↓ pull up),
+Samples: `car` (↑↓ drive, ←→ steer), `plane` (Z/X throttle, then it lifts off by
+itself; a Lua autopilot holds height and level wings, ↓↑ climb/descend, ←→ bank),
 `walker` (↑ walk, ←→ turn; a Lua gait), `hover` (jets with a Lua attitude
 hold; ↑↓←→ move, A/D turn), `tank` (A/D turret, Z fire). The course has a
 ramp, kerbs, a gate, a wall and crates to knock over.

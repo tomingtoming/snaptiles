@@ -32,7 +32,8 @@ describe('plane sample control geometry and motion',()=>{
    }finally{await sim.dispose()}
   }
   expect(results.get(null)!.length()).toBeLessThan(.15);
-  expect(results.get(0)!.x).toBeLessThan(-.3);expect(results.get(1)!.x).toBeGreaterThan(.2);
+  // ↑↓ change the autopilot's wanted climb rate, not the elevator directly, so pitch responds more gently
+  expect(results.get(0)!.x).toBeLessThan(-.15);expect(results.get(1)!.x).toBeGreaterThan(.15);
   expect(results.get(2)!.z).toBeGreaterThan(.7);expect(results.get(3)!.z).toBeLessThan(-.7);
   expect(results.get(7)!.y).toBeGreaterThan(.2);expect(results.get(9)!.y).toBeLessThan(-.2);
   for(const key of [0,1]){expect(Math.abs(results.get(key)!.y)).toBeLessThan(.05);expect(Math.abs(results.get(key)!.z)).toBeLessThan(.05)}
@@ -48,5 +49,25 @@ describe('plane sample control geometry and motion',()=>{
    }finally{await sim.dispose()}
   }
   expect(heights[0]).toBeLessThan(2);expect(heights[1]).toBeGreaterThan(3.5);
+ });
+ it('rolls straight, lifts off and keeps flying hands-off, through a banked turn and back to level',async()=>{
+  const R=await initRapier(),keys=new KeyState(new EventTarget()),sim=new Simulation(R,PLANE,keys);
+  try{
+   await sim.start();const api=sim.api() as Record<string,(n:number)=>number>;
+   let liftoff=-1,lowest=Infinity,drift=0,headingBefore=0;
+   keys.press(4);
+   for(let i=0;i<30*40;i++){
+    if(i===100)keys.release(4);
+    if(i===30*15){headingBefore=api._EY(0);keys.press(2);}
+    if(i===30*22)keys.release(2);
+    sim.step();const p=sim.corePosition();
+    if(liftoff<0){drift=Math.max(drift,Math.abs(p.x));if(p.y>4)liftoff=i;}
+    else if(i>liftoff+90)lowest=Math.min(lowest,p.y);
+    if(i===30*22)expect(Math.abs(api._EY(0)-headingBefore)).toBeGreaterThan(.4);
+   }
+   // Measured: liftoff ~8 s at full throttle, ~14 m sideways on the run, never below ~10 m afterwards.
+   expect(liftoff).toBeGreaterThan(0);expect(liftoff).toBeLessThan(30*12);expect(drift).toBeLessThan(30);
+   expect(lowest).toBeGreaterThan(5);expect(Math.abs(api._EZ(0))).toBeLessThan(.1);
+  }finally{await sim.dispose()}
  });
 });

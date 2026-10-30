@@ -2076,3 +2076,36 @@ General editor, edge-count, touch, guide, selection, direction-marker and
 mixed-input probes pass. Probe note: hit-circle boxes measure 39.99px and the
 editor camera eases after selection changes, so the probe allows 39.5px and
 waits before reading mark positions.
+
+
+## 2026-10-30 — Make the plane sample actually fly (Sprint 69)
+
+Report: the plane still could not fly. A headless log (30 fps, full throttle,
+one pull-up) showed three faults. On the ground the 0.6 m main-gear track let
+the aircraft lean about 25 degrees onto a wingtip, which dragged it into a
+ground loop (up to 120 m sideways). After a pull-up, pitch and roll kept
+diverging and it crashed within about 16 s. Plate aero here is
+v^2 * (6.7 sin^1.5 a + ...), so plates make almost no restoring force near zero
+angle of attack: hands-off attitude is close to neutral. Joint response was
+checked separately (a Trim follows a commanded 20 degrees exactly), so this is a
+sample-design problem, not a joint defect. No physics constants changed.
+
+The sample now has tricycle gear (mains under the inner wing chips, a nose
+wheel on a vertical Trim under the nose), an all-moving tailplane, and a Lua
+autopilot in the style of the community planes (tonbo_202 damps with Lua):
+↓↑ set a wanted climb rate (CLIMB, m/s) and ←→ a bank angle (BANK, up to 45);
+Lua drives ELEV and AIL. Release holds height and levels the wings. With
+throttle it lifts off by itself (8 s at full throttle, 12 s at half, 22 s at a
+quarter) and keeps flying hands-off; a 45-degree bank turns about 0.5 rad in
+7 s at ~100 m/s and returns level. Neutral flight still climbs about 1 m/s.
+
+Validation: a new unit test flies 40 s from the ground through a banked turn
+(liftoff < 12 s, run drift < 30 m, never below 5 m after liftoff, level at
+the end). The airborne axis test keeps its signs; ↑↓ thresholds are lower
+(0.15 rad/s) because the keys now move a climb-rate target, not the elevator.
+Unit tests and both plane Chromium probes pass. Remote CI is disabled at the
+owner's request (2026-10-30).
+
+Not done: landing is not tested; staying on the ground at full speed without
+taking off still veers; the GUI-built aircraft probe builds the old
+Lua-free design and only checks takeoff.
