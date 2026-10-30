@@ -2149,3 +2149,15 @@ car with more than twice the vertical speed an inelastic impact allows. Kerb edg
 has sunk into) are now a spring-damper along the edge normal; flat-ground behaviour is byte-identical.
 Validation: 180 unit tests including the new kerb test, all 41 editor/runtime Chromium scenarios and
 both plane probes pass locally. Remote CI is disabled.
+
+
+## 2026-10-31 — Ditch lips and ramp crests (Sprint 72)
+
+Difference hunt tier 1 follow-up (docs/measured.md, difference hunt). The ditch's far lip is a shallow ground
+edge; as a rigid contact it launched the leading wheels 1.3 m. Kerb springs now apply to any ground edge
+or corner the tyre touches (found by a ray from the hub along the contact normal), not only to contacts
+tilted beyond 30°; faces up to 30° stay rigid. Ditch crossing now matches the original (pitch 0.04 vs 0.08).
+The ramp probe itself caused most of the ramp gap (a wedge and a plateau as two colliders leave an internal
+edge at the crest); ramps are now one convex solid in `terrains.json`. Flat-ground references replay
+byte-identical; 181 unit tests (new ditch test), all 41 browser scenarios and both plane probes pass.
+The wall rebound and the slower ramp climb remain open.

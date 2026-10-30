@@ -26,7 +26,7 @@ for (const name of scenes) {
   const world = sim.physics.world;
   // replace the default 4000 m ground slab with the scene's ground
   const old: RAPIER_Collider[] = [];
-  world.forEachCollider((c) => { if (!c.parent() && c.halfExtents?.().x === 2000) old.push(c); });
+  world.forEachCollider((c) => { if (!c.parent() && c.halfExtents?.()?.x === 2000) old.push(c); });
   for (const c of old) world.removeCollider(c, false);
   const grounds: Box[] = scene.ground ?? [spec.ground];
   const box = ([x0, x1, y0, y1, z0, z1]: Box) => world.createCollider(R.ColliderDesc.cuboid((x1 - x0) / 2, (y1 - y0) / 2, (z1 - z0) / 2)
@@ -35,8 +35,9 @@ for (const name of scenes) {
   for (const s of scene.solids) {
     if (s.box) box(s.box);
     else {
-      const [x0, x1, z0, z1, h] = s.ramp as number[];
-      const pts = new Float32Array([x0, 0, z0, x1, 0, z0, x0, 0, z1, x1, 0, z1, x0, h, z1, x1, h, z1]);
+      // slope and plateau as one convex solid (a seam between two colliders catches the wheels at the crest)
+      const [x0, x1, z0, z1, h, zEnd] = s.ramp as number[];
+      const pts = new Float32Array([x0, 0, z0, x1, 0, z0, x0, 0, zEnd, x1, 0, zEnd, x0, h, z1, x1, h, z1, x0, h, zEnd, x1, h, zEnd]);
       world.createCollider(R.ColliderDesc.convexHull(pts)!.setFriction(1).setCollisionGroups(GROUND));
     }
   }

@@ -97,18 +97,24 @@ export const WHEEL_SPIN_PER_POWER = 1 / 20.6;
 export const WHEEL_INERTIA_SCALE = 0.5;
 /** the motor torque reacts on the chassis (Wheel); RLW is the reactionless one */
 export const WHEEL_REACTION = true;
+/** also apply the reaction while the tyre touches the ground (probe knob) */
+export const WHEEL_REACTION_GROUND = true;
 /** spin drag on a sliding wheel (N·m·s); 0 once the fade zero point scales with power */
 export const WHEEL_SPIN_DRAG = 0;
 /** the tyre still grips this far above the ground (the unsprung front lifts a few cm under power) */
 export const TYRE_CONTACT_MARGIN = 0.1;
-/** a kerb edge (the contact normal tilted more than 30° from vertical) is a spring-damper, not a rigid contact:
+/** a kerb edge (a ground edge or corner the tyre touches, rather than a face) is a spring-damper, not a rigid contact:
  *  the rigid frictionless sphere either kicked the car into a wheelie or stopped it dead, while the original
  *  rolls up 0.10–0.25 m kerbs losing 17–79% of 6.9 m/s (measured 2026-10-31, docs/measured.md kerb section) */
 export const TYRE_SOFT_KERB = true;
 /** soft kerb stiffness: the wheel's static load sags it this far; damping as a ratio of critical */
 export const KERB_SAG = 0.02;
 export const KERB_DAMPING = 0.3;
+/** rigid ground: a face tilted less than 30°, or anything within 2° of vertical; a face normal within 3° of the
+ *  contact direction marks a face rather than an edge */
 const KERB_COS = Math.cos(30 * Math.PI / 180);
+const KERB_COS_FLAT = Math.cos(2 * Math.PI / 180);
+const KERB_FACE_COS = Math.cos(3 * Math.PI / 180);
 const KERB_DEEP = 0.03;
 /** load the tyre forces may transmit: μ × (model weight / number of wheels) */
 export const TYRE_LOAD_SHARE = 1;
@@ -900,7 +906,8 @@ export class PhysicsWorld {
         }
         // the motor (and brake) torque acts between wheel and chassis: its reaction pitches the body (measured:
         // a car at power 10000 pitches 0.7 rad nose-up while still falling after spawn; RLW has no reaction)
-        if (!tile.spec.noReaction && ((globalThis as unknown as { __tune?: { wheelReaction?: boolean } }).__tune?.wheelReaction ?? WHEEL_REACTION)) {
+        const tuneR = (globalThis as unknown as { __tune?: { wheelReaction?: boolean; wheelReactionGround?: boolean } }).__tune;
+        if (!tile.spec.noReaction && (tuneR?.wheelReaction ?? WHEEL_REACTION) && (tuneR?.wheelReactionGround ?? WHEEL_REACTION_GROUND)) {
           const T = normal.clone().multiplyScalar(tau);
           body.addTorque({ x: T.x, y: T.y, z: T.z }, true);
         }
@@ -1382,9 +1389,15 @@ export class PhysicsWorld {
         const dist = e.length();
         if (dist < 1e-6) return true;
         e.divideScalar(dist);
-        // ground under the tyre stays rigid unless the tyre has sunk into it climbing a kerb: a rigid contact would
-        // pop that depth out in one step, with no loss of speed
-        if (e.y >= KERB_COS && r - dist < KERB_DEEP) return true;
+        // a face under the tyre (flat or sloped up to 30°) stays a rigid contact; an edge or corner is a kerb,
+        // however shallow (a 3 cm lip at 9 m/s launched the car). A ray from the hub along -e meets a face with
+        // the same normal; at an edge the face normal differs. A tyre sunk into the ground climbing a kerb stays
+        // soft too: a rigid contact would pop that depth out in one step, with no loss of speed.
+        if (r - dist < KERB_DEEP) {
+          const hit = other.castRayAndGetNormal(new this.R.Ray(t, { x: -e.x, y: -e.y, z: -e.z }), dist + 0.05, true);
+          const onFace = !hit || hit.normal.x * e.x + hit.normal.y * e.y + hit.normal.z * e.z > KERB_FACE_COS;
+          if ((onFace && e.y >= KERB_COS) || e.y >= KERB_COS_FLAT) return true;
+        }
         this.kerbPairs.add(`${col.handle}:${other.handle}`);
         if (dist < r) hits.push({ e, P: new THREE.Vector3(proj.point.x, proj.point.y, proj.point.z), depth: r - dist, other });
         return true;

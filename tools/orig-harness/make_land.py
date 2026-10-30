@@ -35,7 +35,10 @@ def ramp(x0, x1, z0, z1, h):
 for g in grounds: box(*g)
 for s in sc['solids']:
     if 'box' in s: box(*s['box'])
-    else: ramp(*s['ramp'])
+    else:
+        x0, x1, z0, z1, h, zend = s['ramp']
+        ramp(x0, x1, z0, z1, h)
+        box(x0, x1, 0, h, z1, zend)
 v, f = [], []
 for q in quads:
     b = len(v); v += [(x, y + BASE, z) for x, y, z in q]
