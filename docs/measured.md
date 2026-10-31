@@ -302,3 +302,19 @@ outliers are models whose scripts set joint angles on the first frame (mukade's 
 original's first dump but after SnapTiles') and a few still unexplained (dragon wing tips 1.05 m, Talon,
 boidbit, ender, DUCKER ≤ 0.3 m). Frame-30 differences up to 27 m (satellite, Vic viper, qb-xt, ender,
 prin) come from what the models do in their first second and belong to tier 3 (driving runs).
+
+## 2026-10-31: difference hunt, tier 3 (corpus driving)
+
+`rc_drive_corpus.sh` runs every corpus model on a flat 400 m land (150 m base, 50 m faces: 4 m faces gave
+20k faces and ~1 fps) for 600 frames, once with no input and once holding Up from ~4 s; the scenario logs
+whether key 0 is held each frame, so `tools/drive-compare.ts` replays the same frames in SnapTiles and
+`driverank.py` ranks the trajectories (relative to the frame-30 position, cut at 180 m). 194 runs. Groups:
+
+| group | models | what differs |
+|---|---|---|
+| A. SnapTiles falls over with no input | Talon, DUCKER, hebel, hebel_c, talet_s, ika, coin, tw-2, tp-2, patagun3, heri1, … (~12) | the original lands from the spawn drop and stands; SnapTiles starts tilting at the landing (frames 10–30) and falls. Many-jointed standing models (spring/damper joints, servos); likely the same root as the known walker failures |
+| B. only the original goes wild | ender, skal, danboo | the original reaches 78–110 m/s with no input; SnapTiles stays put. Original instability or scripts — not yet examined |
+| C. only SnapTiles flies off | boidbit | rises to 107 m vs 14.5 m |
+| D. vehicles under Up | car2, segway, 1wheel, been3, tp-2, tw-2 | the original drives ~180 m; SnapTiles falls over or lags |
+
+Most other runs agree within a few metres.

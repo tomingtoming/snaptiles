@@ -1,18 +1,212 @@
 {
   "_doc": "Terrain probes for the original vs SnapTiles (rc_terrain.sh, tools/terrain-compare.ts). Solids are boxes [x0,x1,y0,y1,z0,z1] or ramps [x0,x1,z0,z1,height,zEnd] (a wedge rising along +z from y=0, then flat at that height to zEnd, one convex solid: two colliders would leave an internal edge at the crest that real wheels catch). The Basic car spawns at the origin and drives toward +z. Coordinates are SnapTiles' (the original mirrors x; every solid here is symmetric in x).",
-  "ground": [-30, 30, -1, 0, -40, 250],
+  "ground": [
+    -30,
+    30,
+    -1,
+    0,
+    -40,
+    250
+  ],
   "scenes": {
-    "flat":    { "solids": [] },
-    "step010": { "solids": [{ "box": [-10, 10, 0, 0.10, 6, 36] }] },
-    "step020": { "solids": [{ "box": [-10, 10, 0, 0.20, 6, 36] }] },
-    "step025": { "solids": [{ "box": [-10, 10, 0, 0.25, 6, 36] }] },
-    "bump015": { "solids": [{ "box": [-10, 10, 0, 0.15, 8, 8.5] }] },
-    "drop050": { "ground": [[-30, 30, -1, 0, -40, 10], [-30, 30, -1.5, -0.5, 10, 250]], "solids": [] },
-    "drop100": { "ground": [[-30, 30, -1, 0, -40, 10], [-30, 30, -2, -1, 10, 250]], "solids": [] },
-    "ditch":   { "ground": [[-30, 30, -1, 0, -40, 10], [-30, 30, -3, -2, 10, 11], [-30, 30, -1, 0, 11, 250]], "solids": [] },
-    "ramp10":  { "solids": [{ "ramp": [-10, 10, 8, 18, 1.763, 60] }] },
-    "ramp20":  { "solids": [{ "ramp": [-10, 10, 8, 18, 3.640, 60] }] },
-    "ramp30":  { "solids": [{ "ramp": [-10, 10, 8, 18, 5.774, 60] }] },
-    "wall":    { "solids": [{ "box": [-10, 10, 0, 2, 15, 16] }] }
+    "flat": {
+      "solids": []
+    },
+    "step010": {
+      "solids": [
+        {
+          "box": [
+            -10,
+            10,
+            0,
+            0.1,
+            6,
+            36
+          ]
+        }
+      ]
+    },
+    "step020": {
+      "solids": [
+        {
+          "box": [
+            -10,
+            10,
+            0,
+            0.2,
+            6,
+            36
+          ]
+        }
+      ]
+    },
+    "step025": {
+      "solids": [
+        {
+          "box": [
+            -10,
+            10,
+            0,
+            0.25,
+            6,
+            36
+          ]
+        }
+      ]
+    },
+    "bump015": {
+      "solids": [
+        {
+          "box": [
+            -10,
+            10,
+            0,
+            0.15,
+            8,
+            8.5
+          ]
+        }
+      ]
+    },
+    "drop050": {
+      "ground": [
+        [
+          -30,
+          30,
+          -1,
+          0,
+          -40,
+          10
+        ],
+        [
+          -30,
+          30,
+          -1.5,
+          -0.5,
+          10,
+          250
+        ]
+      ],
+      "solids": []
+    },
+    "drop100": {
+      "ground": [
+        [
+          -30,
+          30,
+          -1,
+          0,
+          -40,
+          10
+        ],
+        [
+          -30,
+          30,
+          -2,
+          -1,
+          10,
+          250
+        ]
+      ],
+      "solids": []
+    },
+    "ditch": {
+      "ground": [
+        [
+          -30,
+          30,
+          -1,
+          0,
+          -40,
+          10
+        ],
+        [
+          -30,
+          30,
+          -3,
+          -2,
+          10,
+          11
+        ],
+        [
+          -30,
+          30,
+          -1,
+          0,
+          11,
+          250
+        ]
+      ],
+      "solids": []
+    },
+    "ramp10": {
+      "solids": [
+        {
+          "ramp": [
+            -10,
+            10,
+            8,
+            18,
+            1.763,
+            60
+          ]
+        }
+      ]
+    },
+    "ramp20": {
+      "solids": [
+        {
+          "ramp": [
+            -10,
+            10,
+            8,
+            18,
+            3.64,
+            60
+          ]
+        }
+      ]
+    },
+    "ramp30": {
+      "solids": [
+        {
+          "ramp": [
+            -10,
+            10,
+            8,
+            18,
+            5.774,
+            60
+          ]
+        }
+      ]
+    },
+    "wall": {
+      "solids": [
+        {
+          "box": [
+            -10,
+            10,
+            0,
+            2,
+            15,
+            16
+          ]
+        }
+      ]
+    },
+    "wide": {
+      "ground": [
+        [
+          -200,
+          200,
+          -1,
+          0,
+          -200,
+          200
+        ]
+      ],
+      "solids": []
+    }
   }
 }

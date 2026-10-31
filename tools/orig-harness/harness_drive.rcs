@@ -1,0 +1,26 @@
+-- Corpus driving probe (tier 3): log only. Per frame: whether key 0 (Up) is held, core pose, velocity, Euler,
+-- and how many chips are still attached to the core's tree (_PARENT chain) - detached chips count separately.
+n=0
+buf=""
+wrote=-9
+LAST=600
+function OnInit()
+	n=0
+	buf="frame,key0,x,y,z,vx,vy,vz,ex,ey,ez,chips\n"
+end
+function step()
+	if n<=LAST then
+		buf=buf..n..",".._KEY(0)..",".._X(0)..",".._Y(0)..",".._Z(0)..",".._VX(0)..",".._VY(0)..",".._VZ(0)..","..
+			_EX(0)..",".._EY(0)..",".._EZ(0)..",".._CHIPS().."\n"
+	end
+	if n==LAST then
+		local h=_FOPEN("log.txt","w")
+		if h>=0 then _FPUTS(h,buf) _FCLOSE(h) wrote=h else wrote=-1 end
+	end
+end
+function OnFrame()
+	n=n+1
+	pcall(step)
+	out(0,"frame ",n," wrote ",wrote)
+end
+function OnReset() end

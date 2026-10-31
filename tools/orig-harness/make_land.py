@@ -1,12 +1,12 @@
 """Write the Header+Mesh body of a DirectX text land for one scene of terrains.json (rc_terrain.sh prepends
 the original's template block). usage: make_land.py <terrains.json> <scene> <out.body>
-Faces are split into <= 4 m quads (a lone 1000 m quad was suspected early on; harmless either way), the
+Faces are split into <= LAND_CELL m quads (4 by default; the 400 m "wide" land uses 50: 20k faces ran at ~1 fps), the
 land is lifted to y = BASE (above the original's sea) and every material keeps Emissive 0: that row is the
 original's rolling/static/dynamic friction (readme 15B11)."""
 import json, sys
 spec, scene, out = json.load(open(sys.argv[1])), sys.argv[2], sys.argv[3]
 import os
-BASE, CELL = float(os.environ.get("LAND_BASE", 50.0)), 4.0  # at 50 a 1 m drop and the 30° ramp fell into the sea; rc_terrain_high.sh uses 150
+BASE, CELL = float(os.environ.get("LAND_BASE", 50.0)), float(os.environ.get("LAND_CELL", 4.0))  # at 50 a 1 m drop and the 30° ramp fell into the sea; rc_terrain_high.sh uses 150
 sc = spec['scenes'][scene]
 grounds = sc.get('ground', [spec['ground']])
 if grounds and not isinstance(grounds[0], list): grounds = [grounds]
