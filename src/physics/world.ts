@@ -69,8 +69,12 @@ export const WHEEL_TORQUE_PER_POWER = 0.13; // N·m per power unit (measured: Ba
  *  (measured on the original 1.5B26: Basic car at power 2500, a/a0 = 0.877 at ω≈22 rad/s, 0.62 at ω≈69;
  *  no hard speed cap and no measurable air/rolling drag while coasting at 22 m/s) */
 export const WHEEL_SPIN_FADE = 180; // rad/s at which the torque would reach zero
-/** rapier velocity-solver iterations per step (joint chains sag less with more) */
-export const SOLVER_ITERATIONS = 16; // 8 let the 3-wheeler's joint chain sag 0.4 m under its own weight; 32 settles it at the original's height
+/** rapier solver: one substep with 16 internal PGS iterations. Sixteen substeps (the old setting) fed energy
+ *  into impacts — the Basic car rebounded off a wall at −7.6 m/s (the original stops dead) and standing corpus
+ *  models toppled on landing — and the rebound grew with the substep count. Joint chains still need the 16
+ *  iterations: 8 let the 3-wheeler's chain sag 0.4 m under its own weight. */
+export const SOLVER_ITERATIONS = 1;
+export const PGS_ITERATIONS = 16;
 /** brake: deceleration in g per brake unit and its cap (measured on the original, 4-wheel car) */
 export const BRAKE_G_PER_UNIT = 0.022;
 export const BRAKE_G_MAX = 0.8;
@@ -116,13 +120,6 @@ const KERB_COS = Math.cos(30 * Math.PI / 180);
 const KERB_COS_FLAT = Math.cos(2 * Math.PI / 180);
 const KERB_FACE_COS = Math.cos(3 * Math.PI / 180);
 const KERB_DEEP = 0.03;
-/** no rebound off walls: a model that hits a near-vertical ground face (|normal.y| < 0.5) faster than 1 m/s
- *  loses the velocity that carries it away from the face that step. The original stops dead at a 2 m wall
- *  hit at 10.5 m/s; rapier's correction of a locked joint between the two halves of the Basic car threw it
- *  back at −7.6 m/s (more solver iterations, more rebound), and rapier-compat 0.21 exposes no joint stiffness. */
-export const WALL_NO_REBOUND = true;
-const WALL_MAX_NY = 0.5;
-const WALL_MIN_APPROACH = 1;
 /** load the tyre forces may transmit: μ × (model weight / number of wheels) */
 export const TYRE_LOAD_SHARE = 1;
 /** per-wheel load from the static lever rule about the centre of mass (false: total mass / wheel count);
@@ -325,7 +322,7 @@ export class PhysicsWorld {
     this.world.timestep = this.dt;
     const tune = (globalThis as unknown as { __tune?: { solverIterations?: number; pgsIterations?: number } }).__tune;
     this.world.numSolverIterations = tune?.solverIterations ?? SOLVER_ITERATIONS;
-    if (tune?.pgsIterations) this.world.integrationParameters.numInternalPgsIterations = tune.pgsIterations;
+    this.world.integrationParameters.numInternalPgsIterations = tune?.pgsIterations ?? PGS_ITERATIONS;
     const groundDesc = R.ColliderDesc.cuboid(2000, 1, 2000).setTranslation(0, -1, 0).setFriction(1.0).setCollisionGroups(GROUND_GROUP);
     this.world.createCollider(groundDesc);
     const noCourse = (globalThis as unknown as { __tune?: { noCourse?: boolean } }).__tune?.noCourse ?? false; // bare ground for measurements
@@ -1363,8 +1360,6 @@ export class PhysicsWorld {
 
   /** tyre/ground pairs this step handles as soft kerbs (key: tyre handle:ground handle) */
   private kerbPairs = new Set<string>();
-  /** wall normals (pointing out of the wall) a soft kerb pushed this step, by body handle */
-  private kerbWalls = new Map<number, THREE.Vector3[]>();
   private events: RAPIER.EventQueue | null = null;
   private hooks = {
     filterContactPair: (c1: number, c2: number) => this.kerbPairs.has(`${c1}:${c2}`) || this.kerbPairs.has(`${c2}:${c1}`) ? this.R.SolverFlags.EMPTY : this.R.SolverFlags.COMPUTE_IMPULSE,
@@ -1375,7 +1370,6 @@ export class PhysicsWorld {
    *  contact off. Ground under the tyre (normal within 30° of vertical) stays a rigid contact. */
   private kerbSprings(): void {
     this.kerbPairs.clear();
-    this.kerbWalls.clear();
     const soft = (globalThis as unknown as { __tune?: { softKerb?: boolean } }).__tune?.softKerb ?? TYRE_SOFT_KERB;
     for (const tb of this.tiles) {
       tb.kerbForce = 0;
@@ -1422,88 +1416,16 @@ export class PhysicsWorld {
         const ob = other.parent();
         if (ob && ob.isDynamic()) ob.addForceAtPoint({ x: -e.x * F, y: -e.y * F, z: -e.z * F }, P, true); // crates, balls
         tb.kerbForce += F;
-        if (F > 0 && Math.abs(e.y) < WALL_MAX_NY) {
-          const list = this.kerbWalls.get(body.handle) ?? [];
-          list.push(e.clone());
-          this.kerbWalls.set(body.handle, list);
-        }
-      }
-    }
-  }
-
-  /** after a step: remove the velocity that carries a model away from a wall it hit (see WALL_NO_REBOUND) */
-  private stopWallRebound(pre: Map<number, THREE.Vector3>): void {
-    // bodies grouped by the model they belong to (joints keep their bodies together)
-    const groups = new Map<number, RAPIER.RigidBody[]>();
-    const rootOf = new Map<number, number>();
-    for (const tb of this.tiles) {
-      if (rootOf.has(tb.body.handle)) continue;
-      const root = this.componentRoot(tb.tile);
-      rootOf.set(tb.body.handle, root);
-      groups.set(root, [...(groups.get(root) ?? []), tb.body]);
-    }
-    const walls = new Map<number, THREE.Vector3[]>();
-    const add = (body: RAPIER.RigidBody, n: THREE.Vector3) => {
-      const root = rootOf.get(body.handle);
-      if (root !== undefined) walls.set(root, [...(walls.get(root) ?? []), n]);
-    };
-    for (const [handle, list] of this.kerbWalls) { const b = this.world.getRigidBody(handle); if (b) for (const n of list) add(b, n); }
-    for (const [, bodies] of groups) for (const body of bodies) {
-      const com = body.translation();
-      for (let i = 0; i < body.numColliders(); i++) {
-        const col = body.collider(i);
-        this.world.contactPairsWith(col, (other) => {
-          if (other.parent()) return; // only static ground
-          this.world.contactPair(col, other, (m) => {
-            let impulse = 0;
-            for (let k = 0; k < m.numContacts(); k++) impulse += m.contactImpulse(k);
-            const p = m.numSolverContacts() > 0 ? m.solverContactPoint(0) : null;
-            if (impulse <= 0 || !p) return;
-            const raw = m.normal();
-            const n = new THREE.Vector3(raw.x, raw.y, raw.z);
-            if ((com.x - p.x) * n.x + (com.y - p.y) * n.y + (com.z - p.z) * n.z < 0) n.negate();
-            if (Math.abs(n.y) < WALL_MAX_NY) add(body, n);
-          });
-        });
-      }
-    }
-    for (const [root, normals] of walls) {
-      const bodies = groups.get(root)!;
-      let m = 0;
-      const vPre = new THREE.Vector3(), vPost = new THREE.Vector3();
-      for (const b of bodies) {
-        const w = b.mass(), lv = b.linvel();
-        vPre.addScaledVector(pre.get(b.handle) ?? new THREE.Vector3(lv.x, lv.y, lv.z), w);
-        vPost.add(new THREE.Vector3(lv.x, lv.y, lv.z).multiplyScalar(w));
-        m += w;
-      }
-      if (m <= 0) continue;
-      vPre.divideScalar(m); vPost.divideScalar(m);
-      const seen: THREE.Vector3[] = [];
-      for (const n of normals) {
-        if (seen.some((s) => s.dot(n) > 0.95)) continue;
-        seen.push(n);
-        const away = vPost.dot(n);
-        if (vPre.dot(n) > -WALL_MIN_APPROACH || away <= 0) continue;
-        for (const b of bodies) {
-          const lv = b.linvel();
-          b.setLinvel({ x: lv.x - n.x * away, y: lv.y - n.y * away, z: lv.z - n.z * away }, true);
-        }
-        vPost.addScaledVector(n, -away);
       }
     }
   }
 
   step(): void {
     this.kerbSprings();
-    const noRebound = (globalThis as unknown as { __tune?: { wallNoRebound?: boolean } }).__tune?.wallNoRebound ?? WALL_NO_REBOUND;
-    const pre = new Map<number, THREE.Vector3>();
-    if (noRebound) for (const tb of this.tiles) { const v = tb.body.linvel(); pre.set(tb.body.handle, new THREE.Vector3(v.x, v.y, v.z)); }
     // rapier only consults the hooks when an event queue is passed
     this.events ??= new this.R.EventQueue(false);
     this.world.step(this.events, this.hooks);
     this.events.clear();
-    if (noRebound) this.stopWallRebound(pre);
     this.measureTyreLoads();
     this.tick++;
     if (this.projectiles.length) this.cullProjectiles();

@@ -9,13 +9,14 @@ import { Simulation } from '../src/sim/simulation';
 import { KeyState } from '../src/input/keys';
 
 const [dir, geom, ...only] = process.argv.slice(2);
-mkdirSync(`${dir}/snap`, { recursive: true });
+const SNAP = process.env.SNAP_DIR ?? 'snap'; // write a variant's replays elsewhere
+mkdirSync(`${dir}/${SNAP}`, { recursive: true });
 (globalThis as unknown as { __tune?: unknown }).__tune = { noCourse: true };
 const R = await initRapier();
 const logs = readdirSync(dir).filter((f) => /^\d+\.(idle|up)\.csv$/.test(f)).filter((f) => !only.length || only.includes(f.split('.')[0]));
 for (const file of logs) {
   const [n, mode] = file.split('.');
-  const out = `${dir}/snap/${n}.${mode}.csv`;
+  const out = `${dir}/${SNAP}/${n}.${mode}.csv`;
   if (existsSync(out)) continue;
   const orig = readFileSync(`${dir}/${file}`, 'utf8').trim().split('\n').slice(1).map((l) => l.split(','));
   const held = new Set(orig.filter((r) => Number(r[1]) === 1).map((r) => Number(r[0])));
@@ -34,9 +35,10 @@ for (const file of logs) {
     }
     writeFileSync(out, rows.join('\n') + '\n');
   } catch (e) {
-    writeFileSync(`${dir}/snap/${n}.${mode}.err`, String(e instanceof Error ? e.message : e));
+    writeFileSync(`${dir}/${SNAP}/${n}.${mode}.err`, String(e instanceof Error ? e.message : e));
   } finally {
     if (sim) await sim.dispose();
   }
 }
 console.log('done', logs.length);
+process.exit(0); // rapier's wasm can keep bun alive after the last dispose

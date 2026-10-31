@@ -318,3 +318,14 @@ whether key 0 is held each frame, so `tools/drive-compare.ts` replays the same f
 | D. vehicles under Up | car2, segway, 1wheel, been3, tp-2, tw-2 | the original drives ~180 m; SnapTiles falls over or lags |
 
 Most other runs agree within a few metres.
+
+**Follow-up, same day — the solver substeps (fixes most of group A and the wall).** `numSolverIterations`
+16 means sixteen solver substeps in rapier 0.21, and that fed energy into impacts: the coin model (one rigid
+body standing on two feet) picked up a −1.07 rad/s yaw on a level landing and fell, and the Basic car's
+wall rebound grew with the count (4: −2.7, 16: −7.6, 64: −32 m/s). One substep with 16 internal PGS
+iterations (`SOLVER_ITERATIONS` 1, `PGS_ITERATIONS` 16) keeps the joint stiffness the 3-wheeler needed and
+the eight steady-turn references (speed error 10.8 → 10.7%, yaw-rate error 0.083 → 0.082 rad/s against the
+original), and the wall now stops the car at z = 14.1 with 0.06 rad of pitch (original 0.21), so the
+`WALL_NO_REBOUND` clamp added earlier was removed. Corpus driving: runs where SnapTiles falls but the
+original stands 25 → 11, all upright mismatches 33 → 20, runs scoring above 1 49 → 35; corpus geometry after
+1 s: models off by more than 1 m 28 → 22. Still falling: Talon, DUCKER, zrobo, 2leg1, 15cpHeri, been3, car2.

@@ -13,10 +13,10 @@ def load(p, mirror):
 out, missing = [], []
 for n, path in idx.items():
     o1, o30 = (os.path.join(d, f'{n}.g{k}.csv') for k in (1, 30))
-    s1, s30 = (os.path.join(d, 'snap', f'{n}.g{k}.csv') for k in (1, 30))
+    s1, s30 = (os.path.join(d, os.environ.get('SNAP_DIR', 'snap'), f'{n}.g{k}.csv') for k in (1, 30))
     if not os.path.exists(o30): continue
     if not os.path.exists(s30):
-        err = os.path.join(d, 'snap', f'{n}.err')
+        err = os.path.join(d, os.environ.get('SNAP_DIR', 'snap'), f'{n}.err')
         missing.append((n, path, open(err).read()[:80] if os.path.exists(err) else 'no snap output')); continue
     res = []
     for op, sp in ((o1, s1), (o30, s30)):

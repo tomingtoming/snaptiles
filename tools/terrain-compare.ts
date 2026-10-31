@@ -55,3 +55,4 @@ for (const name of scenes) {
   console.log(name, 'done');
 }
 type RAPIER_Collider = Parameters<Parameters<InstanceType<typeof R.World>['forEachCollider']>[0]>[0];
+process.exit(0); // rapier's wasm can keep bun alive after the last dispose

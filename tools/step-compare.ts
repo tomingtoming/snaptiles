@@ -30,3 +30,4 @@ for (let n = 1; n <= FRAMES; n++) {
 }
 writeFileSync(args[1], rows.join('\n') + '\n');
 await sim.dispose();
+process.exit(0); // rapier's wasm can keep bun alive after the last dispose

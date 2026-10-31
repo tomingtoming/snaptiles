@@ -2173,3 +2173,14 @@ face, applied equally to all of its bodies (`WALL_NO_REBOUND`, knob `wallNoRebou
 z = 14.1 as in the original; its pitch on impact is still larger (0.50 vs 0.21 rad). Flat-ground references
 replay byte-identical; other terrain probes are unchanged; physics costs up to 0.13 ms more per frame on the
 largest corpus models (total stays under 1 ms). New unit test for the wall; 182 unit tests pass.
+
+
+## 2026-10-31 — One solver substep (Sprint 74)
+
+Difference hunt group A (standing models toppling on landing). The cause was rapier's solver substeps:
+sixteen of them injected energy at impacts (a one-body coin spun up on a level landing; the wall rebound
+grew with the count). One substep with 16 internal PGS iterations keeps joint stiffness and the turn
+references, removes the wall rebound without the `WALL_NO_REBOUND` clamp (removed), and halves the corpus
+runs where SnapTiles falls while the original stands (25 → 11). 182 unit tests, all browser scenarios and
+both plane probes pass. The flat-ground byte-identity of earlier sprints no longer holds (the solver
+changed); the turn references were re-compared with the original instead.

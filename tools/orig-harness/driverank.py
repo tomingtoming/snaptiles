@@ -16,7 +16,7 @@ rows, missing = [], []
 for name in sorted(os.listdir(d)):
     if not name.endswith('.csv'): continue
     n, mode = name.split('.')[:2]
-    sp = os.path.join(d, 'snap', name)
+    sp = os.path.join(d, os.environ.get('SNAP_DIR', 'snap'), name)
     if not os.path.exists(sp):
         err = sp[:-4] + '.err'; missing.append((n, mode, open(err).read()[:70] if os.path.exists(err) else 'no replay')); continue
     o, s = load(os.path.join(d, name), 150.0), load(sp, 0.0)
