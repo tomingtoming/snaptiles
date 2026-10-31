@@ -2184,3 +2184,11 @@ references, removes the wall rebound without the `WALL_NO_REBOUND` clamp (remove
 runs where SnapTiles falls while the original stands (25 → 11). 182 unit tests, all browser scenarios and
 both plane probes pass. The flat-ground byte-identity of earlier sprints no longer holds (the solver
 changed); the turn references were re-compared with the original instead.
+
+
+## 2026-10-31 — A quarter of the motor reaction on the ground (Sprint 75)
+
+Difference hunt group D. Corpus car2 flipped backwards when floored and segway ran away; the original
+barely pitches. The motor reaction torque while the tyre touches the ground now applies at a quarter
+(`WHEEL_REACTION_GROUND_SCALE`): off fixed the vehicles but cost the steady-turn references, a quarter keeps
+both (see docs/measured.md tier 3 follow-up). 182 unit tests, all browser scenarios and both plane probes pass.

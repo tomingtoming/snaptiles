@@ -101,8 +101,13 @@ export const WHEEL_SPIN_PER_POWER = 1 / 20.6;
 export const WHEEL_INERTIA_SCALE = 0.5;
 /** the motor torque reacts on the chassis (Wheel); RLW is the reactionless one */
 export const WHEEL_REACTION = true;
-/** also apply the reaction while the tyre touches the ground (probe knob) */
+/** the reaction while the tyre touches the ground, as a fraction of the motor torque. In the original a car
+ *  flooring it barely pitches (corpus car2: 0.01 rad); at full strength SnapTiles' car2 reared up and flipped,
+ *  segway ran away and the Basic car wheelied over ramp crests. Turning it off fixes those but costs the
+ *  steady-turn references (they lean on its rear load transfer: speed error 10.7 → 14.5%); a quarter keeps
+ *  the fixes at 12.4% (2026-10-31, docs/measured.md tier 3). The airborne reaction (spawn-drop pitch) is full. */
 export const WHEEL_REACTION_GROUND = true;
+export const WHEEL_REACTION_GROUND_SCALE = 0.25;
 /** spin drag on a sliding wheel (N·m·s); 0 once the fade zero point scales with power */
 export const WHEEL_SPIN_DRAG = 0;
 /** the tyre still grips this far above the ground (the unsprung front lifts a few cm under power) */
@@ -910,9 +915,9 @@ export class PhysicsWorld {
         }
         // the motor (and brake) torque acts between wheel and chassis: its reaction pitches the body (measured:
         // a car at power 10000 pitches 0.7 rad nose-up while still falling after spawn; RLW has no reaction)
-        const tuneR = (globalThis as unknown as { __tune?: { wheelReaction?: boolean; wheelReactionGround?: boolean } }).__tune;
+        const tuneR = (globalThis as unknown as { __tune?: { wheelReaction?: boolean; wheelReactionGround?: boolean; wheelReactionGroundScale?: number } }).__tune;
         if (!tile.spec.noReaction && (tuneR?.wheelReaction ?? WHEEL_REACTION) && (tuneR?.wheelReactionGround ?? WHEEL_REACTION_GROUND)) {
-          const T = normal.clone().multiplyScalar(tau);
+          const T = normal.clone().multiplyScalar(tau * (tuneR?.wheelReactionGroundScale ?? WHEEL_REACTION_GROUND_SCALE));
           body.addTorque({ x: T.x, y: T.y, z: T.z }, true);
         }
         const lateralGain = (globalThis as unknown as { __tune?: { tyreLateral?: number } }).__tune?.tyreLateral ?? TYRE_LATERAL_GAIN;

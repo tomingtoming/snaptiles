@@ -329,3 +329,14 @@ original), and the wall now stops the car at z = 14.1 with 0.06 rad of pitch (or
 `WALL_NO_REBOUND` clamp added earlier was removed. Corpus driving: runs where SnapTiles falls but the
 original stands 25 → 11, all upright mismatches 33 → 20, runs scoring above 1 49 → 35; corpus geometry after
 1 s: models off by more than 1 m 28 → 22. Still falling: Talon, DUCKER, zrobo, 2leg1, 15cpHeri, been3, car2.
+
+**Follow-up — group D (vehicles under Up).** Corpus car2 reared up and flipped within a second of flooring it
+(pitch −0.56 rad; the original stays at 0.01) and segway ran away: the motor's reaction torque applied while
+the tyre touches the ground. Off, car2 (1.16 → 0.05) and segway (1.23 → 0.05) match, the ramp probes improve,
+but the steady-turn references lose accuracy (speed error 10.7 → 14.5%, yaw 0.082 → 0.110 rad/s: they lean
+on the reaction's rear load transfer). A quarter of it (`WHEEL_REACTION_GROUND_SCALE` 0.25) keeps the vehicle
+fixes (car2 0.06, segway 0.08), gives the best corpus totals (runs scoring above 1: 35 → 33, upright
+mismatches 20 → 18) and terrain scores (ramps 0.25/0.44/0.48, wall 0.54), at a turn error of 12.4% / 0.096.
+The airborne reaction stays full (the measured spawn-drop pitch). Still open in D: 1wheel (108 vs 82 m),
+tp-2 (179 vs 37 m), car1's top speed (66 vs 31 m/s: the high-power fade of a rolling wheel is still a guess),
+and RCModel1 bike, which the original barely moves under Up (8 m) while SnapTiles rides 190 m.
