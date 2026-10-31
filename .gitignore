@@ -7,3 +7,4 @@ dist/
 .dev.log
 .dev.pid
 tools/orig-harness/lands/
+__pycache__/
