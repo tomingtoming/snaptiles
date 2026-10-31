@@ -2192,3 +2192,13 @@ Difference hunt group D. Corpus car2 flipped backwards when floored and segway r
 barely pitches. The motor reaction torque while the tyre touches the ground now applies at a quarter
 (`WHEEL_REACTION_GROUND_SCALE`): off fixed the vehicles but cost the steady-turn references, a quarter keeps
 both (see docs/measured.md tier 3 follow-up). 182 unit tests, all browser scenarios and both plane probes pass.
+
+
+## 2026-11-01 — Spring joints follow their command (Sprint 76)
+
+Difference hunt group A. Measured the original's joints with spring < 1 on an unloaded arm (spring
+0.02–1, damper 0–1, light and heavy tip): they follow a commanded angle as a damped spring whose speed
+grows with spring^1.5, not instantly. Animated joints with spring < 1 now filter their command through that
+spring (`SPRING_SERVO_W`, `SPRING_SERVO_P`, knob `springServo`). Corpus runs scoring above 1: 33 → 30; three
+models stop creeping. Talon and the other standing models still fall (joints do not yet give under load).
+New unit test against the measured response; 186 unit tests, all browser scenarios and both plane probes pass.

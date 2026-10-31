@@ -340,3 +340,18 @@ mismatches 20 → 18) and terrain scores (ramps 0.25/0.44/0.48, wall 0.54), at a
 The airborne reaction stays full (the measured spawn-drop pitch). Still open in D: 1wheel (108 vs 82 m),
 tp-2 (179 vs 37 m), car1's top speed (66 vs 31 m/s: the high-power fade of a rolling wheel is still a guess),
 and RCModel1 bike, which the original barely moves under Up (8 m) while SnapTiles rides 190 m.
+
+**Follow-up, 2026-11-01 — joints with spring < 1 (group A).** Talon still fell. Its Lua converges the legs
+to the same Val values in both programs, and the converged pose assembles identically (0.000 m), but SnapTiles
+moved every animated joint to its command instantly. On the original (`rc_models31.sh`, `rc_models32.sh`:
+an arm standing on a heavy base, commanded 30°) a joint with spring < 1 follows its command like a damped
+spring: ω = 15.5·spring^1.5 rad per 30 fps frame (spring 0.05 reaches the command in ~16 frames, 0.1 in ~6,
+0.2 in ~2, 0.5 and 1 in one), damping ratio ≈ 0.6 for damper ≥ 0.5 (0.5 and 1 give identical runs) and ≈ 0.25
+at damper 0–0.1; a 3× heavier arm is ~20% slower. SnapTiles now filters the command of such joints through
+that spring, wrapping the error the short way round (G.txt's legs command "current + 20°" and wrap at ±180°).
+Corpus: runs scoring above 1 30 (was 33), median 0.43 → 0.40; carrot, pla3 and trimpla no longer creep
+8–20 m while the original stands still; G now walks but in another direction than the original (0.39 → 0.77).
+Upright mismatches unchanged (18). Talon still falls: the original's joints also give under the landing
+(the body sinks 0.18 m and settles), SnapTiles' joints are rigid against external load and the model
+rebounds. Making spring joints compliant to load is the next structural step; still falling also DUCKER,
+zrobo, 2leg1, 15cpHeri, been3.

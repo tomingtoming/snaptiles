@@ -34,6 +34,8 @@ export interface TileBody {
   jetPower: number;
   /** current servo angle (rad, joint frame) of an animated joint */
   servoAngle: number;
+  /** angular velocity (rad/s) of the spring-limited command of an animated joint with spring < 1 */
+  servoVel: number;
   /** wheels: kinematic spin about the rim normal (rad/s, + in the +power direction) and the
    *  accumulated angle for rendering. The tyre is not a spinning body (measured: the original's
    *  wheel does not spin up in the air and reads _WY = v/r while rolling). */
@@ -182,6 +184,12 @@ export const SERVO_GROUND = false;
 /** servo stiffness (N·m/rad at spring=1) when > 0; 0 = infinitely stiff (hard limits). Probe knob: window.__tune.softServo */
 export const SOFT_SERVO = 0;
 export const SERVO_BAND = (20 * Math.PI) / 180;
+/** measured 2026-11-01 (arm_<spring>_<damper>: an unloaded arm standing on a heavy base, commanded 30°): an animated
+ *  joint with spring < 1 follows its command like a damped spring, ω = 15.5·spring^1.5 rad per 30 fps frame
+ *  (spring 0.05 takes ~16 frames, 0.1 ~6, 0.2 ~2, 0.5 and 1 one frame), damping ratio 0.6 for damper ≥ 0.5 and
+ *  about 0.25 at damper 0–0.1. A heavier arm is ~20% slower; the law here ignores that. */
+export const SPRING_SERVO_W = 15.5;
+export const SPRING_SERVO_P = 1.5;
 export const SPRING_STIFFNESS = 4000;
 export const SPRING_DAMPING = 400;
 /** compliant joints may flex this far either way; beyond it the connection is rigid */
@@ -648,7 +656,7 @@ export class PhysicsWorld {
         }
       }
       const restAngle = angleAnimated ? attr(tile.node, 'angle', env, 0) : 0;
-      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0, servoAngle: 0, spin: 0, spinAngle: 0, contactPoint: null, load: 0, collider: null, contactForce: 0, kerbForce: 0, staticLoad: 0, contactAge: 0, slipping: false, jointAxisLocal, jointAnchorLocal };
+      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0, servoAngle: 0, servoVel: 0, spin: 0, spinAngle: 0, contactPoint: null, load: 0, collider: null, contactForce: 0, kerbForce: 0, staticLoad: 0, contactAge: 0, slipping: false, jointAxisLocal, jointAnchorLocal };
       tb.collider = tyreColliders.get(tile.id) ?? null;
       this.tiles.push(tb);
       this.byId.set(tile.id, tb);
@@ -1230,7 +1238,24 @@ export class PhysicsWorld {
           // energy through the hard limits and launch walkers
           const rate = ((globalThis as unknown as { __tune?: { servoRate?: number } }).__tune?.servoRate ?? SERVO_RATE) * DEG;
           const target = jointSign(tile.spec.joint, tile.dir) * (attr(tile.node, 'angle', env, 0) - tb.restAngle) * DEG;
-          const d = target - tb.servoAngle;
+          let d = target - tb.servoAngle;
+          const springVal = tile.node.attrs.spring !== undefined ? attr(tile.node, 'spring', env, 1) : 1;
+          const springW = SPRING_SERVO_W * Math.pow(Math.max(0, springVal), SPRING_SERVO_P) * 30; // rad/s
+          const springOn = (globalThis as unknown as { __tune?: { springServo?: boolean } }).__tune?.springServo ?? true;
+          if (springOn && springVal < 1 && springW * this.dt < 2) {
+            // damped spring toward the command (sub-stepped: ω·dt approaches 1 near spring 0.5)
+            const damper = tile.node.attrs.damper !== undefined ? attr(tile.node, 'damper', env, 0.5) : attr(tile.node, 'dumper', env, 0.5);
+            const zeta = 0.25 + 0.7 * Math.min(0.5, Math.max(0, damper));
+            let a = tb.servoAngle, v = tb.servoVel;
+            const n = 8, h = this.dt / n;
+            // the spring pulls the short way round: a motor-style model that commands "current + 20°" sees its
+            // target wrap from +170° to −170° (G.txt: legs that read _RY and keep chasing)
+            const goal = a + Math.atan2(Math.sin(target - a), Math.cos(target - a));
+            for (let i = 0; i < n; i++) { v += h * (springW * springW * (goal - a) - 2 * zeta * springW * v); a += h * v; }
+            if (Math.abs(goal - a) < 1e-6 && Math.abs(v) < 1e-4) { a = goal; v = 0; }
+            tb.servoVel = v;
+            d = a - tb.servoAngle;
+          } else tb.servoVel = 0;
           if (Math.abs(d) > 1e-8) changedRoots.add(this.componentRoot(tile));
           tb.servoAngle += Math.max(-rate, Math.min(rate, d));
           if ((globalThis as unknown as { __tune?: { debugServo?: boolean } }).__tune?.debugServo) console.log('servo', tile.type, tile.chipIndex, 'rate', (rate / DEG).toFixed(1), 'target', (target / DEG).toFixed(1), 'servo', (tb.servoAngle / DEG).toFixed(1));
