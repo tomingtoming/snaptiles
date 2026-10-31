@@ -70,4 +70,21 @@ describe('kerbs lower than the tyre radius (original 1.5B26, 2026-10-31)', () =>
       expect(hub).toBeLessThan(0.6);
     } finally { await sim.dispose(); (globalThis as unknown as { __tune?: unknown }).__tune = undefined; }
   }, 60000);
+
+  // Original (terrain probe "wall"): a 2 m wall 15 m ahead, hit at 10.5 m/s, stops the car dead at z = 14.1.
+  // Rapier's correction of the locked steering joint threw SnapTiles back at -7.6 m/s (WALL_NO_REBOUND).
+  it('stops dead at a wall instead of rebounding', async () => {
+    (globalThis as unknown as { __tune?: unknown }).__tune = { noCourse: true };
+    const R = await initRapier();
+    const sim = new Simulation(R, BASIC, new KeyState(new EventTarget()));
+    try {
+      await sim.start();
+      sim.physics.world.createCollider(R.ColliderDesc.cuboid(10, 1, 0.5).setTranslation(0, 1, 15.5).setFriction(1).setCollisionGroups(0x0002_0007));
+      const api = sim.api() as Record<string, (n: number) => number>;
+      let minVz = Infinity;
+      for (let n = 0; n < 200; n++) { sim.step(); if (n > 85) minVz = Math.min(minVz, api._VZ(0)); }
+      expect(minVz).toBeGreaterThan(-1.5);
+      expect(Math.abs(api._Z(0) - 14.1)).toBeLessThan(0.5);
+    } finally { await sim.dispose(); (globalThis as unknown as { __tune?: unknown }).__tune = undefined; }
+  }, 60000);
 });

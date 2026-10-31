@@ -2161,3 +2161,15 @@ The ramp probe itself caused most of the ramp gap (a wedge and a plateau as two 
 edge at the crest); ramps are now one convex solid in `terrains.json`. Flat-ground references replay
 byte-identical; 181 unit tests (new ditch test), all 41 browser scenarios and both plane probes pass.
 The wall rebound and the slower ramp climb remain open.
+
+
+## 2026-10-31 — No rebound off walls (Sprint 73)
+
+The Basic car hitting a 2 m wall at 10.5 m/s was thrown back at −7.6 m/s; the original stops dead. The
+rebound comes from rapier's correction of the locked steering joint between the car's two bodies (it grows
+with solver iterations) and rapier-compat 0.21 offers no joint stiffness, so after each step a model that
+approached a near-vertical ground face faster than 1 m/s now loses the velocity carrying it away from that
+face, applied equally to all of its bodies (`WALL_NO_REBOUND`, knob `wallNoRebound`). The car now stops at
+z = 14.1 as in the original; its pitch on impact is still larger (0.50 vs 0.21 rad). Flat-ground references
+replay byte-identical; other terrain probes are unchanged; physics costs up to 0.13 ms more per frame on the
+largest corpus models (total stays under 1 ms). New unit test for the wall; 182 unit tests pass.
