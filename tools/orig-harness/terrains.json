@@ -1,5 +1,5 @@
 {
-  "_doc": "Terrain probes for the original vs SnapTiles (rc_terrain.sh, tools/terrain-compare.ts). Solids are boxes [x0,x1,y0,y1,z0,z1] or ramps [x0,x1,z0,z1,height,zEnd] (a wedge rising along +z from y=0, then flat at that height to zEnd, one convex solid: two colliders would leave an internal edge at the crest that real wheels catch). The Basic car spawns at the origin and drives toward +z. Coordinates are SnapTiles' (the original mirrors x; every solid here is symmetric in x).",
+  "_doc": "Terrain probes for the original vs SnapTiles (rc_terrain.sh, core/src/bin/terrain.rs). Solids are boxes [x0,x1,y0,y1,z0,z1] or ramps [x0,x1,z0,z1,height,zEnd] (a wedge rising along +z from y=0, then flat at that height to zEnd, one convex solid: two colliders would leave an internal edge at the crest that real wheels catch). The Basic car spawns at the origin and drives toward +z. Coordinates are SnapTiles' (the original mirrors x; every solid here is symmetric in x).",
   "ground": [
     -30,
     30,

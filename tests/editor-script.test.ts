@@ -41,17 +41,15 @@ describe('script helpers in the builder', () => {
 
 describe('Lua errors name the file line', () => {
   it.each([['Lua {\n', 5], ['Lua\n{\n', 6]])('with the section opened as %j', async (open, line) => {
-    const { initRapier } = await import('../src/physics/world');
-    const { Simulation } = await import('../src/sim/simulation');
+    const { RustSimulation } = await import('../src/sim/rust-simulation');
     const { KeyState } = await import('../src/input/keys');
     (globalThis as unknown as { __tune?: unknown }).__tune = { noCourse: true };
-    const R = await initRapier();
     const src = `${BODY}${open}function OnFrame()\n  P = nosuch.field\nend\n}\n`;
-    const sim = new Simulation(R, src, new KeyState(new EventTarget()));
+    const sim = new RustSimulation(src, new KeyState(new EventTarget()));
     try {
       await sim.start(); sim.step();
       expect(sim.scriptError).toMatch(new RegExp(`line ${line}:`));
       expect(src.split('\n')[line - 1]).toBe('  P = nosuch.field');
     } finally { await sim.dispose(); }
-  }, 20000); // starts the physics and Lua engines: slow when the whole suite runs in parallel
+  }, 20000); // loads the core's WebAssembly: slow when the whole suite runs in parallel
 });

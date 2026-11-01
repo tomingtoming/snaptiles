@@ -5,14 +5,16 @@ The simulation core in Rust: [Rapier](https://rapier.rs) (`rapier3d` 0.36) and t
 test`) and with Emscripten into one WebAssembly ES module for the browser. The page reads the bodies' state straight
 out of the module's memory, and Lua calls the physics without leaving WebAssembly.
 
-Status: stage 3 (core/PORT.md) — parser and assembler, the physics world, Val/Key handling, the full script API, Lua
-(`src/scripting/lua.rs`) and the legacy `Script` (`rcscript.rs`) run natively and in the page. `src/ffi.rs` is the C ABI
-the page drives (any number of simulations by id: create/load/reset/input/step/free, ad-hoc `core_api`), `src/state.rs`
-the per-frame state buffer the page reads from `HEAPF64` (layout documented there). `src/sim/rust-simulation.ts` is the
-adapter with the `Simulation` surface. Since 2026-11-02 the page runs it by default; `?core=ts` (or `localStorage['snaptiles.core'] =
-'ts'`) selects the TypeScript core. `src/bin/replay.rs` replays the corpus driving and geometry probes.
-`bench/*.mjs` still call the stage-1 prototype ABI (box scenes) and no longer run; `tools/core-bench.mjs` times both
-cores in Chromium.
+Status: the page's only simulation core since 2026-11-02 (core/PORT.md). Parser and assembler, the physics world,
+Val/Key handling, the full script API, Lua (`src/scripting/lua.rs`) and the legacy `Script` (`rcscript.rs`) run
+natively and in the page. `src/ffi.rs` is the C ABI the page drives (any number of simulations by id:
+create/load/reset/input/step/free, ad-hoc `core_api`), `src/state.rs` the per-frame state buffer the page reads from
+`HEAPF64` (layout documented there), `src/sim/rust-simulation.ts` the page's adapter (it also runs under Node, so the
+vitest suites use it). The TypeScript core (rapier3d-compat + wasmoon) was removed on 2026-11-02; the TypeScript
+parser and assembler stay for the editor, checked against this crate by `tests/oracle.rs`.
+
+Native tools against the original's logs: `src/bin/replay.rs` (corpus driving and geometry), `src/bin/orig_compare.rs`
+(the measurement harness), `src/bin/terrain.rs` (terrain and step probes, `--features tools`); see `tools/README.md`.
 
 ## Build
 
@@ -35,8 +37,8 @@ Emscripten is used because C (Lua) does not build for `wasm32-unknown-unknown`.
 
 ## Measured (2026-11-01, this machine)
 
-`node core/bench/compare.mjs N frames` runs the same scene in both stacks (N boxes dropped in a grid, a Lua `OnFrame`
-summing `_Y` of every box); `NOWARM=1` times the falling phase instead of the resting one.
+The stage-1 prototype against the TypeScript stack (benchmarks removed with it, see git history `core/bench`): the same
+scene in both (N boxes dropped in a grid, a Lua `OnFrame` summing `_Y` of every box).
 
 | scene | Rust core | rapier3d-compat + wasmoon |
 |---|---|---|
@@ -47,6 +49,6 @@ summing `_Y` of every box); `NOWARM=1` times the falling phase instead of the re
 | 800 boxes, falling | 4.014 | 6.131 (1.5×) |
 
 Positions and the script's output agree exactly in these scenes. Download: the module is 1.9 MB (0.81 MB gzip)
-against 4.3 MB (1.66 MB gzip) of rapier3d-compat plus 0.27 MB (0.11 MB gzip) of wasmoon. In Chromium
-(`node core/bench/browser-check.mjs`, Vite dev server and a production build) it loads in ~20 ms and runs 200 boxes
-with the Lua at 0.27 ms/frame; Vite emits the `.wasm` as a hashed asset.
+against 4.3 MB (1.66 MB gzip) of rapier3d-compat plus 0.27 MB (0.11 MB gzip) of wasmoon. In Chromium it loaded in
+~20 ms and ran 200 boxes with the Lua at 0.27 ms/frame; Vite emits the `.wasm` as a hashed asset. With the full
+simulation (2026-11-02) the page's default load fell from 5.3 MB to 2.8 MB of scripts and WebAssembly.

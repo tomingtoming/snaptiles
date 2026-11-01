@@ -1,16 +1,28 @@
 // The part of a running model the page reads and drives: main.ts (loop, HUD, overlay, sound, keys), scene.ts (sync)
-// and the probes. Both cores implement it: `Simulation` (TypeScript: rapier3d-compat + wasmoon) and `RustSimulation`
-// (core/ built with Emscripten).
+// and the probes. `RustSimulation` implements it on the simulation core (core/, Rust built with Emscripten).
 import type * as THREE from 'three';
 import type { Assembly, TileInstance, ValEnv } from '../model/assemble';
 import type { RcModel } from '../rc/parser';
-import type { Pose } from '../physics/world';
-import type { ValState } from './simulation';
 
-/** script frames per second (both cores); kept here so the Rust path does not pull in the TypeScript core */
+/** script frames per second */
 export const FRAME_RATE = 30;
 
-export type CoreKind = 'ts' | 'rust';
+export interface Pose {
+  position: THREE.Vector3;
+  quaternion: THREE.Quaternion;
+}
+
+/** a Val as the page shows it (name upper-cased) */
+export interface ValState {
+  name: string;
+  value: number;
+  default: number;
+  min: number;
+  max: number;
+  step: number;
+  disp: boolean;
+  touched: boolean;
+}
 
 interface Vec3Like { x: number; y: number; z: number }
 interface QuatLike { x: number; y: number; z: number; w: number }

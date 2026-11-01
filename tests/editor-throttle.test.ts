@@ -1,8 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import {ModelDocument,CONTROL_KEYS,type ControlKeys} from '../src/editor/document';
 import {parseRc} from '../src/rc/parser';
-import {initRapier} from '../src/physics/world';
-import {Simulation} from '../src/sim/simulation';
+import { RustSimulation as Simulation } from '../src/sim/rust-simulation';
 import {KeyState} from '../src/input/keys';
 
 describe('held throttle controls',()=>{
@@ -24,8 +23,8 @@ describe('held throttle controls',()=>{
  });
  it('accumulates, holds, clamps, decreases to zero and starts a new simulation at zero',async()=>{
   const d=new ModelDocument('Body {Core(){N:Jet(angle=90) S:Trim()}}');d.addThrottleControl(1,1000);d.addSteeringControl(2,25,'vertical');
-  const R=await initRapier(),keys=new KeyState(new EventTarget());
-  const sim=new Simulation(R,d.text,keys);
+  const keys=new KeyState(new EventTarget());
+  const sim=new Simulation(d.text,keys);
   try{
    await sim.start();const advance=(n:number)=>{for(let i=0;i<n;i++)sim.step()};
    keys.press(4);advance(17);expect(sim.env('ST_THROTTLE_1')).toBe(170);keys.release(4);advance(10);expect(sim.env('ST_THROTTLE_1')).toBe(170);
@@ -35,6 +34,6 @@ describe('held throttle controls',()=>{
    keys.press(5);advance(23);expect(sim.env('ST_THROTTLE_1')).toBe(770);keys.release(5);advance(3);expect(sim.env('ST_THROTTLE_1')).toBe(770);
    keys.press(5);advance(100);expect(sim.env('ST_THROTTLE_1')).toBe(0);keys.clear();
   }finally{await sim.dispose()}
-  const fresh=new Simulation(R,d.text,keys);try{await fresh.start();fresh.step();expect(fresh.env('ST_THROTTLE_1')).toBe(0)}finally{await fresh.dispose()}
+  const fresh=new Simulation(d.text,keys);try{await fresh.start();fresh.step();expect(fresh.env('ST_THROTTLE_1')).toBe(0)}finally{await fresh.dispose()}
  });
 });

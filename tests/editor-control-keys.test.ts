@@ -1,8 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import {CONTROL_KEYS,ModelDocument,type ControlKeys} from '../src/editor/document';
 import {parseRc} from '../src/rc/parser';
-import {initRapier} from '../src/physics/world';
-import {Simulation} from '../src/sim/simulation';
+import { RustSimulation as Simulation } from '../src/sim/rust-simulation';
 import {KeyState} from '../src/input/keys';
 
 describe('independent control key pairs',()=>{
@@ -28,7 +27,7 @@ describe('independent control key pairs',()=>{
   d.add(0,'S','Chip');d.add(3,'S','Trim');d.addSteeringControl(4,25,'vertical');
   d.add(3,'N','Rudder');d.addSteeringControl(5,15,'ad');
   d.add(0,'N','Jet');d.angle(6,90);d.addPowerControl(6,3000,'zx');
-  const R=await initRapier(),keys=new KeyState(new EventTarget()),sim=new Simulation(R,d.text,keys);
+  const keys=new KeyState(new EventTarget()),sim=new Simulation(d.text,keys);
   try{
    await sim.start();const names=['ST_STEER_1','ST_STEER_2','ST_STEER_3','ST_POWER_1'];
    for(const [key,expected] of [[0,[0,-25,0,0]],[3,[20,0,0,0]],[7,[0,0,-15,0]],[4,[0,0,0,3000]]] as const){

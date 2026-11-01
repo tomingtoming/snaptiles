@@ -316,11 +316,13 @@ pub struct PhysicsOptions {
     pub gravity: f64,
     /// bare ground for measurements (the TypeScript's `__tune.noCourse`): no course blocks, no crates
     pub no_course: bool,
+    /// no ground at all (terrain probes build their own, `src/bin/terrain.rs`)
+    pub no_ground: bool,
 }
 
 impl Default for PhysicsOptions {
     fn default() -> Self {
-        PhysicsOptions { gravity: -9.8, no_course: false }
+        PhysicsOptions { gravity: -9.8, no_course: false, no_ground: false }
     }
 }
 
@@ -377,13 +379,15 @@ impl World {
         world.integration_parameters.num_solver_iterations = SOLVER_ITERATIONS;
         world.integration_parameters.num_internal_pgs_iterations = PGS_ITERATIONS;
         // effectively endless: planes cover kilometres (a 4 km slab let them fly off the world and fall through)
-        world.insert_collider(
-            ColliderBuilder::cuboid(100000.0, 1.0, 100000.0)
-                .translation(to_vector(Vec3::new(0.0, -1.0, 0.0)))
-                .friction(1.0)
-                .collision_groups(groups(GROUND_GROUP)),
-            None,
-        );
+        if !opts.no_ground {
+            world.insert_collider(
+                ColliderBuilder::cuboid(100000.0, 1.0, 100000.0)
+                    .translation(to_vector(Vec3::new(0.0, -1.0, 0.0)))
+                    .friction(1.0)
+                    .collision_groups(groups(GROUND_GROUP)),
+                None,
+            );
+        }
         let mut crates = Vec::new();
         if !opts.no_course {
             for b in COURSE.iter() {

@@ -3,7 +3,7 @@ import { parseRc } from './rc/parser';
 import { BuildPanel } from './editor/panel';
 import { SceneView } from './render/scene';
 import { KeyState, KEY_TABLE } from './input/keys';
-import type { CoreKind, SimView } from './sim/sim-view';
+import type { SimView } from './sim/sim-view';
 import { Sfx } from './audio/sfx';
 import { SAMPLES } from './samples';
 
@@ -41,22 +41,9 @@ let loadGeneration = 0;
 let builder: BuildPanel;
 let keyCaps: { el: HTMLElement; n: number }[] = [];
 
-// Simulation core: the Rust core (core/, the default since 2026-11-02) or the TypeScript one (rapier3d-compat +
-// wasmoon: ?core=ts or localStorage 'snaptiles.core' = 'ts'; ?core=rust overrides a stored choice). Each core's code
-// and WebAssembly are fetched only when that core is used.
-const CORE: CoreKind = (() => {
-  const q = new URLSearchParams(location.search).get('core');
-  if (q === 'rust' || q === 'ts') return q;
-  try { return localStorage.getItem('snaptiles.core') === 'ts' ? 'ts' : 'rust'; } catch { return 'rust'; }
-})();
-document.documentElement.dataset.core = CORE;
-statusEl.title = CORE === 'rust' ? 'シミュレーション: Rust コア' : 'シミュレーション: TypeScript コア';
-// the Rust adapter and module start loading at boot, so a load later only awaits settled promises (microtasks)
-const rustSimulation = CORE === 'rust' ? import('./sim/rust-simulation').then((m) => { void m.loadRustCore(); return m.RustSimulation; }) : null;
-const tsSimulation = CORE === 'ts'
-  ? Promise.all([import('./sim/simulation'), import('./physics/world')]).then(async ([sim, world]) => ({ Simulation: sim.Simulation, R: await world.initRapier() }))
-  : null;
-if (tsSimulation) await tsSimulation;
+// the simulation core (core/: Rust, rapier3d and Lua, built with Emscripten) starts loading at boot, so a load later
+// only awaits settled promises (microtasks)
+const rustSimulation = import('./sim/rust-simulation').then((m) => { void m.loadRustCore(); return m.RustSimulation; });
 
 async function load(source: string, request: number): Promise<boolean> {
   if (request !== loadGeneration) return false;
@@ -77,7 +64,7 @@ async function load(source: string, request: number): Promise<boolean> {
     if (old) await old.dispose();
     if (request !== loadGeneration) return false;
     const t0 = performance.now();
-    const made: SimView = CORE === 'rust' ? new (await rustSimulation!)(source, keys) : await tsSimulation!.then(({ Simulation, R }) => new Simulation(R, source, keys));
+    const made: SimView = new (await rustSimulation)(source, keys);
     next = made;
     const t1 = performance.now();
     await next.start();

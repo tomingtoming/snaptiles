@@ -1,7 +1,6 @@
 import {describe, it, expect} from 'vitest';
 import {ModelDocument} from '../src/editor/document';
-import {initRapier} from '../src/physics/world';
-import {Simulation} from '../src/sim/simulation';
+import { RustSimulation as Simulation } from '../src/sim/rust-simulation';
 import {KeyState} from '../src/input/keys';
 
 // Use the same document operations as the blank-car GUI workflow, not a hand-written final model.
@@ -20,10 +19,10 @@ function buildCar(mirror = false): string {
 
 describe('constructed vehicle driving outcomes', () => {
   it.each([false,true])('travels straight and turns with generated controls (mirrored wheels: %s)', async mirror => {
-    const R = await initRapier(), source = buildCar(mirror);
+    const source = buildCar(mirror);
     const results: {dx:number; dz:number; yaw:number}[] = [];
     for (const steering of [null, 2, 3]) {
-      const keys = new KeyState(new EventTarget()), sim = new Simulation(R, source, keys);
+      const keys = new KeyState(new EventTarget()), sim = new Simulation(source, keys);
       try {
         await sim.start();
         const advance = (seconds: number) => { for (let i=0;i<Math.round(seconds/sim.frameDt());i++) sim.step(); };

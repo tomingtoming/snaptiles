@@ -7,12 +7,7 @@ const server = await preview({root, preview:{host:'127.0.0.1', port:0, strictPor
 try {
   const address = server.httpServer.address();
   if (!address || typeof address === 'string') throw new Error('Preview did not bind a TCP port');
-  // CORE=ts runs every probe on the TypeScript simulation core (?core=ts), CORE=rust forces the Rust one; without it
-  // the page default (the Rust core) applies
-  const core = process.env.CORE;
-  if (core && core !== 'rust' && core !== 'ts') throw new Error(`CORE must be rust or ts, not ${core}`);
-  const url = `http://127.0.0.1:${address.port}/${core ? `?core=${core}` : ''}`;
-  if (core) console.log(`simulation core: ${core}`);
+  const url = `http://127.0.0.1:${address.port}/`;
   const defaultScripts = ['editor-probe.mjs', 'editor-build-probe.mjs', 'load-probe.mjs', 'editor-error-recovery-probe.mjs', 'editor-unsupported-part-probe.mjs', 'editor-failed-view-probe.mjs', 'editor-section-warning-probe.mjs', 'editor-file-probe.mjs', 'editor-load-history-probe.mjs', 'editor-share-probe.mjs', 'editor-option-probe.mjs', 'editor-color-probe.mjs', 'editor-cowl-probe.mjs', 'editor-keyboard-probe.mjs', 'editor-help-probe.mjs', 'editor-touch-probe.mjs', 'editor-mixed-input-probe.mjs', 'editor-direction-probe.mjs', 'editor-edge-count-probe.mjs', 'editor-view-direction-probe.mjs', 'editor-framing-probe.mjs', 'editor-source-history-probe.mjs', 'editor-short-height-probe.mjs', 'editor-source-help-probe.mjs', 'editor-caret-probe.mjs', 'editor-selection-probe.mjs', 'editor-branch-workflow-probe.mjs', 'editor-move-probe.mjs', 'editor-name-probe.mjs', 'editor-named-copy-probe.mjs', 'editor-copy-dependencies-probe.mjs', 'editor-search-probe.mjs', 'editor-move-script-probe.mjs', 'runtime-camera-probe.mjs', 'editor-filename-probe.mjs', 'editor-recovery-probe.mjs', 'editor-mirror-probe.mjs', 'editor-control-keys-probe.mjs', 'editor-separate-control-probe.mjs', 'editor-custom-keys-probe.mjs', 'editor-key-usage-probe.mjs', 'editor-throttle-probe.mjs', 'editor-multi-probe.mjs', 'editor-script-probe.mjs', 'editor-ux-probe.mjs'];
   for (const script of (process.argv.length > 2 ? process.argv.slice(2) : defaultScripts)) {
     await new Promise((resolve, reject) => {

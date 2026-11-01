@@ -1,6 +1,6 @@
 import csv, math, sys
 
-# Steady-turn analysis of harness_turn2 logs (original) and orig-compare --turn logs (SnapTiles).
+# Steady-turn analysis of harness_turn2 logs (original) and orig_compare --turn logs (SnapTiles, core/src/bin/orig_compare.rs).
 # Columns used by name: frame,x,z,vx,vz,wy,ey. Per window: speed from world xz positions, heading from the
 # world velocity direction, yaw rate from its derivative, curvature radius, lateral acceleration, sideslip.
 

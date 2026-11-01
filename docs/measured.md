@@ -5,7 +5,8 @@ The public docs (`docs/spec/`) leave out most sign conventions and constants. Si
 quarantined WSL2 + wine 9 prefix, and the numbers below come from driving it with a scenario
 harness (`Resources/System.rcs` replaced by a Lua script that sets wheel `POWER` through `_SET`,
 dumps the rest pose of every chip and writes the per-frame core state with `_FOPEN/_FPUTS`).
-`tools/orig-compare.ts` replays the same experiment headless in SnapTiles and prints the same
+`tools/orig-compare.ts` (since 2026-11-02 `core/src/bin/orig_compare.rs`; likewise drive-, geom-, step- and
+terrain-compare became `core/src/bin/{replay,terrain}.rs`, see tools/README.md) replays the same experiment headless in SnapTiles and prints the same
 columns. Raw logs: `D:\snaptiles-models\quarantine\original\runs\*.csv` (not in this repo).
 
 ## Measured against the original exe

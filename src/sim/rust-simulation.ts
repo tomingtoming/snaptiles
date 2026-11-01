@@ -6,11 +6,9 @@
 import * as THREE from 'three';
 import { assemble, type Assembly, type TileInstance } from '../model/assemble';
 import { parseRc, type RcModel } from '../rc/parser';
-import type { Pose } from '../physics/world';
 import type { KeyState } from '../input/keys';
 import type { SnapTilesCoreModule } from '../../core/pkg/snaptiles_core.js';
-import type { ValState } from './simulation';
-import { FRAME_RATE, type BodyView, type PhysicsView, type SimView, type TileBodyView } from './sim-view';
+import { FRAME_RATE, type BodyView, type PhysicsView, type Pose, type SimView, type TileBodyView, type ValState } from './sim-view';
 
 // ---- state buffer layout (core/src/state.rs) ----
 const LAYOUT_VERSION = 1;

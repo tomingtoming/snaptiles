@@ -1,8 +1,9 @@
 # SnapTiles
 
 A browser sandbox for building vehicles out of square tiles and driving them
-with the keyboard or Lua. Runs on [Rapier](https://rapier.rs) (3D rigid bodies,
-WebAssembly), [three.js](https://threejs.org) and [wasmoon](https://github.com/ceifa/wasmoon) (Lua 5.4).
+with the keyboard or Lua. The simulation core (`core/`) is Rust: [Rapier](https://rapier.rs) (3D rigid bodies)
+and Lua 5.4 through [mlua](https://github.com/mlua-rs/mlua), built with Emscripten into one WebAssembly module;
+the page draws with [three.js](https://threejs.org).
 
 It reads the `.rc` model format and implements parts of the RigidChips script
 API, including `_KEY()`/`_X()`/`out()`. Supported models can be pasted in and

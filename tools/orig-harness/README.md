@@ -11,14 +11,14 @@ model and `Resources/System.rcs` as the default scenario, so experiments replace
   own `angle=Val` overrides `_SET ANGLE` each frame; use a model with a constant angle instead).
 - `harness_turn2.rcs` — log only (same columns as `harness_turn.rcs`); the model drives and steers itself
   (Val defaults + its own Lua, see `rc_models17.sh`/`rc_models18.sh`). Replay with
-  `bun tools/orig-compare.ts <model> <out.csv> --self --turn --tune='{"noCourse":true}'` and compare both
+  `cargo run --release --bin orig_compare -- <model> <out.csv> --self --turn --nocourse` (in `core/`) and compare both
   logs with `turndiff.py <csv…>` (speed, yaw rate, radius, lateral g, body slip per 20-frame window).
 - `harness_wheels.rcs` — log only: core pose/velocity/Euler plus `_WY` of up to six wheels (`rc_models19.sh`
   straight-line spin probes). Replay with `--self --wheels`.
 - `rc_launch.sh <secs>` — one run with a screenshot. `rc_batch.sh name:model:power ...` — batch
   runs, copies `log.txt`/`geom.txt`/screenshot to `D:\snaptiles-models\quarantine\original\runs\`.
   `HARNESS=<path>` picks the scenario. `rc_models.sh` writes the probe models.
-- Replay in SnapTiles: `bun tools/orig-compare.ts <model> <out.csv> --allwheels --off=210`.
+- Replay in SnapTiles: `cargo run --release --bin orig_compare -- <model> <out.csv> --allwheels --off=210` (in `core/`).
 
 Results are summarised in `docs/measured.md`.
 

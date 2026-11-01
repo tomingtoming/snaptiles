@@ -445,6 +445,20 @@ impl Simulation {
         self.state.borrow_mut().call_api(name, &a).num()
     }
 
+    /// a static ground-like collider (friction 1, the ground's collision group), for probes that build terrain
+    pub fn add_ground_collider(&mut self, cd: rapier3d::geometry::ColliderBuilder) {
+        let cd = cd.friction(1.0).collision_groups(crate::physics::groups(crate::physics::GROUND_GROUP));
+        self.state.borrow_mut().world.world.insert_collider(cd, None);
+    }
+
+    /// chip numbers of the Wheel/RLW chips, ascending
+    pub fn wheel_chips(&self) -> Vec<usize> {
+        let s = self.state.borrow();
+        let mut v: Vec<usize> = s.world.assembly().map(|a| a.tiles.iter().filter(|t| t.spec.wheel).map(|t| t.chip_index).collect()).unwrap_or_default();
+        v.sort();
+        v
+    }
+
     pub fn ticks(&self) -> f64 {
         self.state.borrow().ticks
     }

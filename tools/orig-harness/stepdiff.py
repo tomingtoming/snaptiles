@@ -1,4 +1,4 @@
-"""Compare step-probe logs (original harness_step.rcs vs tools/step-compare.ts).
+"""Compare step-probe logs (original harness_step.rcs vs core/src/bin/terrain.rs step).
 usage: stepdiff.py <h> <csv> [<csv> ...]   Heights are taken relative to each run's level ground."""
 import csv, math, sys
 h = float(sys.argv[1])

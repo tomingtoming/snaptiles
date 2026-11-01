@@ -16,12 +16,20 @@ the probes take file paths.
 | `restdump.ts` / `lowest.ts` (bun) | rest-pose heights, lowest tiles |
 | `census.ts` (bun) | which sides children attach to on triangle cowls |
 | `corpus.mjs <url> <dir…>` | runs every model and lists parse/script failures (`bun run probe:corpus`) |
-| `parsecheck.ts` / `rcscript-check.ts` (bun) | parse-only checks |
+| `parsecheck.ts` (bun) | parse-only check |
 | `fire-probe.mjs`, `shell-probe.mjs`, `eval-probe.mjs` | arm charge / shells, arbitrary in-page expressions |
 | `touch-probe.mjs`, `pinch-probe.mjs`, `narrow-probe.mjs`, `sfx-probe.mjs`, `hash-probe.mjs` | touch keycaps, pinch zoom, mobile layout, synthesized sound, share-URL round trip |
 | `fetch-model.mjs <pageUrl> <outDir>` | downloads a getuploader file by pressing its button |
-| `orig-compare.ts <model> <out.csv> [--allwheels] [--power=] [--on=] [--off=] [--tune=json]` (bun) | replays the original-exe harness headless: forces ENGINE, dumps the rest pose at frame 30 and the per-frame core state in the original's columns |
+| `editor-ci.mjs [probe…]` | serves `dist` (run `bun run build` first) and runs the editor and runtime probes |
 
-Runtime knobs read by the physics through `window.__tune` (set before loading a model):
-`ex ey ez ax ay az wx wy wz wLocal` (API sign conventions, see `TUNE_DEFAULTS`), `fps substeps`, `noCcd`, `wheelTorque wheelRadius wheelFriction
-noReaction`, `noSpring softServo servoRate`, `aero` (`quad|newton|slope`).
+Headless runs against the original's logs are native Rust binaries in `core/` (2026-11-02; they replaced the
+TypeScript `drive-compare`, `geom-compare`, `orig-compare`, `step-compare` and `terrain-compare`):
+
+| `cargo run --release …` in `core/` | what it does |
+|---|---|
+| `--bin replay -- <runs> [n…]` | corpus driving and geometry replay (`SNAP_DIR`, default `snap_rust`) for `driverank.py` / `geomrank.py` |
+| `--bin orig_compare -- <model> <out.csv> [--allwheels] [--power=] [--on=] [--off=] [--self] [--nocourse] [--key=N:a:b] [--turn\|--wheels\|--arm\|--fuel\|--chips6\|--chips10]` | the original-exe harness: forces ENGINE, dumps the rest pose at frame 30 and the per-frame state in the original's columns |
+| `--features tools --bin terrain -- <scene\|all> <dir>` / `-- step <out.csv> --h=0.10` | terrain probes of `orig-harness/terrains.json` and the step probe, for `terraindiff.py` / `stepdiff.py` |
+
+The physics keeps no runtime knobs: `window.__tune` is read only for `noCourse` (bare ground). Probes that still pass
+other `TUNE` knobs (`drive-probe.mjs`, `tune-probe.mjs`) date from the TypeScript core and now measure the defaults.

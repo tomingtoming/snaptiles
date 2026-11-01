@@ -1,4 +1,4 @@
-//! Native corpus replay: the Rust counterpart of `tools/drive-compare.ts` and `tools/geom-compare.ts`.
+//! Native corpus replay: replaced the TypeScript `tools/drive-compare.ts` and `tools/geom-compare.ts` (removed 2026-11-02).
 //!
 //!   cargo run --release --bin replay -- <runs dir> [n ...]
 //!

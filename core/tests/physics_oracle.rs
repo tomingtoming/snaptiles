@@ -1,5 +1,5 @@
 //! Stage 2a check (core/PORT.md): the Rust physics world against the TypeScript `PhysicsWorld`, both run on every
-//! corpus model without its script (oracle: `bun tools/export-physics-oracle.ts`, JSON in
+//! corpus model without its script (oracle: frozen output of the removed TypeScript core, `tools/export-physics-oracle.ts` in git history; JSON in
 //! `D:/snaptiles-models/quarantine/oracle-physics`, or `SNAPTILES_PHYSICS_ORACLE`). Without the oracle the test passes
 //! with a message.
 //!
@@ -44,7 +44,7 @@ fn run(path: &str, frames: usize, drive_at: Option<usize>) -> Result<Run, String
     let mut r = Run { tiles0: tiles(&w), tiles1: vec![], tiles30: vec![], core: vec![] };
     for f in 1..=frames {
         if drive_at == Some(f) {
-            // as tools/export-physics-oracle.ts: every Val to its max, else its min, when within 1e5 and not the default
+            // as the oracle export did: every Val to its max, else its min, when within 1e5 and not the default
             for v in &model.vals {
                 let k = v.name.to_uppercase();
                 if v.max <= 1e5 && v.max != v.default {
@@ -122,7 +122,7 @@ fn oracle_dir() -> Option<PathBuf> {
 #[test]
 fn physics_matches_the_typescript_oracle() {
     let Some(dir) = oracle_dir() else {
-        eprintln!("no physics oracle (run `bun tools/export-physics-oracle.ts`); skipped");
+        eprintln!("no physics oracle (frozen oracle JSON not found); skipped");
         return;
     };
     let mut files: Vec<PathBuf> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.extension().is_some_and(|x| x == "json")).collect();
