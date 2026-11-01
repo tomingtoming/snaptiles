@@ -39,6 +39,11 @@ export interface TileBody {
   /** spring < 1: a revolute joint held by a position motor (SPRING_K·spring²), and the inertia it swings */
   springy: boolean;
   springInertia: number;
+  /** a wheel carrying chips is a rotor: they turn with its spin (rotorOf on each of them); its inertia and the
+   *  mass that sets its air drag */
+  rotorOf: TileBody | null;
+  rotorInertia: number;
+  rotorMass: number;
   /** wheels: kinematic spin about the rim normal (rad/s, + in the +power direction) and the
    *  accumulated angle for rendering. The tyre is not a spinning body (measured: the original's
    *  wheel does not spin up in the air and reads _WY = v/r while rolling). */
@@ -197,6 +202,16 @@ export const SPRING_SERVO_P = 1.5;
  *  with a Weight at its tip, 1913 N·m): static sag 0.8/1.4/3.7/14.7° at spring 0.5/0.2/0.1/0.05 and collapse at
  *  0.02 → stiffness ≈ SPRING_K·spring^SPRING_K_P N·m/rad. Damping ratio from damper as in SPRING_SERVO_*. */
 export const SPRING_JOINTS = true;
+/** measured 2026-11-01 (rc_models34.sh: a horizontal wheel on a weighted base carrying two Trims or two Weights,
+ *  power 5000/20000/60000): a wheel with chips on it spins them up in the air and settles at 26/44/64 rad/s
+ *  (two Weights at 20000: 20.5). Fit: I·dω/dt = ROTOR_TORQUE·power − ROTOR_DRAG·m^ROTOR_DRAG_M·ω^ROTOR_DRAG_N,
+ *  I = Σ m·d² of the carried chips, m their mass (steady speeds within 2%). RLW and Wheel spin alike. */
+export const ROTOR = true;
+const ROTOR_AXIS = new THREE.Vector3(0, 1, 0); // a wheel spins about its plate normal (the renderer's SPIN_AXIS)
+export const ROTOR_TORQUE = 0.111;
+export const ROTOR_DRAG = 1.6e-4;
+export const ROTOR_DRAG_M = 1.56;
+export const ROTOR_DRAG_N = 2.74;
 export const SPRING_K = 3.7e6;
 export const SPRING_K_P = 2;
 /** damping ratio of a spring joint at damper 0 and at damper ≥ 0.5 (0.5 and 1 run identically in the original) */
@@ -663,7 +678,7 @@ export class PhysicsWorld {
         if (springy) revolute.configureMotorModel(R.MotorModel.ForceBased); // gains set every step (springMotor)
       }
       const restAngle = angleAnimated ? attr(tile.node, 'angle', env, 0) : 0;
-      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, springy, springInertia: 0, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0, servoAngle: 0, servoVel: 0, spin: 0, spinAngle: 0, contactPoint: null, load: 0, collider: null, contactForce: 0, kerbForce: 0, staticLoad: 0, contactAge: 0, slipping: false, jointAxisLocal, jointAnchorLocal };
+      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, springy, springInertia: 0, rotorOf: null, rotorInertia: 0, rotorMass: 0, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0, servoAngle: 0, servoVel: 0, spin: 0, spinAngle: 0, contactPoint: null, load: 0, collider: null, contactForce: 0, kerbForce: 0, staticLoad: 0, contactAge: 0, slipping: false, jointAxisLocal, jointAnchorLocal };
       tb.collider = tyreColliders.get(tile.id) ?? null;
       this.tiles.push(tb);
       this.byId.set(tile.id, tb);
@@ -681,6 +696,31 @@ export class PhysicsWorld {
         I += t.mass * (r.lengthSq() + (TILE * TILE) / 12);
       }
       tb.springInertia = I;
+    }
+    if ((globalThis as unknown as { __tune?: { rotor?: boolean } }).__tune?.rotor ?? ROTOR) for (const w of this.tiles) if (w.tile.spec.wheel && w.tile.parent) {
+      const n = w.tile.axis.clone().normalize();
+      let I = 0, m = 0;
+      for (const tb of this.tiles) {
+        if (tb === w) continue;
+        let p: TileInstance | null = tb.tile.parent;
+        while (p && p !== w.tile && !p.detached) p = p.parent;
+        if (p !== w.tile) continue;
+        tb.rotorOf ??= w; // the nearest rotor wins (rotors on rotors turn with the inner one only)
+        const r = tb.tile.position.clone().sub(w.tile.position);
+        r.sub(n.clone().multiplyScalar(r.dot(n)));
+        I += tb.tile.mass * (r.lengthSq() + (TILE * TILE) / 12);
+        m += tb.tile.mass;
+      }
+      w.rotorInertia = I;
+      w.rotorMass = m;
+    }
+    // the rotor turns its chips outside the solver, which suits blades but not a wheel that carries most of the model
+    // (2leg1 and 4leg2 hang their legs on a "head wheel" their Lua holds still): those stay rigid
+    const total = this.tiles.reduce((a, t) => a + t.tile.mass, 0);
+    for (const w of this.tiles) if (w.rotorInertia > 0 && w.rotorMass > 0.5 * (total - w.tile.mass)) {
+      w.rotorInertia = 0;
+      w.rotorMass = 0;
+      for (const tb of this.tiles) if (tb.rotorOf === w) tb.rotorOf = null;
     }
   }
 
@@ -1005,7 +1045,16 @@ export class PhysicsWorld {
       // in the air a powered wheel spins up against the motor's fade (measured: 34→207 rad/s over the first
       // 12 frames of the spawn drop at power 10000; a flipped car's wheels pass 1200 rad/s at 20000)
       const airSpin = (globalThis as unknown as { __tune?: { wheelSpin?: boolean } }).__tune?.wheelSpin ?? WHEEL_SPIN_DYNAMICS;
-      if (airSpin && power !== 0) {
+      if (tb.rotorInertia > 0) {
+        // a rotor: driven against the air drag of the chips it carries (ROTOR_*); the motor reacts on the body
+        const torque = power * ROTOR_TORQUE;
+        const drag = ROTOR_DRAG * Math.pow(tb.rotorMass, ROTOR_DRAG_M) * Math.pow(Math.abs(tb.spin), ROTOR_DRAG_N) * Math.sign(tb.spin);
+        tb.spin += (this.dt * (torque - drag)) / (tb.rotorInertia + WHEEL_INERTIA_SCALE * 0.5 * tile.mass * r * r);
+        if (power !== 0 && !tile.spec.noReaction && ((globalThis as unknown as { __tune?: { wheelReaction?: boolean } }).__tune?.wheelReaction ?? WHEEL_REACTION)) {
+          const T = normal.clone().multiplyScalar(torque);
+          body.addTorque({ x: T.x, y: T.y, z: T.z }, true);
+        }
+      } else if (airSpin && power !== 0) {
         const w0 = Math.max(WHEEL_SPIN_FADE, Math.abs(power) * WHEEL_SPIN_PER_POWER);
         const k = (globalThis as unknown as { __tune?: { wheelTorque?: number } }).__tune?.wheelTorque ?? WHEEL_TORQUE_PER_POWER;
         const tau = power * k * (1 - (Math.sign(power) * tb.spin) / w0);
@@ -1025,6 +1074,13 @@ export class PhysicsWorld {
     const q = (out?.quaternion ?? new THREE.Quaternion()).set(r.x, r.y, r.z, r.w);
     const p = (out?.position ?? new THREE.Vector3()).copy(tb.relPos).applyQuaternion(q).add(new THREE.Vector3(t.x, t.y, t.z));
     q.multiply(tb.relQuat);
+    if (tb.rotorOf) {
+      // carried by a rotor: turned about the wheel's axis through its hub by the wheel's spin angle
+      const w = this.pose(tb.rotorOf);
+      const spin = new THREE.Quaternion().setFromAxisAngle(ROTOR_AXIS.clone().applyQuaternion(w.quaternion), -tb.rotorOf.spinAngle); // +power turns a rotor clockwise about its normal (measured)
+      p.sub(w.position).applyQuaternion(spin).add(w.position);
+      q.premultiply(spin);
+    }
     return { position: p, quaternion: q };
   }
 
@@ -1034,7 +1090,13 @@ export class PhysicsWorld {
     const w = tb.body.angvel();
     const c = tb.body.translation();
     const r = pose.position.clone().sub(new THREE.Vector3(c.x, c.y, c.z));
-    return new THREE.Vector3(w.x, w.y, w.z).cross(r).add(new THREE.Vector3(v.x, v.y, v.z));
+    const out = new THREE.Vector3(w.x, w.y, w.z).cross(r).add(new THREE.Vector3(v.x, v.y, v.z));
+    if (tb.rotorOf) {
+      const hub = this.pose(tb.rotorOf);
+      const n = ROTOR_AXIS.clone().applyQuaternion(hub.quaternion);
+      out.add(n.multiplyScalar(-tb.rotorOf.spin).cross(pose.position.clone().sub(hub.position)));
+    }
+    return out;
   }
 
   /** Static load of each touching wheel: minimum-norm solution of weight and moment balance about the
@@ -1392,9 +1454,10 @@ export class PhysicsWorld {
         // isotropic air resistance per tile (the reference table lists a per-type coefficient:
         // Chip 1, Weight 1, Arm 0.7, Wheel 0.05, Frame/Jet 0) — caps top speeds
         const vl = v.length();
+        const Fair = new THREE.Vector3();
         if (vl > 0.5) {
           const iso = -ISO_DRAG * tile.spec.drag * vl;
-          body.addForceAtPoint({ x: v.x * iso, y: v.y * iso, z: v.z * iso }, { x: pose.position.x, y: pose.position.y, z: pose.position.z }, true);
+          Fair.addScaledVector(v, iso);
         }
         // plate normal force (lift at angle of attack, broadside drag)
         const vn = v.dot(normal);
@@ -1417,12 +1480,17 @@ export class PhysicsWorld {
         }
         const f = -Math.sign(vn) * tile.spec.drag * mag;
         if ((globalThis as unknown as { __tune?: { debugAero?: number } }).__tune?.debugAero === this.tick) console.log('aero', tile.chipIndex, tile.type, 'angle', tile.node.attrs.angle ?? '', 'sinA', (speed > 1e-6 ? Math.abs(vn) / speed : 0).toFixed(3), 'Fy', (f * normal.y).toFixed(0), 'speed', speed.toFixed(1));
-        if (Math.abs(f) > 1e-4) {
-          body.addForceAtPoint(
-            { x: normal.x * f, y: normal.y * f, z: normal.z * f },
-            { x: pose.position.x, y: pose.position.y, z: pose.position.z },
-            true,
-          );
+        if (Math.abs(f) > 1e-4) Fair.addScaledVector(normal, f);
+        if (Fair.lengthSq() > 0) {
+          body.addForceAtPoint({ x: Fair.x, y: Fair.y, z: Fair.z }, { x: pose.position.x, y: pose.position.y, z: pose.position.z }, true);
+          if (tb.rotorOf) {
+            // the air's drag on a rotor's chips brakes the rotor (ROTOR_DRAG), not the body: take its moment about
+            // the rotor axis back off the body, keeping lift and the tilting moments of cyclic pitch
+            const hub = this.pose(tb.rotorOf);
+            const n = ROTOR_AXIS.clone().applyQuaternion(hub.quaternion);
+            const along = pose.position.clone().sub(hub.position).cross(Fair).dot(n);
+            body.addTorque({ x: -n.x * along, y: -n.y * along, z: -n.z * along }, true);
+          }
         }
       }
     }

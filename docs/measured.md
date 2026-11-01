@@ -383,3 +383,15 @@ Tents of two plates hinged down 30°/60° (Chip, Frame and Arm alike) rest exact
 settled pose within 0.10 m; with the Lua (legs moving during the spawn drop) it is 0.47 m off and still falls
 after the landing — unresolved. 15cpHeri lifts on Trim blades carried by RLW rotors at power 60000:
 SnapTiles does not turn a wheel's children, so it has no rotor lift (a separate feature, not a joint issue).
+
+**2026-11-01 — rotors.** `rc_models34.sh`: a horizontal wheel on a weighted base carrying two Trims (or two
+Weights), powered from frame 60. The carried chips turn with the wheel and spin up in the air to a steady
+26.1 / 43.8 / 64.3 rad/s at power 5000 / 20000 / 60000 (time constants 12 / 5 / 2.4 frames); two Weights at
+20000 reach only 20.5. Blades pitched 10° run ~2% slower; RLW and Wheel spin alike. +power turns them clockwise
+about the wheel normal in the original's frame. Fit (`ROTOR_*`, steady speeds within 2%):
+I·dω/dt = 0.111·power − 1.6·10⁻⁴·m^1.56·ω^2.74 with I = Σ m·d² and m the carried mass. SnapTiles now turns a
+wheel's carried chips by its spin angle (pose and velocity, so plate aero gives rotor lift), integrates the spin
+by that law in the air, applies the motor reaction for Wheel (not RLW) and keeps the air drag's moment about
+the rotor axis off the body. Colliders of carried chips do not turn. A wheel carrying more than half of the
+rest of the model (2leg1's and 4leg2's "head wheel" axles) stays rigid. 15cpHeri now hovers on its rotors
+(core 2.70 m, original 2.40); corpus runs scoring above 1 28 → 25, upright mismatches 12 → 10.

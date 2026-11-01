@@ -2210,3 +2210,10 @@ Measured the original's static sag of spring joints (animated and literal angles
 spring < 1 as revolute joints held by a force-based position motor of 3.7·10⁶·spring² N·m/rad. The internal PGS
 iterations go 16 → 48 so jointed axles hold on landing. Upright mismatches against the original 18 → 12, runs
 where only SnapTiles falls 10 → 5. New sag tests; 190 unit tests, all browser scenarios and both plane probes pass.
+
+
+## 2026-11-01 — Rotors (Sprint 78)
+
+Measured how a wheel carrying chips spins in the air (power, carried mass, blade pitch) and fitted a spin law.
+The carried chips now turn with the wheel, so blades lift through the existing plate aero; helicopters such as
+15cpHeri hover. Wheels that carry most of a model stay rigid. New rotor test; 194 unit tests pass.
