@@ -1,0 +1,13 @@
+-- _H (height above ground) against _Y for every chip 0..3, 120 frames
+n=0
+buf="frame,y0,h0,y1,h1,y2,h2,y3,h3\n"
+function OnFrame()
+	n=n+1
+	if n<=120 then
+		local row=""..n
+		for c=0,3 do if c<_CHIPS() then row=row..",".._Y(c)..",".._H(c) else row=row..",," end end
+		buf=buf..row.."\n"
+	end
+	if n==120 then local h=_FOPEN("log.txt","w") if h>=0 then _FPUTS(h,buf) _FCLOSE(h) end end
+	out(0,"frame ",n)
+end

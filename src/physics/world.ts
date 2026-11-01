@@ -106,6 +106,9 @@ export const WHEEL_SPIN_DYNAMICS = true;
 /** fade zero point per unit of power above 2500 (rad/s per power): the sliding-wheel equilibria 135 rad/s at
  *  5000 and 376 at 10000 both fit ω0 = power / 20.6 with no extra spin drag */
 export const WHEEL_SPIN_PER_POWER = 1 / 20.6;
+/** 2026-11-01: a rolling wheel's fade zero point also grows with power (car1 drives each wheel at 10000–20000 and
+ *  keeps accelerating past 180 rad/s); the 180 rad/s regime was measured at power 1000 and 2500 only */
+export const ROLL_FADE_SCALES = true;
 /** wheel inertia as a fraction of ½mr² with m the hub+tyre mass: the air spin-up at power 10000 (34→207 rad/s in
  *  12 frames) and the sliding spin-up on the ground both fit ≈ 0.7 */
 export const WHEEL_INERTIA_SCALE = 0.5;
@@ -151,12 +154,14 @@ export const TYRE_LOAD_SMOOTH = 0.3;
 /** dynamic load used for grip is capped at this multiple of the wheel's static share (the touchdown spike must still
  *  shove the car with the wheels' stored momentum, measured ~1000 N·s, but not explode) */
 export const TYRE_LOAD_CAP = 30;
-/** sustained grip load cap as a multiple of the static share (load transfer yes, aero downforce no) */
-export const TYRE_LOAD_CAP_SUSTAINED = 1.5;
+/** sustained grip load cap as a multiple of the static share. 2026-11-01: 3 — the corpus car1 runs its Trim wings
+ *  at 45→26° (measured in the original while driving) and Trim plates feel the same aero as Chips (rollt_*), so
+ *  its constant 12.5 m/s² to 65 m/s needs the wings' downforce as grip (1.5 stalled it at 32 m/s) */
+export const TYRE_LOAD_CAP_SUSTAINED = 3;
 /** steps after a touchdown during which the full impact load (TYRE_LOAD_CAP) may be used for grip */
 export const TYRE_TOUCHDOWN_STEPS = 40;
 /** spec: 6 power = 1 N */
-export const JET_NEWTON_PER_POWER = 0.145; // measured 2026-10-28: a 530 kg wheeled car pushed by a jet at power 10000 accelerates at 2.74 m/s² (1452 N); the same at 5000 (1.38 m/s²); wheel option makes no difference
+export const JET_NEWTON_PER_POWER = 1 / 6; // measured 2026-11-01 (rc_models37.sh): two flat Jets lifting a 98.7 kg core leave the ground at power 3000 each but not 2800 (1/6 N per power: 2904), and climb slowly at 0.163 N/power before the plates' drag grows; the 2026-10-28 0.145 came from a jet-pushed wheeled car whose mass was underestimated. tp-2 hovers on 6 power per newton
 /** plate aero (per 1 m² tile): broadside drag N per (m/s)², and the lift slope N per (m/s)² per sin α.
  *  ½ρ·Cd≈0.7 and ½ρ·2π≈3.8 for air; the original's numbers are unknown. */
 export const AIR_DRAG = 0.7;
@@ -947,7 +952,8 @@ export class PhysicsWorld {
         // two regimes (measured): a rolling wheel's push fades to zero at 180 rad/s whatever the power (power 1000
         // and 2500 straight runs; the corpus car1 on the original stops accelerating near 54 m/s = 180 rad/s on
         // 0.3 m wheels and takes off), while a sliding wheel spins on to p/20.6 rad/s (135 at 5000, 376 at 10000)
-        const w0 = tb.slipping ? Math.max(WHEEL_SPIN_FADE, Math.abs(power) * WHEEL_SPIN_PER_POWER) : WHEEL_SPIN_FADE;
+        const scaleRolling = (globalThis as unknown as { __tune?: { rollFadeScales?: boolean } }).__tune?.rollFadeScales ?? ROLL_FADE_SCALES;
+        const w0 = tb.slipping || scaleRolling ? Math.max(WHEEL_SPIN_FADE, Math.abs(power) * WHEEL_SPIN_PER_POWER) : WHEEL_SPIN_FADE;
         let tau = power !== 0 ? power * k * Math.max(0, 1 - (Math.sign(power) * tb.spin) / w0) : 0;
         if (brake > 0) {
           // measured: a 530 kg car with brake=10 on four wheels sheds 2.2 m/s² (0.22 g), brake=50 7.7 m/s²
@@ -1048,8 +1054,14 @@ export class PhysicsWorld {
       if (tb.rotorInertia > 0) {
         // a rotor: driven against the air drag of the chips it carries (ROTOR_*); the motor reacts on the body
         const torque = power * ROTOR_TORQUE;
-        const drag = ROTOR_DRAG * Math.pow(tb.rotorMass, ROTOR_DRAG_M) * Math.pow(Math.abs(tb.spin), ROTOR_DRAG_N) * Math.sign(tb.spin);
-        tb.spin += (this.dt * (torque - drag)) / (tb.rotorInertia + WHEEL_INERTIA_SCALE * 0.5 * tile.mass * r * r);
+        // the drag grows with ω^2.74, so step in small pieces and never past the speed where it balances the motor
+        // (a rotor that touched the ground at speed otherwise overshot and diverged)
+        const cd = ROTOR_DRAG * Math.pow(tb.rotorMass, ROTOR_DRAG_M), I = tb.rotorInertia + WHEEL_INERTIA_SCALE * 0.5 * tile.mass * r * r;
+        const eq = Math.sign(torque) * Math.pow(Math.abs(torque) / cd, 1 / ROTOR_DRAG_N);
+        for (let i = 0; i < 8; i++) {
+          const next = tb.spin + (this.dt / 8) * (torque - cd * Math.pow(Math.abs(tb.spin), ROTOR_DRAG_N) * Math.sign(tb.spin)) / I;
+          tb.spin = (next - eq) * (tb.spin - eq) < 0 ? eq : next;
+        }
         if (power !== 0 && !tile.spec.noReaction && ((globalThis as unknown as { __tune?: { wheelReaction?: boolean } }).__tune?.wheelReaction ?? WHEEL_REACTION)) {
           const T = normal.clone().multiplyScalar(torque);
           body.addTorque({ x: T.x, y: T.y, z: T.z }, true);

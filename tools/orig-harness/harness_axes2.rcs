@@ -1,0 +1,11 @@
+-- attitude APIs of chips 0..2 (E*, A*) at frame 150
+n=0
+function OnFrame()
+	n=n+1
+	if n==150 then
+		local buf="chip,ex,ey,ez,ax,ay,az\n"
+		for c=0,2 do buf=buf..c..",".._EX(c)..",".._EY(c)..",".._EZ(c)..",".._AX(c)..",".._AY(c)..",".._AZ(c).."\n" end
+		local h=_FOPEN("log.txt","w") if h>=0 then _FPUTS(h,buf) _FCLOSE(h) end
+	end
+	out(0,"frame ",n)
+end

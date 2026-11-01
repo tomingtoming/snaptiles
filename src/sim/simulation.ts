@@ -402,7 +402,10 @@ export class Simulation {
       _EZ: (n: number) => tune.ez * euler(n).z,
       _AX: (n: number) => tune.ax * euler(n).x,
       _AY: (n: number) => tune.ay * euler(n).y,
-      _AZ: (n: number) => tune.az * euler(n).z,
+      // measured 2026-11-01 (rc_models38.sh): the A* are tilts of the chip's own axes, not Euler angles — an upside-down
+      // chip reads _AZ ≈ 0 (its Euler roll is ±π), one turned over about its forward axis reads the roll negated.
+      // _AX = asin(−Lz·up) is already the Euler pitch; the roll becomes asin(Lx·up) (tp-2 steers by its flipped body chip)
+      _AZ: (n: number) => { const q = this.poseOf(n)?.quaternion; if (!q) return 0; const lx = new THREE.Vector3(1, 0, 0).applyQuaternion(q); return tune.az * Math.asin(Math.max(-1, Math.min(1, lx.y))); },
       // axis vectors in the original's left-handed frame (local x = W, local z = S, world x mirrored); the
       // mirror is measured for _X/_VX/_VZ, these follow by construction and are not measured themselves
       _XX: (n: number) => -worldAxis(n, LEFT, 'x'),

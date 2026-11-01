@@ -395,3 +395,28 @@ by that law in the air, applies the motor reaction for Wheel (not RLW) and keeps
 the rotor axis off the body. Colliders of carried chips do not turn. A wheel carrying more than half of the
 rest of the model (2leg1's and 4leg2's "head wheel" axles) stays rigid. 15cpHeri now hovers on its rotors
 (core 2.70 m, original 2.40); corpus runs scoring above 1 28 → 25, upright mismatches 12 → 10.
+
+**2026-11-01 — group D.** Four changes, each measured on the original:
+- **car1's top speed.** Its Trim wings run at 45→26° while it drives (logged in the original, `harness_drive_car1.rcs`)
+  and Trim plates feel the same aero as Chips (`rc_models36.sh`, rollt_* vs rollb_*), so the original's constant
+  12.5 m/s² up to 65 m/s is reached against ~8 kN of wing drag. That needs the wings' downforce as grip and a
+  rolling wheel that keeps pushing past 180 rad/s: `TYRE_LOAD_CAP_SUSTAINED` 1.5 → 3 and `ROLL_FADE_SCALES` (the
+  power-scaled fade zero point, ω0 = power/20.6, now also while rolling). car1 under Up: 11.3/23.3/36.7/46/56/69 m/s
+  at 30-frame steps (original 11.9/25.9/38.7/51/62/68); score 0.20 → 0.08. The original then stops at 68.5 m/s
+  (its wheels' `_H` turns −100000) and SnapTiles does not. Steady-turn references 12.7 → 11.7%, 0.099 → 0.094 rad/s.
+- **Jet thrust is 1/6 N per power** (the readme's "6 power = 1 N"): two flat Jets lifting a 98.7 kg core
+  (`rc_models37.sh`) leave the ground at power 3000 each but not 2800. The 0.145 of 2026-10-28 came from a
+  jet-pushed wheeled car.
+- **`_AZ` is a tilt, not an Euler roll** (`rc_models38.sh`, `harness_axes2.rcs`): an upside-down chip reads
+  `_AZ` ≈ 0 (Euler roll ±π) and one turned over about its forward axis reads the roll negated; `_AX` = asin(−Lz·up)
+  already was. SnapTiles' `_AZ` is now asin(Lx·up). tp-2 steers by a flipped body chip: with the Euler roll its
+  hover controller saturated every jet at ±100000; now it flies (Up 0.42 → 0.15) and hovers (idle 2.63 → 0.86,
+  though it climbs 0.13 m/s where the original holds 3.0 m).
+- **Rotor spin integration** is sub-stepped and stops at the drag/motor balance (a rotor that touched the ground at
+  speed diverged to NaN in 15cpHeri under Up).
+
+1wheel was not a sign error: the original yaws ~160° while idle, which flips its Euler pitch; it then rides at
+7.5 m/s against SnapTiles' 5.8. RCModel1's bike stops in the original after 4.7 m/s, nose up 0.25 rad, with Up held
+(about 2.8 kN of extra resistance): most likely its two side stands, lowered below 5 m/s by its Lua, dragging on
+their edges — the friction of a plate's edge on the ground is not measured (Frame faces slide at 0.1). Open.
+Corpus: runs scoring above 1 25 → 21, median 0.33 → 0.29, upright mismatches 10.

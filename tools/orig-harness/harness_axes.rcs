@@ -1,0 +1,9 @@
+-- Sign relations of the core's attitude APIs: log _EX/_EY/_EZ, _AX/_AY/_AZ, _WX/_WY/_WZ and _VX/_VY/_VZ of chip 0
+n=0
+buf="frame,ex,ey,ez,ax,ay,az,wx,wy,wz,vx,vy,vz\n"
+function OnFrame()
+	n=n+1
+	if n<=200 then buf=buf..n..",".._EX(0)..",".._EY(0)..",".._EZ(0)..",".._AX(0)..",".._AY(0)..",".._AZ(0)..",".._WX(0)..",".._WY(0)..",".._WZ(0)..",".._VX(0)..",".._VY(0)..",".._VZ(0).."\n" end
+	if n==200 then local h=_FOPEN("log.txt","w") if h>=0 then _FPUTS(h,buf) _FCLOSE(h) end end
+	out(0,"frame ",n)
+end

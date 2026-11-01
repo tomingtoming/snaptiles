@@ -2217,3 +2217,12 @@ where only SnapTiles falls 10 → 5. New sag tests; 190 unit tests, all browser 
 Measured how a wheel carrying chips spins in the air (power, carried mass, blade pitch) and fitted a spin law.
 The carried chips now turn with the wheel, so blades lift through the existing plate aero; helicopters such as
 15cpHeri hover. Wheels that carry most of a model stay rigid. New rotor test; 194 unit tests pass.
+
+
+## 2026-11-01 — Vehicles: wing downforce, jet thrust, tilt sensors (Sprint 79)
+
+Difference hunt group D. car1 reaches its original top-speed curve (downforce now buys grip up to 3× the static
+load and a rolling wheel's fade scales with power); jets push 1/6 N per power as the readme says (lift-off probe);
+`_AZ` reads the tilt of the chip's own axis like the original (an upside-down chip reads 0), which lets tp-2 hover
+and fly; rotor spin integration no longer diverges. Turn references improve (11.7%). 194 unit tests and both plane
+probes pass. The bike's stop (stand edge friction) and 1wheel's speed remain open.
