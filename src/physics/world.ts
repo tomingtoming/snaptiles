@@ -36,6 +36,9 @@ export interface TileBody {
   servoAngle: number;
   /** angular velocity (rad/s) of the spring-limited command of an animated joint with spring < 1 */
   servoVel: number;
+  /** spring < 1: a revolute joint held by a position motor (SPRING_K·spring²), and the inertia it swings */
+  springy: boolean;
+  springInertia: number;
   /** wheels: kinematic spin about the rim normal (rad/s, + in the +power direction) and the
    *  accumulated angle for rendering. The tyre is not a spinning body (measured: the original's
    *  wheel does not spin up in the air and reads _WY = v/r while rolling). */
@@ -76,7 +79,7 @@ export const WHEEL_SPIN_FADE = 180; // rad/s at which the torque would reach zer
  *  models toppled on landing — and the rebound grew with the substep count. Joint chains still need the 16
  *  iterations: 8 let the 3-wheeler's chain sag 0.4 m under its own weight. */
 export const SOLVER_ITERATIONS = 1;
-export const PGS_ITERATIONS = 16;
+export const PGS_ITERATIONS = 48;
 /** brake: deceleration in g per brake unit and its cap (measured on the original, 4-wheel car) */
 export const BRAKE_G_PER_UNIT = 0.022;
 export const BRAKE_G_MAX = 0.8;
@@ -190,10 +193,14 @@ export const SERVO_BAND = (20 * Math.PI) / 180;
  *  about 0.25 at damper 0–0.1. A heavier arm is ~20% slower; the law here ignores that. */
 export const SPRING_SERVO_W = 15.5;
 export const SPRING_SERVO_P = 1.5;
-export const SPRING_STIFFNESS = 4000;
-export const SPRING_DAMPING = 400;
-/** compliant joints may flex this far either way; beyond it the connection is rigid */
-export const SPRING_TRAVEL = (8 * Math.PI) / 180;
+/** joints with spring < 1 are torsion springs (knob springJoints). Measured 2026-11-01 (sag_v/sag_c: an arm at 45°
+ *  with a Weight at its tip, 1913 N·m): static sag 0.8/1.4/3.7/14.7° at spring 0.5/0.2/0.1/0.05 and collapse at
+ *  0.02 → stiffness ≈ SPRING_K·spring^SPRING_K_P N·m/rad. Damping ratio from damper as in SPRING_SERVO_*. */
+export const SPRING_JOINTS = true;
+export const SPRING_K = 3.7e6;
+export const SPRING_K_P = 2;
+/** damping ratio of a spring joint at damper 0 and at damper ≥ 0.5 (0.5 and 1 run identically in the original) */
+export const SPRING_ZETA: [number, number] = [0.1, 0.4]; // lower than the fit: rapier's implicit motor adds damping
 
 // Tiles of a model never collide with each other (only with the ground / objects).
 const MODEL_GROUP = 0x0001_0002; // membership 1, filter 2
@@ -528,10 +535,14 @@ export class PhysicsWorld {
       const animated = angleAnimated && tile.spec.joint !== 'wheel';
       // spring < 1 asks for a compliant connection (suspension); default spring=1 is rigid
       const springVal = tile.node.attrs.spring !== undefined ? attr(tile.node, 'spring', env, 1) : 1;
-      // measured 2026-10-27: a Frame(spring=0.1) holding a 4× Weight at 1.2 m sags only 0.1° in the original
-      // (spring=0.5: none) — spring joints are rigid for practical purposes, so they are welded unless asked
-      const noSpring = !((globalThis as unknown as { __tune?: { springJoints?: boolean } }).__tune?.springJoints ?? false);
-      const compliant = !noSpring && !!parentTb && !animated && tile.spec.joint !== 'wheel' && tile.spec.joint !== 'fixed' && springVal < 1;
+      // measured 2026-11-01 (sag_v/sag_c): a joint with spring < 1 gives under load like a torsion spring of
+      // SPRING_K·spring² N·m/rad, whether its angle is a Val or a literal (the 2026-10-27 "no sag" probe had its
+      // arm lying on the ground). Such joints are revolute joints with a position motor, not welds or servos.
+      const springyOn = (globalThis as unknown as { __tune?: { springJoints?: boolean } }).__tune?.springJoints ?? SPRING_JOINTS;
+      const springExpr = tile.node.attrs.spring;
+      const springy = springyOn && !!parentTb && tile.spec.joint !== 'wheel' && tile.spec.joint !== 'fixed'
+        && springExpr !== undefined && (!exprIsConstant(springExpr) || springVal < 1);
+      const compliant = springy && !animated;
       // every hinge its own body on a hard-limited revolute joint (probe knob allJoints): the original's joints are
       // rigid statically but flex and recover under an impulse (measured 2026-10-28, leg probes), which a welded
       // group cannot do and an iteratively solved chain of joints does
@@ -634,13 +645,13 @@ export class PhysicsWorld {
         jointAxisLocal = new THREE.Vector3(axisL.x, axisL.y, axisL.z);
         const anchL = toLocal(parentTb.body, anchorW);
         jointAnchorLocal = new THREE.Vector3(anchL.x, anchL.y, anchL.z);
-        const splitServo = animated && ((globalThis as unknown as { __tune?: { splitServo?: boolean } }).__tune?.splitServo ?? true);
+        const splitServo = animated && !springy && ((globalThis as unknown as { __tune?: { splitServo?: boolean } }).__tune?.splitServo ?? true);
         const jd = splitServo
           ? R.JointData.fixed(toLocal(parentTb.body, anchorW), {x:0,y:0,z:0,w:1}, toLocal(body, anchorW), {x:0,y:0,z:0,w:1})
           : R.JointData.revolute(toLocal(parentTb.body, anchorW), toLocal(body, anchorW), axisL);
         joint = this.world.createImpulseJoint(jd, parentTb.body, body, true) as RAPIER.RevoluteImpulseJoint | RAPIER.FixedImpulseJoint;
         const revolute = joint as RAPIER.RevoluteImpulseJoint;
-        if (!splitServo && (animated || everyJoint)) revolute.setLimits(0, 0);
+        if (!splitServo && !springy && (animated || everyJoint)) revolute.setLimits(0, 0);
         // a stiff position motor on top of the hard limits: rapier's limits alone give under static load
         // (probe knob jointStiff = stiffness N·m/rad, damping = stiffness/100)
         const stiff = (globalThis as unknown as { __tune?: { jointStiff?: number } }).__tune?.jointStiff ?? 0;
@@ -648,18 +659,27 @@ export class PhysicsWorld {
           revolute.configureMotorModel(R.MotorModel.ForceBased);
           revolute.configureMotorPosition(0, stiff, stiff / 100);
         }
-        if (compliant) {
-          const damper = tile.node.attrs.damper !== undefined ? attr(tile.node, 'damper', env, 0.5) : attr(tile.node, 'dumper', env, 0.5);
-          revolute.configureMotorModel(R.MotorModel.ForceBased);
-          revolute.configureMotorPosition(0, SPRING_STIFFNESS * Math.max(0.02, springVal), SPRING_DAMPING * Math.max(0.05, damper));
-          revolute.setLimits(-SPRING_TRAVEL, SPRING_TRAVEL);
-        }
+        if (springy) revolute.configureMotorModel(R.MotorModel.ForceBased); // gains set every step (springMotor)
       }
       const restAngle = angleAnimated ? attr(tile.node, 'angle', env, 0) : 0;
-      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0, servoAngle: 0, servoVel: 0, spin: 0, spinAngle: 0, contactPoint: null, load: 0, collider: null, contactForce: 0, kerbForce: 0, staticLoad: 0, contactAge: 0, slipping: false, jointAxisLocal, jointAnchorLocal };
+      const tb: TileBody = { tile, body, groupRoot, relPos, relQuat, joint, animated, springy, springInertia: 0, rim, rimJoint, bodyRestQuat, bodyRestPos, restAngle, jetPower: 0, servoAngle: 0, servoVel: 0, spin: 0, spinAngle: 0, contactPoint: null, load: 0, collider: null, contactForce: 0, kerbForce: 0, staticLoad: 0, contactAge: 0, slipping: false, jointAxisLocal, jointAnchorLocal };
       tb.collider = tyreColliders.get(tile.id) ?? null;
       this.tiles.push(tb);
       this.byId.set(tile.id, tb);
+    }
+    // a spring joint's damping needs the inertia it swings: the subtree beyond it about its axis
+    for (const tb of this.tiles) if (tb.springy) {
+      const { anchor, axis } = tb.tile, n = axis.clone().normalize();
+      let I = 0;
+      for (const t of a.tiles) {
+        let p: TileInstance | null = t;
+        while (p && p !== tb.tile) p = p.parent;
+        if (!p) continue;
+        const r = t.position.clone().sub(anchor);
+        r.sub(n.clone().multiplyScalar(r.dot(n)));
+        I += t.mass * (r.lengthSq() + (TILE * TILE) / 12);
+      }
+      tb.springInertia = I;
     }
   }
 
@@ -683,6 +703,24 @@ export class PhysicsWorld {
   private componentRoot(tile: TileInstance): number {
     while (tile.parent && !tile.detached) tile = tile.parent;
     return tile.id;
+  }
+
+  /** a joint with spring < 1: a torsion spring toward its (possibly animated) angle, SPRING_K·spring² N·m/rad,
+   *  damped by the damper's ratio over the inertia it swings. The target is taken the short way round from the
+   *  current angle (G.txt's legs command "current + 20°" and wrap at ±180°). */
+  private springMotor(tb: TileBody, env: ValEnv): void {
+    const DEG = Math.PI / 180;
+    const { tile } = tb;
+    const s = Math.max(0, attr(tile.node, 'spring', env, 1));
+    const k = ((globalThis as unknown as { __tune?: { springK?: number } }).__tune?.springK ?? SPRING_K) * Math.pow(s, SPRING_K_P);
+    const damper = tile.node.attrs.damper !== undefined ? attr(tile.node, 'damper', env, 0.5) : attr(tile.node, 'dumper', env, 0.5);
+    const zt = (globalThis as unknown as { __tune?: { springZeta?: [number, number] } }).__tune?.springZeta ?? SPRING_ZETA;
+    const zeta = zt[0] + (zt[1] - zt[0]) * Math.min(1, Math.max(0, damper) / 0.5);
+    const c = 2 * zeta * Math.sqrt(k * Math.max(1e-3, tb.springInertia));
+    const want = tb.animated ? jointSign(tile.spec.joint, tile.dir) * (attr(tile.node, 'angle', env, 0) - tb.restAngle) * DEG : 0;
+    const target = Math.atan2(Math.sin(want), Math.cos(want));
+    tb.servoAngle = target;
+    (tb.joint as RAPIER.RevoluteImpulseJoint).configureMotorPosition(target, k, c);
   }
 
   /** current angle of an animated joint, measured from the two bodies' rotations (rad) */
@@ -1231,6 +1269,7 @@ export class PhysicsWorld {
     const changedRoots = new Set<number>();
     for (const tb of this.tiles) {
       const { tile, joint, body } = tb;
+      if (tb.springy && joint) { this.springMotor(tb, env); continue; }
       if (joint && tile.parent && !tile.spec.wheel) {
         if (tb.animated) {
           // servo: the commanded angle is reached at a bounded rate (window.__tune.servoRate

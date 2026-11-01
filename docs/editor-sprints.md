@@ -2202,3 +2202,11 @@ grows with spring^1.5, not instantly. Animated joints with spring < 1 now filter
 spring (`SPRING_SERVO_W`, `SPRING_SERVO_P`, knob `springServo`). Corpus runs scoring above 1: 33 → 30; three
 models stop creeping. Talon and the other standing models still fall (joints do not yet give under load).
 New unit test against the measured response; 186 unit tests, all browser scenarios and both plane probes pass.
+
+
+## 2026-11-01 — Spring joints are torsion springs (Sprint 77)
+
+Measured the original's static sag of spring joints (animated and literal angles alike) and rebuilt joints with
+spring < 1 as revolute joints held by a force-based position motor of 3.7·10⁶·spring² N·m/rad. The internal PGS
+iterations go 16 → 48 so jointed axles hold on landing. Upright mismatches against the original 18 → 12, runs
+where only SnapTiles falls 10 → 5. New sag tests; 190 unit tests, all browser scenarios and both plane probes pass.

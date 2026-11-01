@@ -355,3 +355,18 @@ Upright mismatches unchanged (18). Talon still falls: the original's joints also
 (the body sinks 0.18 m and settles), SnapTiles' joints are rigid against external load and the model
 rebounds. Making spring joints compliant to load is the next structural step; still falling also DUCKER,
 zrobo, 2leg1, 15cpHeri, been3.
+
+**Follow-up, 2026-11-01 — spring joints give under load.** `rc_models33.sh`: the arm at 45° elevation with a
+Weight at its tip (1913 N·m about the hinge), its angle a Val (`sag_v`) or a literal (`sag_c`) — both identical.
+Settled elevation 44.3/44.2/43.6/41.3/30.3/0.2° at spring 1/0.5/0.2/0.1/0.05/0.02: every joint with spring < 1
+is a torsion spring of ≈ 3.7·10⁶·spring² N·m/rad (the 2026-10-27 "rigid" sag probe had its arm lying on the
+ground). The landing swings these arms 6–15° and they recover. Such joints are now revolute joints with a
+force-based position motor (`SPRING_K`, `SPRING_K_P`, damping ratio `SPRING_ZETA` over the subtree's inertia;
+the earlier command filter stays only for the `springJoints: false` knob). Settled sag in SnapTiles
+44.2/41.9/30.6/0.0°. The oscillation at low damper is under-reproduced (rapier's implicit motor adds damping).
+With the extra bodies, one substep with 16 PGS iterations let 3wheel's rear axle (a TrimF spring) roll the car
+over on landing; `PGS_ITERATIONS` 48 holds it (cost +0.02 ms per frame on the largest corpus models; steady-turn
+references 12.4 → 12.7%, 0.096 → 0.099 rad/s). Moving tyre forces past the spring to the chassis also fixed
+3wheel but broke the RCModel1 bike (its steering is a spring) and was dropped. Corpus: upright mismatches
+18 → 12, runs where only SnapTiles falls 10 → 5 (zrobo, been3, 2leg1, DUCKER idle now stand), runs scoring above
+1 30 → 28, median 0.40 → 0.33. Still falling: Talon, 15cpHeri, DUCKER under Up.
