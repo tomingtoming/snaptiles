@@ -175,6 +175,19 @@ export class Simulation {
       v.touched = true;
     }
 
+    // probe knob scriptAfterPhysics: run this frame's physics before the script (the original shows no script effect
+    // in its first frame)
+    const late = (globalThis as unknown as { __tune?: { scriptAfterPhysics?: boolean } }).__tune?.scriptAfterPhysics ?? false;
+    const physics = () => {
+      // the original runs scripts and key steps at 30 fps; physics takes two 1/60 s steps per frame
+      const sub = (globalThis as unknown as { __tune?: { substeps?: number } }).__tune?.substeps ?? PHYSICS_SUBSTEPS;
+      this.physics.world.timestep = this.frameDt() / sub;
+      for (let i = 0; i < sub; i++) {
+        this.physics.applyControls(this.env);
+        this.physics.step();
+      }
+    };
+    if (late) physics();
     this.lines3d = [];
     this.lines2d = [];
     this.penColor = [1, 1, 1];
@@ -201,13 +214,7 @@ export class Simulation {
       v.value = Math.max(v.min, Math.min(v.max, v.value));
     }
 
-    // the original runs scripts and key steps at 30 fps; physics takes two 1/60 s steps per frame
-    const sub = (globalThis as unknown as { __tune?: { substeps?: number } }).__tune?.substeps ?? PHYSICS_SUBSTEPS;
-    this.physics.world.timestep = this.frameDt() / sub;
-    for (let i = 0; i < sub; i++) {
-      this.physics.applyControls(this.env);
-      this.physics.step();
-    }
+    if (!late) physics();
     this.ticks++;
   }
 

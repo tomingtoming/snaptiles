@@ -420,3 +420,10 @@ rest of the model (2leg1's and 4leg2's "head wheel" axles) stays rigid. 15cpHeri
 (about 2.8 kN of extra resistance): most likely its two side stands, lowered below 5 m/s by its Lua, dragging on
 their edges — the friction of a plate's edge on the ground is not measured (Frame faces slide at 0.1). Open.
 Corpus: runs scoring above 1 25 → 21, median 0.33 → 0.29, upright mismatches 10.
+
+**Talon, last look (2026-11-01).** The original shows no script effect in a model's first frame (Talon's legs, car1's
+wings), which suggested it runs physics before the script. A knob (`scriptAfterPhysics`) that does so leaves the
+corpus totals unchanged (improves baloon4 and 3wheel, worsens the bike and satellite) and Talon still falls; the
+spring-joint probes also show a command taking effect in the frame it is given. Not adopted. Talon remains open:
+without its Lua it settles within 0.10 m of the original, with it the landing after the leg motion in the air
+tips it forward.
