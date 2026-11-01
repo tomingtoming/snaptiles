@@ -1,0 +1,5 @@
+# Emscripten build: one ES module (snaptiles_core.js + .wasm) exporting the core_* functions of src/ffi.rs.
+[target.wasm32-unknown-emscripten]
+rustflags = [
+  "-C", "link-args=-sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=web,node -sINVOKE_RUN=0 -sALLOW_MEMORY_GROWTH=1 -sEXPORT_NAME=SnapTilesCore -sEXPORTED_RUNTIME_METHODS=UTF8ToString,HEAPU8,HEAPF64 -sEXPORTED_FUNCTIONS=_malloc,_free,_core_reset,_core_add_box,_core_load_lua,_core_set_key,_core_step,_core_step_n,_core_state_ptr,_core_state_len,_core_error,_core_out",
+]
