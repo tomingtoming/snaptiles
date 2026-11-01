@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:core": "powershell -ExecutionPolicy Bypass -File core/build-wasm.ps1",
     "test": "vitest run",
     "preview": "vite preview",
     "test:plane": "node tools/editor-ci.mjs plane-control-probe.mjs editor-plane-build-probe.mjs",

@@ -49,3 +49,5 @@ Acceptance per stage:
   scripts) hold when ported to `cargo test`.
 - **Stage 3 (page)**: a TypeScript adapter with the `Simulation` surface used by `main.ts`, `scene.ts` and the HUD,
   switchable by a flag; all browser scenarios and both plane probes pass on the Rust core before it becomes the default.
+  Done as `src/sim/rust-simulation.ts` (`SimView` in `src/sim/sim-view.ts` is the surface both cores implement),
+  switched by `?core=rust` / `localStorage['snaptiles.core']`; `CORE=rust node tools/editor-ci.mjs` runs the scenarios on it.

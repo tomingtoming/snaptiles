@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { TILE, TILE_T, type TileInstance, type ValEnv } from '../model/assemble';
 import { evalExpr, exprIsConstant } from '../rc/expr';
-import { wheelRadius, type PhysicsWorld } from '../physics/world';
+import { wheelRadius } from '../physics/world';
+import type { PhysicsView } from '../sim/sim-view';
 import { COURSE, CRATES } from '../model/course';
 const SPIN_AXIS = new THREE.Vector3(0, 1, 0);
 const UP_AXIS = new THREE.Vector3(0, 1, 0);
@@ -469,7 +470,7 @@ export class SceneView {
 
   private crateMeshes: THREE.Mesh[] = [];
   private ballMeshes: THREE.Mesh[] = [];
-  sync(world: PhysicsWorld): void {
+  sync(world: PhysicsView): void {
     while (this.ballMeshes.length < world.balls.length) {
       const b = world.balls[this.ballMeshes.length];
       const m = new THREE.Mesh(new THREE.SphereGeometry(b.radius, 24, 16), new THREE.MeshStandardMaterial({ color: new THREE.Color(...b.color), roughness: 0.5 }));

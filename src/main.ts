@@ -5,6 +5,7 @@ import { initRapier } from './physics/world';
 import { SceneView } from './render/scene';
 import { KeyState, KEY_TABLE } from './input/keys';
 import { Simulation } from './sim/simulation';
+import type { CoreKind, SimView } from './sim/sim-view';
 import { Sfx } from './audio/sfx';
 import { SAMPLES } from './samples';
 
@@ -37,12 +38,24 @@ let lastShells = 0;
 let lastCoreVel: { x: number; y: number; z: number } | null = null;
 const crateVel: ({ x: number; y: number; z: number } | null)[] = [];
 const scene = new SceneView(canvas);
-let sim: Simulation | null = null;
+let sim: SimView | null = null;
 let loadGeneration = 0;
 let builder: BuildPanel;
 let keyCaps: { el: HTMLElement; n: number }[] = [];
 
-const R = await initRapier();
+// Simulation core: TypeScript (rapier3d-compat + wasmoon, the default) or the Rust core (core/, ?core=rust or
+// localStorage 'snaptiles.core' = 'rust'; ?core=ts overrides a stored choice). The Rust module and the rapier
+// WebAssembly are each loaded only when their core is used.
+const CORE: CoreKind = (() => {
+  const q = new URLSearchParams(location.search).get('core');
+  if (q === 'rust' || q === 'ts') return q;
+  try { return localStorage.getItem('snaptiles.core') === 'rust' ? 'rust' : 'ts'; } catch { return 'ts'; }
+})();
+document.documentElement.dataset.core = CORE;
+statusEl.title = CORE === 'rust' ? 'シミュレーション: Rust コア' : 'シミュレーション: TypeScript コア';
+// the Rust adapter and module start loading at boot, so a load later only awaits settled promises (microtasks)
+const rustSimulation = CORE === 'rust' ? import('./sim/rust-simulation').then((m) => { void m.loadRustCore(); return m.RustSimulation; }) : null;
+const R = CORE === 'ts' ? await initRapier() : null;
 
 async function load(source: string, request: number): Promise<boolean> {
   if (request !== loadGeneration) return false;
@@ -55,21 +68,21 @@ async function load(source: string, request: number): Promise<boolean> {
   sfx.update(0, 0);
   const old = sim;
   sim = null;
-  (window as unknown as { __sim: Simulation | null }).__sim = null;
+  (window as unknown as { __sim: SimView | null }).__sim = null;
   scene.clearModel();
   hudCtx.clearRect(0, 0, hud.width, hud.height);
-  let next: Simulation | null = null;
+  let next: SimView | null = null;
   try {
     if (old) await old.dispose();
     if (request !== loadGeneration) return false;
     const t0 = performance.now();
-    next = new Simulation(R, source, keys);
+    next = CORE === 'rust' ? new (await rustSimulation!)(source, keys) : new Simulation(R ?? await initRapier(), source, keys);
     const t1 = performance.now();
     await next.start();
     if (request !== loadGeneration) { await next.dispose(); return false; }
     const t2 = performance.now();
     sim = next;
-    (window as unknown as { __sim: Simulation }).__sim = next;
+    (window as unknown as { __sim: SimView }).__sim = next;
     scene.rebuild(next.assembly!.tiles, next.env);
     scene.setLines3d([]);
     const t3 = performance.now();
@@ -87,7 +100,7 @@ async function load(source: string, request: number): Promise<boolean> {
     if (next) await next.dispose();
     if (request === loadGeneration) {
       sim = null;
-      (window as unknown as { __sim: Simulation | null }).__sim = null;
+      (window as unknown as { __sim: SimView | null }).__sim = null;
       scene.clearModel();
       statusEl.textContent = e instanceof Error ? e.message : String(e);
     }
@@ -95,7 +108,7 @@ async function load(source: string, request: number): Promise<boolean> {
   }
 }
 
-function buildKeyCaps(s: Simulation): void {
+function buildKeyCaps(s: SimView): void {
   keysEl.replaceChildren();
   keyCaps = [];
   // keys bound in Key{} plus any _KEY(n) literal the script polls
@@ -340,7 +353,7 @@ function frame(now: number): void {
   if (builder?.active) { acc = 0; scene.updateEditorCamera(); }
   scene.render();
 }
-function updateSound(s: Simulation): void {
+function updateSound(s: SimView): void {
   let spin = 0;
   let jet = 0;
   for (const tb of s.physics.tiles) {
@@ -371,7 +384,7 @@ function updateSound(s: Simulation): void {
     lastCoreVel = { x: v.x, y: v.y, z: v.z };
   } else lastCoreVel = null;
 }
-function updateOverlay(s: Simulation): void {
+function updateOverlay(s: SimView): void {
   const lines: string[] = [];
   for (const v of s.vals.values()) if (v.disp) lines.push(`${v.name.padEnd(10)} ${fmt(v.value)}`);
   valsEl.textContent = lines.join('\n');
@@ -385,7 +398,7 @@ function updateOverlay(s: Simulation): void {
 // _MOVE2D/_LINE2D overlay: x spans -1..1 across the width, y is 1 at the top and -1 at the bottom
 const hud = $<HTMLCanvasElement>('hud');
 const hudCtx = hud.getContext('2d')!;
-function drawHud(buf: number[], s: Simulation): void {
+function drawHud(buf: number[], s: SimView): void {
   const w = hud.clientWidth;
   const h = hud.clientHeight;
   if (hud.width !== w || hud.height !== h) {

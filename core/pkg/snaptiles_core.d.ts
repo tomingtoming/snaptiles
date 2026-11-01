@@ -1,0 +1,27 @@
+// Types of the Emscripten module built by core/build-wasm.ps1 (the core_* functions of core/src/ffi.rs; the state
+// buffer layout is in core/src/state.rs). Written by hand: keep in step with ffi.rs and .cargo/config.toml.
+export interface SnapTilesCoreModule {
+  HEAPU8: Uint8Array;
+  HEAPF64: Float64Array;
+  UTF8ToString(ptr: number): string;
+  _malloc(n: number): number;
+  _free(ptr: number): void;
+  _core_create(): number;
+  _core_free(id: number): void;
+  _core_load(id: number, ptr: number, len: number, noCourse: number): number;
+  _core_reset(id: number): void;
+  _core_set_input(id: number, keys: number, mx: number, my: number, ml: number, mr: number, mm: number, width: number, height: number): void;
+  _core_set_axes(id: number, a0: number, a1: number, a2: number, a3: number, a4: number, a5: number): void;
+  _core_add_ball(id: number, radius: number, x: number, y: number, z: number, gravity: number): number;
+  _core_set_wind(id: number, x: number, y: number, z: number): void;
+  _core_step(id: number, n: number): void;
+  _core_state_ptr(id: number): number;
+  _core_state_len(id: number): number;
+  _core_error(id: number): number;
+  _core_out(id: number): number;
+  _core_val_names(id: number): number;
+  _core_tile_body_mass(id: number, tile: number): number;
+  _core_api(id: number, name: number, len: number, argc: number, a0: number, a1: number, a2: number, a3: number, a4: number, a5: number): number;
+}
+declare const SnapTilesCore: (options?: Record<string, unknown>) => Promise<SnapTilesCoreModule>;
+export default SnapTilesCore;

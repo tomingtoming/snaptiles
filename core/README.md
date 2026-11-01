@@ -5,19 +5,21 @@ The simulation core in Rust: [Rapier](https://rapier.rs) (`rapier3d` 0.36) and t
 test`) and with Emscripten into one WebAssembly ES module for the browser. The page reads the bodies' state straight
 out of the module's memory, and Lua calls the physics without leaving WebAssembly.
 
-Status: stage 2b (core/PORT.md) — parser and assembler, the physics world, Val/Key handling, the full script API, Lua
-(`src/scripting/lua.rs`) and the legacy `Script` (`rcscript.rs`) run natively; `src/bin/replay.rs` replays the corpus
-driving and geometry probes. The C ABI in `src/ffi.rs` is a minimal stand-in until stage 3 writes the page adapter:
-`core_load_lua` now takes a whole `.rc` model (third argument: bare ground), `core_add_box` does nothing, so
-`bench/*.mjs` (box scenes) no longer measure what the table below describes. The app still runs on
-`src/physics/world.ts` (rapier3d-compat) and wasmoon; nothing in `src/` imports this crate yet.
+Status: stage 3 (core/PORT.md) — parser and assembler, the physics world, Val/Key handling, the full script API, Lua
+(`src/scripting/lua.rs`) and the legacy `Script` (`rcscript.rs`) run natively and in the page. `src/ffi.rs` is the C ABI
+the page drives (any number of simulations by id: create/load/reset/input/step/free, ad-hoc `core_api`), `src/state.rs`
+the per-frame state buffer the page reads from `HEAPF64` (layout documented there). `src/sim/rust-simulation.ts` is the
+adapter with the `Simulation` surface; the page runs it with `?core=rust` (or `localStorage['snaptiles.core'] =
+'rust'`), the TypeScript core stays the default. `src/bin/replay.rs` replays the corpus driving and geometry probes.
+`bench/*.mjs` still call the stage-1 prototype ABI (box scenes) and no longer run; `tools/core-bench.mjs` times both
+cores in Chromium.
 
 ## Build
 
 ```
 cargo test --release                 # native
 cargo run --release --bin replay -- D:/snaptiles-models/quarantine/original/runs   # corpus replay → snap_rust
-pwsh core/build-wasm.ps1             # browser: core/pkg/snaptiles_core.{js,wasm}
+bun run build:core                   # browser: core/pkg/snaptiles_core.{js,wasm} (core/build-wasm.ps1)
 ```
 
 The browser build needs [emsdk](https://emscripten.org/docs/getting_started/downloads.html) (`emsdk install latest`,
@@ -25,6 +27,11 @@ The browser build needs [emsdk](https://emscripten.org/docs/getting_started/down
 `rustup target add wasm32-unknown-emscripten`. `build-wasm.ps1` sets the Emscripten environment for its own process
 only and points the C compiler, archiver and linker at `emcc.exe`/`emar.exe` (current emsdk ships no `.bat`).
 Emscripten is used because C (Lua) does not build for `wasm32-unknown-unknown`.
+
+`core/pkg` is committed so `bun run build` works without emsdk: **rebuild it (`bun run build:core`) after changing
+`core/src`** and commit the new `snaptiles_core.{js,wasm}`. `snaptiles_core.d.ts` there is written by hand; keep it, the
+`EXPORTED_FUNCTIONS` list in `.cargo/config.toml`, `src/ffi.rs` and the decoder in `src/sim/rust-simulation.ts` in step
+(bump `LAYOUT_VERSION` in both when the buffer layout changes).
 
 ## Measured (2026-11-01, this machine)
 

@@ -9,6 +9,7 @@ pub mod physics;
 pub mod rc;
 pub mod scripting;
 pub mod sim;
+pub mod state;
 
 pub use physics::PhysicsOptions;
 pub use sim::{Simulation, FRAME_RATE, PHYSICS_SUBSTEPS};

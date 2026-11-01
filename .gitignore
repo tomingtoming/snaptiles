@@ -9,5 +9,4 @@ dist/
 tools/orig-harness/lands/
 __pycache__/
 core/target/
-core/pkg/
 core/bench/dist/
