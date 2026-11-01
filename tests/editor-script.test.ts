@@ -53,5 +53,5 @@ describe('Lua errors name the file line', () => {
       expect(sim.scriptError).toMatch(new RegExp(`line ${line}:`));
       expect(src.split('\n')[line - 1]).toBe('  P = nosuch.field');
     } finally { await sim.dispose(); }
-  });
+  }, 20000); // starts the physics and Lua engines: slow when the whole suite runs in parallel
 });

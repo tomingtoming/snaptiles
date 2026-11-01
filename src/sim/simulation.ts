@@ -10,7 +10,8 @@ import { RcScript } from '../scripting/rcscript';
 import type { KeyState } from '../input/keys';
 
 /** script / key frame rate of the original tool and physics substeps per frame */
-export const FRAME_RATE = 30;
+import { FRAME_RATE } from './sim-view';
+export { FRAME_RATE };
 export const PHYSICS_SUBSTEPS = 2;
 
 /** sign knobs on the script API, applied to three.js 'YXZ' Euler angles / local angular velocity */

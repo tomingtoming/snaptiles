@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
-import { DIR_VEC, TILE, TILE_T, assemblyBottom, attr, jointSign, refreshJointFrames, type Assembly, type TileInstance, type ValEnv } from '../model/assemble';
+import { DIR_VEC, TILE, TILE_T, assemblyBottom, attr, jointSign, refreshJointFrames, wheelRadius, type Assembly, type TileInstance, type ValEnv } from '../model/assemble';
 import { exprIsConstant } from '../rc/expr';
 import { COURSE, CRATES } from '../model/course';
 import { balancePose, type MassPoint } from './pose-balance';
@@ -1600,12 +1600,5 @@ function toLocalDir(body: RAPIER.RigidBody, worldDir: THREE.Vector3) {
   return { x: v.x, y: v.y, z: v.z };
 }
 
-/** Wheel/RLW radius: 0.30/0.45/0.60 m, measured against 1.5B26 on 2026-10-27. */
-export function wheelRadius(option: number): number {
-  const tune = (globalThis as unknown as { __tune?: { wheelRadius?: number } }).__tune?.wheelRadius;
-  const base = tune ?? WHEEL_RADIUS0;
-  // measured 2026-10-27: option 1 rolls at 0.45 m, option 2 at 0.60 m (1.5× and 2× option 0)
-  return base * (option >= 2 ? 2 : option >= 1 ? 1.5 : 1);
-}
-/** measured: the Basic car (option 0) rolls at v/ω = 0.30 m in the original */
-export const WHEEL_RADIUS0 = 0.3;
+// wheelRadius and WHEEL_RADIUS0 live in model/assemble (the renderer needs them without the physics bundle)
+export { wheelRadius, WHEEL_RADIUS0 } from '../model/assemble';

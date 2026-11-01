@@ -44,7 +44,8 @@
           <div class="edit-row"><label>ひな形<select id="snippet"></select></label><button id="snippet-insert" type="button">挿入</button></div>
         </details>
       </section>
-      <textarea aria-label="モデルのソース。Tabで字下げ、ShiftとTabで前の操作へ移動" id="source" spellcheck="false" wrap="off"></textarea>
+      <textarea aria-label="モデルのソース。Tabで字下げ、Escでソース欄から抜ける" aria-describedby="source-hint" id="source" spellcheck="false" wrap="off"></textarea>
+      <div id="source-hint">Tab＝字下げ／Escで抜ける／Ctrl＋Enter＝実行</div>
       <footer id="status" tabindex="0" aria-label="読み込み・実行のメッセージ"></footer>
       <div id="script-error" hidden><span id="script-error-text"></span><button id="script-error-goto" type="button">エラーの行へ</button></div>
     </aside>

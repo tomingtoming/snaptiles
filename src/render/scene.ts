@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { TILE, TILE_T, type TileInstance, type ValEnv } from '../model/assemble';
 import { evalExpr, exprIsConstant } from '../rc/expr';
-import { wheelRadius } from '../physics/world';
+import { wheelRadius } from '../model/assemble';
 import type { PhysicsView } from '../sim/sim-view';
 import { COURSE, CRATES } from '../model/course';
 const SPIN_AXIS = new THREE.Vector3(0, 1, 0);

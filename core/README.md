@@ -9,8 +9,8 @@ Status: stage 3 (core/PORT.md) — parser and assembler, the physics world, Val/
 (`src/scripting/lua.rs`) and the legacy `Script` (`rcscript.rs`) run natively and in the page. `src/ffi.rs` is the C ABI
 the page drives (any number of simulations by id: create/load/reset/input/step/free, ad-hoc `core_api`), `src/state.rs`
 the per-frame state buffer the page reads from `HEAPF64` (layout documented there). `src/sim/rust-simulation.ts` is the
-adapter with the `Simulation` surface; the page runs it with `?core=rust` (or `localStorage['snaptiles.core'] =
-'rust'`), the TypeScript core stays the default. `src/bin/replay.rs` replays the corpus driving and geometry probes.
+adapter with the `Simulation` surface. Since 2026-11-02 the page runs it by default; `?core=ts` (or `localStorage['snaptiles.core'] =
+'ts'`) selects the TypeScript core. `src/bin/replay.rs` replays the corpus driving and geometry probes.
 `bench/*.mjs` still call the stage-1 prototype ABI (box scenes) and no longer run; `tools/core-bench.mjs` times both
 cores in Chromium.
 

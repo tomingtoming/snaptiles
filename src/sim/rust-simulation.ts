@@ -9,8 +9,8 @@ import { parseRc, type RcModel } from '../rc/parser';
 import type { Pose } from '../physics/world';
 import type { KeyState } from '../input/keys';
 import type { SnapTilesCoreModule } from '../../core/pkg/snaptiles_core.js';
-import { FRAME_RATE, type ValState } from './simulation';
-import type { BodyView, PhysicsView, SimView, TileBodyView } from './sim-view';
+import type { ValState } from './simulation';
+import { FRAME_RATE, type BodyView, type PhysicsView, type SimView, type TileBodyView } from './sim-view';
 
 // ---- state buffer layout (core/src/state.rs) ----
 const LAYOUT_VERSION = 1;

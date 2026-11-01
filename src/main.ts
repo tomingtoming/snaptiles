@@ -1,10 +1,8 @@
 import { downloadFilename } from './editor/document';
 import { parseRc } from './rc/parser';
 import { BuildPanel } from './editor/panel';
-import { initRapier } from './physics/world';
 import { SceneView } from './render/scene';
 import { KeyState, KEY_TABLE } from './input/keys';
-import { Simulation } from './sim/simulation';
 import type { CoreKind, SimView } from './sim/sim-view';
 import { Sfx } from './audio/sfx';
 import { SAMPLES } from './samples';
@@ -43,19 +41,22 @@ let loadGeneration = 0;
 let builder: BuildPanel;
 let keyCaps: { el: HTMLElement; n: number }[] = [];
 
-// Simulation core: TypeScript (rapier3d-compat + wasmoon, the default) or the Rust core (core/, ?core=rust or
-// localStorage 'snaptiles.core' = 'rust'; ?core=ts overrides a stored choice). The Rust module and the rapier
-// WebAssembly are each loaded only when their core is used.
+// Simulation core: the Rust core (core/, the default since 2026-11-02) or the TypeScript one (rapier3d-compat +
+// wasmoon: ?core=ts or localStorage 'snaptiles.core' = 'ts'; ?core=rust overrides a stored choice). Each core's code
+// and WebAssembly are fetched only when that core is used.
 const CORE: CoreKind = (() => {
   const q = new URLSearchParams(location.search).get('core');
   if (q === 'rust' || q === 'ts') return q;
-  try { return localStorage.getItem('snaptiles.core') === 'rust' ? 'rust' : 'ts'; } catch { return 'ts'; }
+  try { return localStorage.getItem('snaptiles.core') === 'ts' ? 'ts' : 'rust'; } catch { return 'rust'; }
 })();
 document.documentElement.dataset.core = CORE;
 statusEl.title = CORE === 'rust' ? 'シミュレーション: Rust コア' : 'シミュレーション: TypeScript コア';
 // the Rust adapter and module start loading at boot, so a load later only awaits settled promises (microtasks)
 const rustSimulation = CORE === 'rust' ? import('./sim/rust-simulation').then((m) => { void m.loadRustCore(); return m.RustSimulation; }) : null;
-const R = CORE === 'ts' ? await initRapier() : null;
+const tsSimulation = CORE === 'ts'
+  ? Promise.all([import('./sim/simulation'), import('./physics/world')]).then(async ([sim, world]) => ({ Simulation: sim.Simulation, R: await world.initRapier() }))
+  : null;
+if (tsSimulation) await tsSimulation;
 
 async function load(source: string, request: number): Promise<boolean> {
   if (request !== loadGeneration) return false;
@@ -76,7 +77,8 @@ async function load(source: string, request: number): Promise<boolean> {
     if (old) await old.dispose();
     if (request !== loadGeneration) return false;
     const t0 = performance.now();
-    next = CORE === 'rust' ? new (await rustSimulation!)(source, keys) : new Simulation(R ?? await initRapier(), source, keys);
+    const made: SimView = CORE === 'rust' ? new (await rustSimulation!)(source, keys) : await tsSimulation!.then(({ Simulation, R }) => new Simulation(R, source, keys));
+    next = made;
     const t1 = performance.now();
     await next.start();
     if (request !== loadGeneration) { await next.dispose(); return false; }
@@ -192,6 +194,10 @@ sourceEl.addEventListener('keydown', (e) => {
     void loadAndShare(sourceEl.value);
     return;
   }
+  if (e.key === 'Escape') {
+    // Tab indents here, so Esc is the keyboard way out of the source: to the 3D view
+    e.preventDefault(); canvas.focus(); return;
+  }
   if (e.key === 'Tab' && !e.shiftKey) {
     // keep Tab in the editor (model files are tab-indented)
     e.preventDefault();
@@ -240,7 +246,22 @@ window.addEventListener('keydown', (e) => {
     saveModel();
     return;
   }
-  if (typing || builder?.active) return;
+  if (typing) return;
+  if (builder?.active) {
+    // build mode, focus on the 3D view or the page: arrows orbit, +/- zoom, Delete removes the selection,
+    // N/W/E/S add the chosen part on that edge (the buttons do the checks)
+    const orbit = { ArrowLeft: [-24, 0], ArrowRight: [24, 0], ArrowUp: [0, -18], ArrowDown: [0, 18] }[e.key];
+    if (orbit) { e.preventDefault(); scene.orbitBy(orbit[0], orbit[1]); return; }
+    if (e.key === '+' || e.key === '=' || e.key === '-' || e.code === 'NumpadAdd' || e.code === 'NumpadSubtract') {
+      e.preventDefault(); scene.zoomBy(e.key === '-' || e.code === 'NumpadSubtract' ? 1.15 : 1 / 1.15, true); return;
+    }
+    if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); $<HTMLButtonElement>('part-delete').click(); return; }
+    const edge = /^Key([NWES])$/.exec(e.code);
+    if (edge && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      document.querySelector<HTMLButtonElement>(`#builder [data-edge="${edge[1]}"]`)?.click();
+    }
+    return;
+  }
   if (e.code === 'Space') { e.preventDefault(); paused = !paused; } // Space carries no key number in the original
   // the original's default scenario: H drops a ball (r 0.6, specific gravity 0.3) 6 m up at x = 2, J cycles the wind
   if (e.code === 'KeyH' && sim) { const n = sim.physics.balls.length; sim.physics.addBall(0.6, 2, 6 + n, n / 10, 0.3); }
@@ -418,13 +439,21 @@ function drawHud(buf: number[], s: SimView): void {
   if (core) {
     const p = s.physics.pose(core);
     const kmh = s.physics.velocity(core, p).length() * 3.6;
-    hudCtx.font = `${Math.max(12, Math.round(h / 28))}px system-ui, sans-serif`;
+    const size = Math.max(12, Math.round(h / 28)), step = Math.round(h / 24);
+    hudCtx.font = `${size}px system-ui, sans-serif`;
     hudCtx.textAlign = 'right';
     hudCtx.textBaseline = 'bottom';
-    hudCtx.fillStyle = 'rgba(255,255,255,0.85)';
-    hudCtx.fillText(`${kmh.toFixed(0)} km/h`, w - 12, h - 12);
-    hudCtx.fillText(`${p.position.y.toFixed(1)} m`, w - 12, h - 12 - Math.round(h / 24));
-    if (s.physics.wind.lengthSq() > 0) hudCtx.fillText(`wind ${s.physics.wind.length().toFixed(0)} m/s`, w - 12, h - 12 - 2 * Math.round(h / 24));
+    const rows = [`${kmh.toFixed(0)} km/h`, `${p.position.y.toFixed(1)} m`];
+    if (s.physics.wind.lengthSq() > 0) rows.push(`wind ${s.physics.wind.length().toFixed(0)} m/s`);
+    // a dark plate behind the readout: white text alone vanished over the bright ground and sky (UI audit 2026-11-01)
+    const width = Math.max(...rows.map((r) => hudCtx.measureText(r).width)) + 16;
+    const height = (rows.length - 1) * step + size + 12;
+    hudCtx.fillStyle = 'rgba(16,20,24,0.62)';
+    hudCtx.beginPath();
+    hudCtx.roundRect(w - 12 - width + 8, h - 12 - height + 6, width, height, 8);
+    hudCtx.fill();
+    hudCtx.fillStyle = '#fff';
+    rows.forEach((r, i) => hudCtx.fillText(r, w - 12, h - 12 - i * step));
   }
   if (buf.length === 0) return;
   hudCtx.lineWidth = 1.5;
@@ -570,3 +599,9 @@ async function boot(): Promise<void> {
 builder = new BuildPanel(sourceEl, scene, statusEl, () => { ++loadGeneration; paused = true; sfx.update(0, 0); });
 void boot();
 window.addEventListener('hashchange', () => void boot()); // #car / #plane / #m=... links switch models
+
+// an opened section of the builder panel scrolls itself into view (the panel scrolls on short screens)
+for (const id of ['appearance', 'placement', 'script-tools']) {
+  const details = $<HTMLDetailsElement>(id);
+  details.addEventListener('toggle', () => { if (details.open) details.scrollIntoView({ block: 'nearest' }); });
+}

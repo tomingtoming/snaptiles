@@ -7,6 +7,9 @@ import type { RcModel } from '../rc/parser';
 import type { Pose } from '../physics/world';
 import type { ValState } from './simulation';
 
+/** script frames per second (both cores); kept here so the Rust path does not pull in the TypeScript core */
+export const FRAME_RATE = 30;
+
 export type CoreKind = 'ts' | 'rust';
 
 interface Vec3Like { x: number; y: number; z: number }
