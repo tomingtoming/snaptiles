@@ -171,10 +171,8 @@ function childPose(spec: TypeSpec, dir: 'N' | 'S' | 'E' | 'W', angleDeg: number)
   let pos: THREE.Vector3;
   let axis: THREE.Vector3;
   let anchor: THREE.Vector3;
-  // Fold sign measured 2026-10-27 against the corpus: a positive angle folds the child UP
-  // (bike forks go down with Frame(angle=-10){Frame(angle=-135)}, car1's wheels hang below
-  // via Frame(50){Frame(-140)}). Right-hand rotation about hingeAxis = cross(up, dir) folds
-  // down, hence the negation.
+  // Fold sign: a positive angle folds the child DOWN (FOLD_SIGN +1 on every edge; the assembled poses of 97
+  // corpus models match the original's first frame, docs/measured.md difference hunt tier 2).
   switch (spec.joint) {
     case 'hinge':
     case 'fixed':

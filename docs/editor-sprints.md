@@ -2275,3 +2275,14 @@ The parser now records the brace line (`script.firstLine`).
 
 Validation: 7 unit tests (insertion cases, line lookup, reference entries, error lines for both brace styles) and a
 Chromium probe (`editor-script-probe.mjs`). 210 unit tests, all 43 browser scenarios and both plane probes pass.
+
+
+## 2026-11-01 — README and guide (Sprint 83)
+
+The README had grown by appending feature notes after "License", repeated colour/option notes, still said
+multi-selection and a Lua GUI were missing, cited CI that is disabled and a wheel torque of 0.1 N·m per unit (0.13).
+It is now organised as Run / Play / Build visually (parts and selection, branches and names, controls, scripts,
+saving and sharing, limits) / Model file / Physics notes / Tests, keeping every documented behaviour. The in-app
+guide gained multi-selection and script entries. A stale source comment in `assemble.ts` said a positive fold
+angle folds the child up; the assembled pose (and README, and the `FOLD_SIGN` doc) say down, which matches the
+original's corpus geometry. 210 unit tests; guide, general editor and short-height probes pass.
