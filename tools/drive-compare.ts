@@ -11,7 +11,7 @@ import { KeyState } from '../src/input/keys';
 const [dir, geom, ...only] = process.argv.slice(2);
 const SNAP = process.env.SNAP_DIR ?? 'snap'; // write a variant's replays elsewhere
 mkdirSync(`${dir}/${SNAP}`, { recursive: true });
-(globalThis as unknown as { __tune?: unknown }).__tune = { noCourse: true };
+(globalThis as unknown as { __tune?: unknown }).__tune = { noCourse: true, ...JSON.parse(process.env.TUNE ?? "{}") };
 const R = await initRapier();
 const logs = readdirSync(dir).filter((f) => /^\d+\.(idle|up)\.csv$/.test(f)).filter((f) => !only.length || only.includes(f.split('.')[0]));
 for (const file of logs) {

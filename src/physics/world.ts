@@ -619,7 +619,8 @@ export class PhysicsWorld {
         const tyreCylinder = (globalThis as unknown as { __tune?: { tyreCylinder?: boolean } }).__tune?.tyreCylinder ?? false;
         const cd = tile.spec.wheel
           ? tyreCylinder ? R.ColliderDesc.cylinder(TILE_T / 2, wheelRadius(tile.option)) : R.ColliderDesc.ball(wheelRadius(tile.option))
-          : R.ColliderDesc.cuboid(TILE / 2, TILE_T / 2, TILE / 2);
+          // probe knob plateT: the original's plates collide with no thickness (measured 2026-11-01, docs/measured.md)
+          : R.ColliderDesc.cuboid(TILE / 2, ((globalThis as unknown as { __tune?: { plateT?: number } }).__tune?.plateT ?? TILE_T) / 2, TILE / 2);
         // a tyre is a frictionless cylinder (it only carries load); grip comes from driveWheel()
         const frictionScale = (globalThis as unknown as { __tune?: { frictionScale?: number } }).__tune?.frictionScale ?? 1;
         cd.setMass(Math.max(0.1, mass)).setFriction(tile.spec.wheel ? 0 : tile.spec.friction * frictionScale).setCollisionGroups(MODEL_GROUP);

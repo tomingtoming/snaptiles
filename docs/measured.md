@@ -370,3 +370,16 @@ references 12.4 → 12.7%, 0.096 → 0.099 rad/s). Moving tyre forces past the s
 3wheel but broke the RCModel1 bike (its steering is a spring) and was dropped. Corpus: upright mismatches
 18 → 12, runs where only SnapTiles falls 10 → 5 (zrobo, been3, 2leg1, DUCKER idle now stand), runs scoring above
 1 30 → 28, median 0.40 → 0.33. Still falling: Talon, 15cpHeri, DUCKER under Up.
+
+**Follow-up, 2026-11-01 — the ground contact and what is left of group A.** `rc_ground.sh` (flat land, 150 m
+base) and `rc_ground_default.sh` (the default land): resting plates do not sink with load — a lone Core, five
+Chips, five, nine and 25 Weights (25–2500 kg) all rest at −0.003…−0.005 m on the probe land, so the original's
+ground is not a soft penalty contact (rapier's `contact_natural_frequency` has no effect in this build either).
+Tents of two plates hinged down 30°/60° (Chip, Frame and Arm alike) rest exactly where a **zero-thickness**
+0.6 m plate would (60°: 0.5198 m above the flat core on the default land, geometry 0.5196; two chips deep
+1.0378, geometry 1.0392). SnapTiles' plates collide with the 0.03 m thickness, so its models stand ~2 cm higher
+(median over 85 upright corpus runs); a thin collider (knob `plateT`) leaves the corpus scores unchanged
+(median 0.33 → 0.32, mismatches 12), so the default stays. Talon without its Lua now matches the original's
+settled pose within 0.10 m; with the Lua (legs moving during the spawn drop) it is 0.47 m off and still falls
+after the landing — unresolved. 15cpHeri lifts on Trim blades carried by RLW rotors at power 60000:
+SnapTiles does not turn a wheel's children, so it has no rotor lift (a separate feature, not a joint issue).
