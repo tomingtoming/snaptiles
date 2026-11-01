@@ -71,7 +71,9 @@ button:disabled { opacity: .4; cursor: default !important; }
   .edges button:nth-child(n) { grid-row: auto; grid-column: auto; padding: 5px; min-width: 44px; min-height: 44px; }
 }
 
-#angle-control-row[hidden], #power-row[hidden] { display: none; }
+#angle-control-row[hidden], #power-row[hidden], #multi-status[hidden] { display: none; }
+#multi-status { align-items: center; }
+#multi-select[aria-pressed="true"] { background: #3fa9ff; color: #fff; }
 @media(max-width: 800px) {
   .building { grid-template-rows: 40vh 60vh; }
   #builder { max-height: 43vh; }

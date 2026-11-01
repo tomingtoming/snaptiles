@@ -402,7 +402,25 @@ export class SceneView {
       this.selectionBox.renderOrder = 10;
       this.scene.add(this.selectionBox);
     }
+    if (id === null) this.markTiles([]);
   }
+
+  /** the other parts of a multi-selection, outlined in blue (the primary keeps the yellow box) */
+  private markBoxes: THREE.BoxHelper[] = [];
+  markTiles(ids: number[]): void {
+    for (const box of this.markBoxes) { this.scene.remove(box); box.geometry.dispose(); box.material.dispose(); }
+    this.markBoxes = [];
+    for (const id of ids) {
+      const view = this.views.get(id);
+      if (!view) continue;
+      const box = new THREE.BoxHelper(view.mesh, 0x3fa9ff);
+      box.material.depthTest = false;
+      box.renderOrder = 10;
+      this.scene.add(box);
+      this.markBoxes.push(box);
+    }
+  }
+  get markedCount(): number { return this.markBoxes.length; }
 
   pickTile(x: number, y: number): number | null {
     const rect = this.renderer.domElement.getBoundingClientRect();

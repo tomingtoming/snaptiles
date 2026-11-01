@@ -2233,3 +2233,24 @@ probes pass. The bike's stop (stand edge friction) and 1wheel's speed remain ope
 `_WEIGHT()` now counts only what is still attached to the core (measured with `_SPLIT`), which keeps boidbit's body
 from climbing away, and option-2 (air) balloon jets give no force in the air (measured), which lets tp-2 hold its
 hover. Group B turned out to be the original's own breakdown. New tests for both; 198 unit tests pass.
+
+
+## 2026-11-01 — Multi-selection (Sprint 81)
+
+Goal: change several parts at once. Selection was a single source anchor.
+
+`ModelDocument` keeps further selected parts as source anchors beside the primary one (`extraOffsets`), carried
+through GUI edits by traversal index when the topology is unchanged and through typing like the primary anchor
+(a part whose declaration is retyped drops out); Undo/Redo restore them. `typeMany`, `angleMany`, `colorMany` and
+`removeMany` apply one edit per part as a single undo step and refuse the whole operation (no edit) when a part
+cannot take it (Core, variable-driven angle or colour); `removeMany` takes a part inside another selected branch
+with that branch. In the builder, Shift/Ctrl+click in the 3D view adds or removes a part, and the 「複数選択」 toggle
+does the same for plain taps (touch has no Shift). Other selected parts are outlined in blue; a status row shows
+the count and 「選択を解除」. Type, angle, colour and delete apply to all; branch tools, controls and adding stay
+single-part and are disabled meanwhile. Choosing a part from the list or the search ends the multi-selection.
+
+Validation: 5 unit tests (toggle order, bulk edits with one undo step each and preserved selection, refusals
+without edits, nested deletes, selection through typing) and a Chromium probe (`editor-multi-probe.mjs`: Shift and
+Ctrl clicks, tap mode, outlines, bulk angle/colour/type, bulk delete, Undo, exits, 390 px layout). 203 unit tests
+and all 42 browser scenarios pass. Probe note: `page.mouse.click` ignores `modifiers`; hold the key with
+`page.keyboard.down`.

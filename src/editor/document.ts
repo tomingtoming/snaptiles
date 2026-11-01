@@ -6,7 +6,7 @@ export interface SourceViewState {
   start: number; end: number; direction: 'forward' | 'backward' | 'none';
   top: number; left: number;
 }
-interface DocumentState { text: string; filename?: string; sourceView?: SourceViewState; selectedOffset?: number }
+interface DocumentState { text: string; filename?: string; sourceView?: SourceViewState; selectedOffset?: number; extraOffsets?: number[] }
 
 export const OPTION_SETTINGS: Record<string, {label: string; choices: [number, string][]}> = {
   wheel: {label: '半径', choices: [[0, '0.30 m'], [1, '0.45 m'], [2, '0.60 m']]},
@@ -31,6 +31,8 @@ export class ModelDocument {
   text: string;
   private controlCache?: {text: string; entries: Map<string, {strength: number; label: string; keys: readonly [number, number]}>};
   selectedOffset?: number;
+  /** further selected parts (multi-selection); the primary one stays selectedOffset */
+  extraOffsets: number[] = [];
   sourceView?: SourceViewState;
   undoStack: DocumentState[] = [];
   redoStack: DocumentState[] = [];
@@ -45,8 +47,9 @@ export class ModelDocument {
     const next = this.text.slice(0, start) + value + this.text.slice(end);
     parseRc(next); // do not commit a malformed edit
     if (next === this.text) return;
-    const oldNodes = this.selectedOffset === undefined ? [] : this.nodes();
+    const oldNodes = this.selectedOffset === undefined && !this.extraOffsets.length ? [] : this.nodes();
     const selectedIndex = oldNodes.findIndex(n => n.source?.start === this.selectedOffset);
+    const extraIndices = this.extraOffsets.map(o => oldNodes.findIndex(n => n.source?.start === o));
     this.undoStack.push(this.snapshot()); this.redoStack = [];
     if (this.sourceView) {
       // Find the changed span even for whole-document operations that preserve most text.
@@ -59,9 +62,12 @@ export class ModelDocument {
     this.remapSelection(next);
     this.text = next;
     // GUI operations with unchanged topology (e.g. generated controls) preserve traversal identity.
-    if (selectedIndex >= 0) {
+    if (selectedIndex >= 0 || extraIndices.length) {
       const newNodes = this.nodes();
-      if (newNodes.length === oldNodes.length) this.selectedOffset = newNodes[selectedIndex].source?.start;
+      if (newNodes.length === oldNodes.length) {
+        if (selectedIndex >= 0) this.selectedOffset = newNodes[selectedIndex].source?.start;
+        this.extraOffsets = extraIndices.filter(i => i >= 0).map(i => newNodes[i].source!.start);
+      }
     }
   }
   type(index: number, type: string): void {
@@ -203,7 +209,7 @@ export class ModelDocument {
   }
   fixedAngle(index: number): void { this.replace(...this.attributeEdit(index, 'angle', '0')); }
   restore(text: string, filename?: string): void {
-    this.undoStack.push(this.snapshot()); this.redoStack = []; this.text = text.replace(/\r\n?/g, '\n'); this.filename = filename; this.sourceView = undefined; this.selectedOffset = undefined;
+    this.undoStack.push(this.snapshot()); this.redoStack = []; this.text = text.replace(/\r\n?/g, '\n'); this.filename = filename; this.sourceView = undefined; this.selectedOffset = undefined; this.extraOffsets = [];
   }
   /** Direct typing may temporarily be invalid; preserve it and the preceding GUI history. */
   editSource(text: string, coalesce = false, range?: {start: number; end: number}): void {
@@ -214,7 +220,7 @@ export class ModelDocument {
   }
   private remapSelection(next: string, range?: {start: number; end: number}): void {
     const position = this.selectedOffset;
-    if (position === undefined) return;
+    if (position === undefined && !this.extraOffsets.length) return;
     let first = 0, oldEnd = this.text.length, newEnd = next.length;
     while (first < oldEnd && first < newEnd && this.text[first] === next[first]) first++;
     while (oldEnd > first && newEnd > first && this.text[oldEnd - 1] === next[newEnd - 1]) { oldEnd--; newEnd--; }
@@ -223,8 +229,9 @@ export class ModelDocument {
       first = range.start; oldEnd = range.end; newEnd = next.length - (this.text.length - range.end);
     }
     // Keep a surviving source anchor. If its declaration was replaced, do not guess another part.
-    if (position >= oldEnd) this.selectedOffset = position + newEnd - oldEnd;
-    else if (position >= first) this.selectedOffset = undefined;
+    const moved = (p: number): number | undefined => p >= oldEnd ? p + newEnd - oldEnd : p >= first ? undefined : p;
+    if (position !== undefined) this.selectedOffset = moved(position);
+    this.extraOffsets = this.extraOffsets.map(moved).filter((p): p is number => p !== undefined);
   }
   renameFile(filename: string): void {
     const next = downloadFilename(filename);
@@ -373,9 +380,62 @@ export class ModelDocument {
     if (!n?.dir) throw new Error('Coreは削除できません');
     this.replace(n.source!.start, n.source!.end, '');
   }
-  private snapshot(): DocumentState { return {text: this.text, filename: this.filename, sourceView: this.sourceView ? {...this.sourceView} : undefined, selectedOffset: this.selectedOffset}; }
-  undo(): void { const state = this.undoStack.pop(); if (state) { this.redoStack.push(this.snapshot()); Object.assign(this, state); } }
-  redo(): void { const state = this.redoStack.pop(); if (state) { this.undoStack.push(this.snapshot()); Object.assign(this, state); } }
+  private snapshot(): DocumentState { return {text: this.text, filename: this.filename, sourceView: this.sourceView ? {...this.sourceView} : undefined, selectedOffset: this.selectedOffset, extraOffsets: [...this.extraOffsets]}; }
+  undo(): void { const state = this.undoStack.pop(); if (state) { this.redoStack.push(this.snapshot()); Object.assign(this, {extraOffsets: []}, state); } }
+  redo(): void { const state = this.redoStack.pop(); if (state) { this.undoStack.push(this.snapshot()); Object.assign(this, {extraOffsets: []}, state); } }
+  /** Selected traversal indices: the primary part first, then the others in model order. */
+  selection(): number[] {
+    const nodes = this.nodes(), primary = nodes.findIndex(n => n.source?.start === this.selectedOffset);
+    const extra = this.extraOffsets.map(o => nodes.findIndex(n => n.source?.start === o)).filter(i => i >= 0 && i !== primary).sort((a, b) => a - b);
+    return [...new Set([...(primary >= 0 ? [primary] : []), ...extra])];
+  }
+  /** Add a part to the selection or take it out; a part toggled in becomes the primary one. */
+  toggleSelected(index: number): void {
+    const nodes = this.nodes(), offset = nodes[index]?.source?.start;
+    if (offset === undefined) return;
+    const all = this.selection().map(i => nodes[i].source!.start);
+    if (all.includes(offset)) {
+      if (all.length === 1) return; // at least one part stays selected
+      const rest = all.filter(o => o !== offset);
+      this.selectedOffset = rest[0]; this.extraOffsets = rest.slice(1);
+    } else {
+      this.selectedOffset = offset; this.extraOffsets = all;
+    }
+  }
+  clearExtraSelection(): void { this.extraOffsets = []; }
+  /** One edit per part as a single undoable step (each is a span of its own declaration, so they never overlap). */
+  private bulk(indices: number[], edit: (index: number) => [number, number, string]): void {
+    let next = this.text;
+    for (const [start, end, value] of indices.map(edit).sort((a, b) => b[0] - a[0])) next = next.slice(0, start) + value + next.slice(end);
+    this.replace(0, this.text.length, next);
+  }
+  typeMany(indices: number[], type: string): void {
+    const nodes = this.nodes();
+    if (indices.some(i => !nodes[i]?.dir)) throw new Error('Coreの種類は変更できません');
+    this.bulk(indices, i => [nodes[i].source!.typeStart, nodes[i].source!.typeEnd, type]);
+  }
+  colorMany(indices: number[], value: string): void {
+    if (!/^#[0-9a-f]{6}$/i.test(value)) throw new Error('色は6桁のRGB値で指定してください');
+    const nodes = this.nodes();
+    if (indices.some(i => nodes[i].attrs.color && !exprIsConstant(nodes[i].attrs.color))) throw new Error('変数で制御する色の部品が含まれています。ソースで編集してください');
+    this.bulk(indices, i => this.attributeEdit(i, 'color', value.toLowerCase()));
+  }
+  angleMany(indices: number[], value: number): void {
+    if (!Number.isFinite(value)) throw new Error('角度には数値を入力してください');
+    const nodes = this.nodes();
+    if (indices.some(i => !nodes[i]?.dir)) throw new Error('Coreの角度は変更できません');
+    if (indices.some(i => nodes[i].attrs.angle && !Number.isFinite(Number(nodes[i].attrs.angle.replace(/\s/g, '')))))
+      throw new Error('変数で制御する角度の部品が含まれています。ソースで編集してください');
+    this.bulk(indices, i => this.attributeEdit(i, 'angle', String(value)));
+  }
+  /** Delete several parts; a part inside another selected branch goes with that branch. */
+  removeMany(indices: number[]): void {
+    const nodes = this.nodes();
+    if (indices.some(i => !nodes[i]?.dir)) throw new Error('Coreは削除できません');
+    const roots = indices.filter(i => !indices.some(j => j !== i && nodes[j].source!.start <= nodes[i].source!.start && nodes[i].source!.end <= nodes[j].source!.end));
+    this.bulk(roots, i => [nodes[i].source!.start, nodes[i].source!.end, '']);
+    this.extraOffsets = [];
+  }
 }
 
 /** Keep imported names portable while always exporting UTF-8 .rcd files. */

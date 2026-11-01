@@ -20,7 +20,9 @@ export class BuildPanel {
     const index = this.assembly?.tiles.findIndex(t => t.node.source?.start === this.document.selectedOffset) ?? -1;
     return Math.max(0, index);
   }
+  /** choosing one part ends a multi-selection */
   set selected(index: number) {
+    this.document.clearExtraSelection();
     try { this.document.selectedOffset = this.document.nodes()[index]?.source?.start; }
     catch { this.document.selectedOffset = undefined; }
   }
@@ -52,6 +54,14 @@ export class BuildPanel {
   private undo = document.getElementById('edit-undo') as HTMLButtonElement;
   private redo = document.getElementById('edit-redo') as HTMLButtonElement;
   private remove = document.getElementById('part-delete') as HTMLButtonElement;
+  private multiButton = document.getElementById('multi-select') as HTMLButtonElement;
+  private multiStatus = document.getElementById('multi-status')!;
+  /** taps in the 3D view add parts to the selection or take them out (touch has no Shift) */
+  private multiMode = false;
+  /** traversal indices of every selected part when more than one is selected, else null */
+  private get multi(): number[] | null {
+    try { const all = this.document.selection(); return all.length > 1 ? all : null; } catch { return null; }
+  }
   constructor(private source: HTMLTextAreaElement, private scene: SceneView, private status: HTMLElement, private enter: () => void) {
     this.document = new ModelDocument(source.value);
     this.type.add(new Option('Core', 'Core'));
@@ -73,11 +83,13 @@ export class BuildPanel {
     this.toggle.onclick = () => this.open();
     this.angleSettings.onclick = event => { event.preventDefault(); this.angleRow.hidden = !this.angleRow.hidden; this.angleSettings.setAttribute('aria-expanded', String(!this.angleRow.hidden)); };
     new ResizeObserver(() => this.revealSelection()).observe(this.tree);
-    this.tree.onchange = () => { this.selected = Number(this.tree.value); this.paintSelection(); };
-    this.type.onchange = () => this.edit(() => this.document.type(this.selected, this.type.value));
-    this.angle.onchange = () => this.edit(() => { if (!this.angle.value.trim()) throw new Error('角度には数値を入力してください'); const expression = this.document.nodes()[this.selected].attrs.angle ?? '0'; if (this.document.controlStrength(expression) !== null) this.document.setControlStrength(expression, Number(this.angle.value)); else this.document.angle(this.selected, Number(this.angle.value)); });
+    this.tree.onchange = () => { this.document.clearExtraSelection(); this.selected = Number(this.tree.value); this.paintSelection(); };
+    this.multiButton.onclick = () => { this.multiMode = !this.multiMode; this.multiButton.setAttribute('aria-pressed', String(this.multiMode)); };
+    document.getElementById('multi-clear')!.onclick = () => { this.document.clearExtraSelection(); this.paintSelection(); };
+    this.type.onchange = () => this.edit(() => { const all = this.multi; if (all) this.document.typeMany(all, this.type.value); else this.document.type(this.selected, this.type.value); });
+    this.angle.onchange = () => this.edit(() => { if (!this.angle.value.trim()) throw new Error('角度には数値を入力してください'); const all = this.multi; if (all) { this.document.angleMany(all, Number(this.angle.value)); return; } const expression = this.document.nodes()[this.selected].attrs.angle ?? '0'; if (this.document.controlStrength(expression) !== null) this.document.setControlStrength(expression, Number(this.angle.value)); else this.document.angle(this.selected, Number(this.angle.value)); });
     this.resetColor.onclick = () => this.edit(() => this.document.resetColor(this.selected));
-    this.color.onchange = () => this.edit(() => this.document.color(this.selected, this.color.value));
+    this.color.onchange = () => this.edit(() => { const all = this.multi; if (all) this.document.colorMany(all, this.color.value); else this.document.color(this.selected, this.color.value); });
     this.option.onchange = () => this.edit(() => this.document.option(this.selected, Number(this.option.value)), true);
     this.power.onchange = () => this.edit(() => {
       if (!this.power.value.trim()) throw new Error('出力には数値を入力してください');
@@ -114,7 +126,21 @@ export class BuildPanel {
         this.addType.value = 'clipboard'; this.status.textContent = parseRc(this.document.text).warnings.join('\n');
       } catch (e) { this.status.textContent = e instanceof Error ? e.message : String(e); }
     };
-    this.remove.onclick = () => this.edit(() => { const parent = this.assembly?.tiles[this.selected].parent?.id ?? 0; this.document.remove(this.selected); this.selected = parent; });
+    this.remove.onclick = () => this.edit(() => {
+      const all = this.multi;
+      if (all) {
+        // land on the nearest surviving ancestor of the primary part
+        const doomed = new Set(all.map(i => this.assembly!.tiles[i]));
+        let keep = this.assembly!.tiles[this.selected].parent;
+        while (keep && [...doomed].some(d => { for (let t: typeof keep = keep; t; t = t.parent) if (t === d) return true; return false; })) keep = keep.parent;
+        // the document re-anchors the selection across the deletion; if it loses it, fall back to the Core
+        this.document.selectedOffset = keep?.node.source?.start;
+        this.document.removeMany(all);
+        if (this.document.selectedOffset === undefined) this.selected = 0;
+        return;
+      }
+      const parent = this.assembly?.tiles[this.selected].parent?.id ?? 0; this.document.remove(this.selected); this.selected = parent;
+    });
     this.undo.onclick = () => this.edit(() => this.document.undo());
     this.redo.onclick = () => this.edit(() => this.document.redo());
     this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(button => {
@@ -164,7 +190,11 @@ export class BuildPanel {
     canvas.addEventListener('pointerup', e => {
       if (this.active && down?.id === e.pointerId && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 5) {
         const id = this.scene.pickTile(e.clientX, e.clientY);
-        if (id !== null) { this.selected = id; this.paintSelection(); }
+        if (id !== null) {
+          if (e.shiftKey || e.ctrlKey || e.metaKey || this.multiMode) this.document.toggleSelected(id);
+          else { this.document.clearExtraSelection(); this.selected = id; }
+          this.paintSelection();
+        }
       }
       down = null;
     });
@@ -251,7 +281,6 @@ export class BuildPanel {
       // Source offsets identify surviving parts; an unknown/replaced declaration falls back to Core.
       if (fit) this.scene.frameModel();
       this.status.textContent = model.warnings.join('\n'); this.paintSelection();
-      this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = false);
     } catch (e) {
       this.assembly = null; this.tree.replaceChildren(); this.scene.clearModel();
       this.type.disabled = this.angle.disabled = this.remove.disabled = this.copy.disabled = this.mirror.disabled = this.move.disabled = this.namePart.disabled = this.findPart.disabled = true;
@@ -495,5 +524,21 @@ export class BuildPanel {
     this.sourceHelp.hidden = !this.sourceHelp.childElementCount;
     this.remove.disabled = this.copy.disabled = this.mirror.disabled = this.move.disabled = !tile.parent;
     this.remove.textContent = tile.children.length ? '枝ごと削除' : '削除';
+    // multi-selection: type, angle, colour and delete apply to every selected part; branch tools, controls and
+    // adding stay with a single part
+    const all = this.multi;
+    this.scene.markTiles(all ? all.filter(i => i !== this.selected).map(i => this.assembly!.tiles[i].id) : []);
+    this.multiStatus.hidden = !all;
+    if (all) {
+      document.getElementById('multi-count')!.textContent = `${all.length}部品を選択中（種類・角度・色・削除をまとめて変更）`;
+      this.type.disabled = all.some(i => !this.assembly!.tiles[i].parent);
+      this.angle.disabled = this.type.disabled;
+      this.remove.disabled = this.type.disabled;
+      this.remove.textContent = `${all.length}部品を削除`;
+      this.copy.disabled = this.mirror.disabled = this.move.disabled = this.namePart.disabled = true;
+      this.angleSettings.disabled = true; this.angleRow.hidden = true; this.powerRow.hidden = true;
+      this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = true);
+    } else this.panel.querySelectorAll<HTMLButtonElement>('[data-edge]').forEach(b => b.disabled = false);
+    for (const option of this.tree.options) if (all?.includes(Number(option.value)) && !option.selected) option.text = `○ ${option.dataset.label ?? option.text}`;
   }
 }
