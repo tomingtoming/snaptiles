@@ -1,18 +1,22 @@
-# snaptiles-core (prototype)
+# snaptiles-core
 
 The simulation core in Rust: [Rapier](https://rapier.rs) (`rapier3d` 0.36) and the model's Lua (Lua 5.4 through
 [mlua](https://github.com/mlua-rs/mlua), vendored C sources) in one crate. It builds natively (headless runs, `cargo
 test`) and with Emscripten into one WebAssembly ES module for the browser. The page reads the bodies' state straight
 out of the module's memory, and Lua calls the physics without leaving WebAssembly.
 
-Status: a prototype of the boundary only — boxes on the ground, a Lua `OnFrame` with `_X/_Y/_Z`, `_KEY`, `_TICKS`
-and `out`, an instruction budget, Lua 5.0 spellings and file line numbers in errors. The app still runs on
+Status: stage 2b (core/PORT.md) — parser and assembler, the physics world, Val/Key handling, the full script API, Lua
+(`src/scripting/lua.rs`) and the legacy `Script` (`rcscript.rs`) run natively; `src/bin/replay.rs` replays the corpus
+driving and geometry probes. The C ABI in `src/ffi.rs` is a minimal stand-in until stage 3 writes the page adapter:
+`core_load_lua` now takes a whole `.rc` model (third argument: bare ground), `core_add_box` does nothing, so
+`bench/*.mjs` (box scenes) no longer measure what the table below describes. The app still runs on
 `src/physics/world.ts` (rapier3d-compat) and wasmoon; nothing in `src/` imports this crate yet.
 
 ## Build
 
 ```
 cargo test --release                 # native
+cargo run --release --bin replay -- D:/snaptiles-models/quarantine/original/runs   # corpus replay → snap_rust
 pwsh core/build-wasm.ps1             # browser: core/pkg/snaptiles_core.{js,wasm}
 ```
 
