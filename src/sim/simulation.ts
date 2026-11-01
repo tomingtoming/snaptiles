@@ -354,7 +354,9 @@ export class Simulation {
       _TICKS: () => this.ticks,
       _SETTICKS: (v: number) => { this.ticks = Math.floor(v); return 0; },
       _CHIPS: () => this.assembly?.chipCount ?? 0,
-      _WEIGHT: () => this.assembly?.tiles.reduce((s, t) => s + t.mass, 0) ?? 0,
+      // measured 2026-11-01 (harness_weight.rcs): the mass still attached to the core — 176.4 → 50.4 kg after _SPLIT
+      // cuts a Chip+Weight off — while _CHIPS keeps counting the split chips (boidbit hovers its body on _WEIGHT)
+      _WEIGHT: () => (this.assembly?.tiles ?? []).reduce((s, t) => { let u = t; while (u.parent && !u.detached) u = u.parent; return u.detached ? s : s + t.mass; }, 0),
       _M: (n: number) => this.tileOf(n)?.mass ?? 0,
       _FUEL: () => this.physics.fuelTotal(),
       _FUELMAX: () => this.physics.fuelMaxTotal(),

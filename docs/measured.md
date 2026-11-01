@@ -427,3 +427,20 @@ corpus totals unchanged (improves baloon4 and 3wheel, worsens the bike and satel
 spring-joint probes also show a command taking effect in the frame it is given. Not adopted. Talon remains open:
 without its Lua it settles within 0.10 m of the original, with it the landing after the leg motion in the air
 tips it forward.
+
+**2026-11-01 — groups B and C, tp-2's hover.**
+- **`_WEIGHT()` is the mass still attached to the core** (`harness_weight.rcs`): 176.4 → 50.4 kg once `_SPLIT` cuts a
+  Chip+Weight off, while `_CHIPS()` keeps counting the split chips. boidbit splits its 16 jet "bits" off every frame
+  and hovers its body on `_WEIGHT()`; counting the bits made SnapTiles' body climb at 5 m/s to 106 m (group C).
+  Now it hovers at 11.7 m (original 11.3 → 14.3); score 50.5 → 1.4.
+- **A Jet of option 2 (air balloon) gives no force in the air** (`rc_models40.sh`); option 1 (hydrogen) lifts.
+  tp-2 carries two option-2 jets (power 1200 and 4000) that SnapTiles counted as 867 N of buoyancy: it climbed while
+  hovering. Now it holds 3.4 m (original 3.0) and under Up runs 177.8 m at up to 34.2 m/s (original 179.3, 33.7).
+- The original clamps Lua-written Vals to their min/max like SnapTiles (`valclamp`).
+- Plate edges dragging on the ground barely brake (`rc_models39.sh`: sleds riding on plates folded down 30/60° accelerate
+  almost freely), so RCModel1's bike does not stop on its stands. In the original its steering (spring 0.012) flops
+  sideways while it stands still for 4 s and the turned front wheel stops it (screenshot `bikelate.png`; it rides
+  fine when powered from the start); SnapTiles' steering stays within 8°. Open.
+- Group B (ender, skal, danboo) is the original's own breakdown: ender's core sinks to −1.3 m into the ground and
+  its velocity jitters at 35–54 m/s while it barely moves. Not reproduced on purpose.
+Corpus: runs scoring above 1 21 → 20, median 0.29 → 0.28.

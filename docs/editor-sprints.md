@@ -2226,3 +2226,10 @@ load and a rolling wheel's fade scales with power); jets push 1/6 N per power as
 `_AZ` reads the tilt of the chip's own axis like the original (an upside-down chip reads 0), which lets tp-2 hover
 and fly; rotor spin integration no longer diverges. Turn references improve (11.7%). 194 unit tests and both plane
 probes pass. The bike's stop (stand edge friction) and 1wheel's speed remain open.
+
+
+## 2026-11-01 — Split mass and air balloons (Sprint 80)
+
+`_WEIGHT()` now counts only what is still attached to the core (measured with `_SPLIT`), which keeps boidbit's body
+from climbing away, and option-2 (air) balloon jets give no force in the air (measured), which lets tp-2 hold its
+hover. Group B turned out to be the original's own breakdown. New tests for both; 198 unit tests pass.

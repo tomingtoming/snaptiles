@@ -1450,9 +1450,11 @@ export class PhysicsWorld {
         if (power !== 0) power *= this.useFuel(FUEL_PER_POWER_JET * Math.abs(power) * this.dt * 30);
         tb.jetPower = power;
         if (power !== 0) {
-          // option 1/2 = balloon (wikiwiki: 1 hydrogen, 2 air): buoyancy straight up, whatever the tilt;
+          // option 1 = balloon (wikiwiki: 1 hydrogen, 2 air): buoyancy straight up, whatever the tilt;
           // the airship model mounts them at angle -90/0/90 and lifts with 10,000-50,000
-          const balloon = tile.option === 1 || tile.option === 2;
+          // measured 2026-11-01 (rc_models40.sh): option 2 (air) gives no force at all in the air; option 1 lifts
+          if (tile.option === 2) power = 0;
+          const balloon = tile.option === 1;
           const f = balloon
             ? new THREE.Vector3(0, power * JET_NEWTON_PER_POWER, 0)
             : normal.clone().multiplyScalar(power * JET_NEWTON_PER_POWER);

@@ -1,0 +1,9 @@
+-- _WEIGHT() and _CHIPS() every frame to 120 (the model splits a part at frame 60)
+n=0
+buf="frame,weight,chips\n"
+function OnFrame()
+	n=n+1
+	if n<=120 then buf=buf..n..",".._WEIGHT()..",".._CHIPS().."\n" end
+	if n==120 then local h=_FOPEN("log.txt","w") if h>=0 then _FPUTS(h,buf) _FCLOSE(h) end end
+	out(0,"frame ",n)
+end
