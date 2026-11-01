@@ -48,7 +48,8 @@ Files can also be dropped onto the editor.
   as in the original.
 
 Samples: `car` (↑↓ drive, ←→ steer), `plane` (Z/X throttle, then it lifts off by
-itself; a Lua autopilot holds height and level wings, ↓↑ climb/descend, ←→ bank),
+itself; a Lua autopilot holds height and level wings, ↓↑ climb/descend, ←→ bank; to land, X to
+zero throttle and hold ↑: it flares by itself and brakes once down),
 `walker` (↑ walk, ←→ turn; a Lua gait), `hover` (jets with a Lua attitude
 hold; ↑↓←→ move, A/D turn), `tank` (A/D turret, Z fire). The course has a
 ramp, kerbs, a gate, a wall and crates to knock over.

@@ -71,3 +71,29 @@ describe('plane sample control geometry and motion',()=>{
   }finally{await sim.dispose()}
  });
 });
+
+describe('plane sample landing',()=>{
+ it('descends on ↑ with the throttle closed, flares, touches down gently and brakes to a stop in one piece',async()=>{
+  const R=await initRapier(),keys=new KeyState(new EventTarget()),sim=new Simulation(R,PLANE,keys);
+  try{
+   await sim.start();const api=sim.api() as Record<string,(...a:number[])=>number>,V=(n:string)=>sim.vals.get(n)!.value;
+   const chips=api._CHIPS(),weight=api._WEIGHT();
+   let phase='takeoff',touchdown=-1,sink=0;
+   for(let f=0;f<30*90;f++){
+    keys.down.clear();
+    if(f<100)keys.down.add(4);
+    if(f===30*20)phase='approach';
+    if(phase!=='takeoff'){if(V('THROTTLE')>0)keys.down.add(5);keys.down.add(0);} // a player holds ↑ until it stops
+    const down=sim.physics.tiles.some(t=>t.tile.spec.wheel&&t.contactPoint);
+    if(phase==='approach'&&down){phase='roll';touchdown=f;sink=-api._VY(0);}
+    sim.step();
+   }
+   expect(touchdown).toBeGreaterThan(0);
+   expect(touchdown/30).toBeLessThan(60);         // it does come down
+   expect(sink).toBeLessThan(5);                   // flared: no bounce off the gear
+   expect(Math.hypot(api._VX(0),api._VZ(0))).toBeLessThan(1); // braked to a stop
+   expect(Math.abs(api._EZ(0))).toBeLessThan(.3);expect(Math.abs(api._EX(0))).toBeLessThan(.4);
+   expect(api._CHIPS()).toBe(chips);expect(api._WEIGHT()).toBe(weight); // nothing broke off
+  }finally{await sim.dispose()}
+ },60000);
+});

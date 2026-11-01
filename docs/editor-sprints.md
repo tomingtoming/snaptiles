@@ -2286,3 +2286,21 @@ saving and sharing, limits) / Model file / Physics notes / Tests, keeping every 
 guide gained multi-selection and script entries. A stale source comment in `assemble.ts` said a positive fold
 angle folds the child up; the assembled pose (and README, and the `FOLD_SIGN` doc) say down, which matches the
 original's corpus geometry. 210 unit tests; guide, general editor and short-height probes pass.
+
+
+## 2026-11-01 — Landing the plane, and an endless ground (Sprint 84)
+
+Goal: the plane sample can land (landing was untested). A headless approach (zero throttle, ↑ held) found three
+problems. (1) The world ended: the physics ground was a 4 km slab and the drawn ground 1 km, so a plane cruising at
+~100 m/s flew off both within a minute and fell through. The ground collider is now 200 km across and the drawn
+ground and grids follow the camera in whole 10 m cells (the camera's far plane is 500 m). (2) The autopilot's pitch
+target was 8° plus a climb-rate term, so at speed it could not descend (a steady-state offset) and the plane floated
+or kept climbing ~1 m/s hands-off; it now learns a trim from the climb-rate error while flying (above 2.2 m and
+40 m/s; on the ground it is frozen, so the take-off is unchanged). (3) Nothing slowed it on the ground. The sample
+now flares by itself (the descent asked for shrinks with `_H(0)`), and with the throttle closed on the ground it
+holds the nose level and brakes the main wheels below 50 m/s (`BRAKE`).
+
+New test: take off, then from 20 s close the throttle and hold ↑ — it touches down within 60 s sinking under 5 m/s,
+stops, ends upright and loses no chips. Still open: the rollout rocks up to ~0.3–0.5 rad in roll at high ground
+speed (the known high-speed ground instability; neutral ailerons on the ground made it worse). 211 unit tests, all
+43 browser scenarios and both plane probes pass.

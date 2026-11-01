@@ -232,12 +232,14 @@ export class SceneView {
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     this.scene.add(ground);
+    this.floor.push(ground);
     for (const [div, color] of [[1000, 0x8f9a86], [100, 0x6f7a66]] as const) {
       const grid = new THREE.GridHelper(1000, div, color, color);
       (grid.material as THREE.Material).transparent = true;
       (grid.material as THREE.Material).opacity = 0.35;
       grid.position.y = div === 1000 ? 0.002 : 0.004;
       this.scene.add(grid);
+      this.floor.push(grid);
     }
 
     for (const b of COURSE) {
@@ -666,7 +668,12 @@ export class SceneView {
     });
   }
 
+  /** the visible ground and its grids (1000 m across, the camera's far plane is 500 m) */
+  private floor: THREE.Object3D[] = [];
   render(): void {
+    // keep the ground under the camera, moved in whole 10 m grid cells so the lines stay put in the world
+    const fx = Math.round(this.camera.position.x / 10) * 10, fz = Math.round(this.camera.position.z / 10) * 10;
+    for (const o of this.floor) { o.position.x = fx; o.position.z = fz; }
     this.camera.updateMatrixWorld();
     this.updateDirectionMarks();
     this.renderer.render(this.scene, this.camera);

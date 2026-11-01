@@ -363,7 +363,8 @@ export class PhysicsWorld {
     const tune = (globalThis as unknown as { __tune?: { solverIterations?: number; pgsIterations?: number } }).__tune;
     this.world.numSolverIterations = tune?.solverIterations ?? SOLVER_ITERATIONS;
     this.world.integrationParameters.numInternalPgsIterations = tune?.pgsIterations ?? PGS_ITERATIONS;
-    const groundDesc = R.ColliderDesc.cuboid(2000, 1, 2000).setTranslation(0, -1, 0).setFriction(1.0).setCollisionGroups(GROUND_GROUP);
+    // effectively endless: planes cover kilometres (a 4 km slab let them fly off the world and fall through)
+    const groundDesc = R.ColliderDesc.cuboid(100000, 1, 100000).setTranslation(0, -1, 0).setFriction(1.0).setCollisionGroups(GROUND_GROUP);
     this.world.createCollider(groundDesc);
     const noCourse = (globalThis as unknown as { __tune?: { noCourse?: boolean } }).__tune?.noCourse ?? false; // bare ground for measurements
     for (const b of noCourse ? [] : COURSE) {
