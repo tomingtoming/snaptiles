@@ -42,7 +42,8 @@ export interface RcModel {
   body: ChipNode | null;
   bodies: ChipNode[];
   /** `line` is the file line of the block's opening brace (for error messages) */
-  script: { lang: 'lua' | 'rc'; source: string; line: number } | null;
+  /** line: the section header's line; firstLine: the line of its opening brace, where the script's own line 1 is */
+  script: { lang: 'lua' | 'rc'; source: string; line: number; firstLine: number } | null;
 }
 
 export class RcParseError extends Error {
@@ -347,12 +348,12 @@ export function parseRc(source: string): RcModel {
   for (const b of blocks) {
     const name = b.name.toLowerCase();
     if (name === 'lua') {
-      model.script = { lang: 'lua', source: b.inner, line: b.line };
+      model.script = { lang: 'lua', source: b.inner, line: b.line, firstLine: text.slice(0, b.offset).split('\n').length };
       continue;
     }
     if (name === 'script') {
       // legacy RC script; a Lua block (if present) takes precedence
-      if (!model.script || model.script.lang !== 'lua') model.script = { lang: 'rc', source: b.inner, line: b.line };
+      if (!model.script || model.script.lang !== 'lua') model.script = { lang: 'rc', source: b.inner, line: b.line, firstLine: text.slice(0, b.offset).split('\n').length };
       continue;
     }
     const inner = stripComments(b.inner);

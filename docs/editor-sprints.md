@@ -2254,3 +2254,24 @@ without edits, nested deletes, selection through typing) and a Chromium probe (`
 Ctrl clicks, tap mode, outlines, bulk angle/colour/type, bulk delete, Undo, exits, 390 px layout). 203 unit tests
 and all 42 browser scenarios pass. Probe note: `page.mouse.click` ignores `modifiers`; hold the key with
 `page.keyboard.down`.
+
+
+## 2026-11-01 — Script tools (Sprint 82)
+
+Goal: help write the Lua part without leaving the builder. The Lua section was edited in the model's one textarea
+with no reference, templates or way to find an error's line.
+
+A 「スクリプト（Lua）」 section in the builder: 「Luaへ移動」 (adds a `Lua { function OnFrame() … end }` section
+when there is none and puts the caret in its body), a searchable reference of 34 API entries with Japanese
+descriptions written against the measurements (e.g. `_WEIGHT` excludes split parts, `_AX/_AZ` are axis tilts), and
+five snippets (OnFrame, show a value, move a value by keys, hold a height and level the roll with PD control) that
+use the model's first Val. Insertion goes to the caret inside the Lua section, else to the end of that section
+(`insertScript`), as one Undo step. A row under the status line shows 「エラー: N行目」 with 「エラーの行へ」
+whenever the status names a `line N:`, also with the builder closed, and selects that line in the source.
+
+Fix found on the way: Lua errors named the line after the real one (the offset counted from the section header,
+not the opening brace that holds the chunk's line 1; models writing `Lua` and `{` on two lines were off by two).
+The parser now records the brace line (`script.firstLine`).
+
+Validation: 7 unit tests (insertion cases, line lookup, reference entries, error lines for both brace styles) and a
+Chromium probe (`editor-script-probe.mjs`). 210 unit tests, all 43 browser scenarios and both plane probes pass.

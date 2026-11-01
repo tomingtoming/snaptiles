@@ -2,8 +2,9 @@ import { KEY_TABLE } from '../input/keys';
 import { exprIsConstant } from '../rc/expr';
 import { DraftStore, type Draft } from './draft';
 import { CONTROL_KEYS, OPTION_SETTINGS, ModelDocument, type CopiedBranch, type ControlKeys } from './document';
-import { parseRc } from '../rc/parser';
+import { parseRc, findBlocks } from '../rc/parser';
 import { assemble, type Assembly } from '../model/assemble';
+import { LUA_REF, LUA_SNIPPETS, insertScript, diagnosticLine } from './script';
 import type { SceneView } from '../render/scene';
 
 const TYPES = ['Chip', 'Frame', 'Wheel', 'Rudder', 'RudderF', 'Trim', 'TrimF', 'Jet', 'Weight', 'Cowl', 'Arm', 'RLW'];
@@ -183,6 +184,7 @@ export class BuildPanel {
       this.sourceEditGroup = continuous ? {type, time, end: source.selectionEnd} : null;
       if (this.active) this.refresh(); this.saveDraft();
     });
+    this.wireScriptTools();
     const canvas = document.getElementById('view')!;
     let down: { x: number; y: number; id: number } | null = null;
     canvas.addEventListener('pointerdown', e => { down = e.isPrimary && e.button === 0 ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null; });
@@ -198,6 +200,66 @@ export class BuildPanel {
       }
       down = null;
     });
+  }
+  /** Script helpers: jump to the Lua section, insert API calls and snippets at the caret, jump to an error's line. */
+  private wireScriptTools(): void {
+    const search = document.getElementById('api-search') as HTMLInputElement;
+    const list = document.getElementById('api-list') as HTMLSelectElement;
+    const desc = document.getElementById('api-desc')!;
+    const snippet = document.getElementById('snippet') as HTMLSelectElement;
+    LUA_SNIPPETS.forEach((s, i) => snippet.add(new Option(s.label, String(i))));
+    const describe = () => { const r = LUA_REF[Number(list.value)]; desc.textContent = r ? `${r.name} — ${r.ja}` : ''; };
+    const filter = () => {
+      const q = search.value.trim().toLowerCase(), previous = list.value;
+      list.replaceChildren();
+      LUA_REF.forEach((r, i) => { if (!q || `${r.name} ${r.ja} ${r.group}`.toLowerCase().includes(q)) list.add(new Option(`${r.name}　${r.group}`, String(i))); });
+      list.value = [...list.options].some(o => o.value === previous) ? previous : list.options[0]?.value ?? '';
+      describe();
+      (document.getElementById('api-insert') as HTMLButtonElement).disabled = !list.options.length;
+    };
+    search.oninput = filter; list.onchange = describe; filter();
+    const insert = (text: string) => this.edit(() => {
+      const r = insertScript(this.document.text, this.source.selectionStart, text);
+      this.document.editSource(r.text);
+      this.document.sourceView = {start: r.caret, end: r.caret, direction: 'none', top: this.source.scrollTop, left: 0};
+    });
+    const reveal = () => { this.source.focus(); this.revealSource(this.source.selectionStart); };
+    document.getElementById('api-insert')!.onclick = () => { const r = LUA_REF[Number(list.value)]; if (r) { insert(r.insert); reveal(); } };
+    list.ondblclick = () => document.getElementById('api-insert')!.click();
+    document.getElementById('snippet-insert')!.onclick = () => {
+      const first = parseRc(this.document.text).vals[0]?.name ?? 'VALUE';
+      insert(LUA_SNIPPETS[Number(snippet.value)].body.replace(/VALUE/g, first)); reveal();
+    };
+    document.getElementById('script-goto')!.onclick = () => {
+      const lua = this.luaBlockOffset();
+      if (lua === null) insert(LUA_SNIPPETS[0].body);
+      else this.source.setSelectionRange(lua, lua);
+      reveal();
+    };
+    const errorRow = document.getElementById('script-error')!;
+    const paintError = () => {
+      const hit = diagnosticLine(this.source.value, this.status.textContent ?? '');
+      errorRow.hidden = !hit;
+      if (hit) document.getElementById('script-error-text')!.textContent = `エラー: ${hit.line}行目`;
+    };
+    new MutationObserver(paintError).observe(this.status, {childList: true, characterData: true, subtree: true});
+    document.getElementById('script-error-goto')!.onclick = () => {
+      const hit = diagnosticLine(this.source.value, this.status.textContent ?? '');
+      if (!hit) return;
+      this.source.focus(); this.source.setSelectionRange(hit.start, hit.end); this.revealSource(hit.start);
+    };
+  }
+  private luaBlockOffset(): number | null {
+    try {
+      const block = findBlocks(this.document.text).find(b => /^lua$/i.test(b.name));
+      return block ? block.offset : null;
+    } catch { return null; }
+  }
+  /** scroll the source so the line holding this offset is in view */
+  private revealSource(offset: number): void {
+    const style = getComputedStyle(this.source), line = this.source.value.slice(0, offset).split('\n').length - 1;
+    const height = parseFloat(style.lineHeight) || 16;
+    this.source.scrollTop = Math.max(0, line * height - this.source.clientHeight / 3);
   }
   renameFile(filename: string): void { this.edit(() => this.document.renameFile(filename)); }
   loadSource(text: string, filename?: string): void {

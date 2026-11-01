@@ -35,9 +35,18 @@
         <div id="source-edit-help" hidden aria-label="ソースで編集する項目"></div>
         <details id="appearance"><summary>色</summary><div class="edit-row"><label>部品の色<input id="part-color" type="color" /></label><button id="reset-color" type="button">既定色</button><span id="color-note"></span></div></details>
         <details id="placement"><summary>名前・接続先</summary><button id="name-part" type="button">部品名…</button><button id="move-branch" type="button">枝を移動…</button></details>
+        <details id="script-tools"><summary>スクリプト（Lua）</summary>
+          <div class="edit-row"><button id="script-goto" type="button">Luaへ移動</button></div>
+          <div class="edit-row"><label>関数を探す<input id="api-search" type="search" placeholder="例: _KEY、高さ" autocomplete="off" /></label></div>
+          <select id="api-list" size="5" aria-label="Luaの関数"></select>
+          <p id="api-desc" role="status"></p>
+          <div class="edit-row"><button id="api-insert" type="button">カーソル位置に挿入</button></div>
+          <div class="edit-row"><label>ひな形<select id="snippet"></select></label><button id="snippet-insert" type="button">挿入</button></div>
+        </details>
       </section>
       <textarea aria-label="モデルのソース。Tabで字下げ、ShiftとTabで前の操作へ移動" id="source" spellcheck="false" wrap="off"></textarea>
       <footer id="status" tabindex="0" aria-label="読み込み・実行のメッセージ"></footer>
+      <div id="script-error" hidden><span id="script-error-text"></span><button id="script-error-goto" type="button">エラーの行へ</button></div>
     </aside>
     <main id="stage">
       <canvas id="view" tabindex="0" aria-label="モデルの操縦・表示画面"></canvas>

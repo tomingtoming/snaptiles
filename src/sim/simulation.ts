@@ -123,7 +123,8 @@ export class Simulation {
     const s = this.model.script;
     if (!s) return;
     if (s.lang === 'lua') {
-      await this.lua.load(s.source, this.api(), this.luaPrelude(), s.line);
+      // Lua reports chunk lines; the chunk's line 1 is the opening brace's line in the file
+      await this.lua.load(s.source, this.api(), this.luaPrelude(), s.firstLine - 1);
       this.scriptError = this.lua.error;
       this.callLua('OnInit');
     } else {
