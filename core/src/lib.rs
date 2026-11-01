@@ -7,6 +7,8 @@
 
 mod physics;
 pub mod ffi;
+pub mod rc;
+pub mod model;
 
 use mlua::{HookTriggers, Lua, Value, VmState};
 use std::cell::RefCell;
