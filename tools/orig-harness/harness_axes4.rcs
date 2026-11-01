@@ -1,0 +1,11 @@
+-- axis-vector APIs (_XX.._ZZ) and position of chips 0..12 at frame 20
+n=0
+function OnFrame()
+	n=n+1
+	if n==20 then
+		local buf="chip,x,y,z,xx,xy,xz,yx,yy,yz,zx,zy,zz\n"
+		for c=0,12 do buf=buf..c..",".._X(c)..",".._Y(c)..",".._Z(c)..",".._XX(c)..",".._XY(c)..",".._XZ(c)..",".._YX(c)..",".._YY(c)..",".._YZ(c)..",".._ZX(c)..",".._ZY(c)..",".._ZZ(c).."\n" end
+		local h=_FOPEN("log.txt","w") if h>=0 then _FPUTS(h,buf) _FCLOSE(h) end
+	end
+	out(0,"frame ",n)
+end

@@ -177,7 +177,8 @@ export class Simulation {
 
     // probe knob scriptAfterPhysics: run this frame's physics before the script (the original shows no script effect
     // in its first frame)
-    const late = (globalThis as unknown as { __tune?: { scriptAfterPhysics?: boolean } }).__tune?.scriptAfterPhysics ?? false;
+    const lt = (globalThis as unknown as { __tune?: { scriptAfterPhysics?: boolean; firstScriptAfterPhysics?: boolean } }).__tune;
+    const late = (lt?.scriptAfterPhysics ?? false) || ((lt?.firstScriptAfterPhysics ?? false) && this.ticks === 0);
     const physics = () => {
       // the original runs scripts and key steps at 30 fps; physics takes two 1/60 s steps per frame
       const sub = (globalThis as unknown as { __tune?: { substeps?: number } }).__tune?.substeps ?? PHYSICS_SUBSTEPS;

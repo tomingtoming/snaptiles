@@ -444,3 +444,17 @@ tips it forward.
 - Group B (ender, skal, danboo) is the original's own breakdown: ender's core sinks to −1.3 m into the ground and
   its velocity jitters at 35–54 m/s while it barely moves. Not reproduced on purpose.
 Corpus: runs scoring above 1 21 → 20, median 0.29 → 0.28.
+
+**2026-11-01 — what is left, and why.**
+- **Weak spring joints** (`rc_models41.sh`, a short arm, ~184 N·m): the settled sag still follows 3.7·10⁶·spring²
+  down to spring 0.012 (0.03: 36.4° vs SnapTiles 36.3°; 0.02: 23.2° vs 22.5°; 0.012 and 0.008 fall to the ground in
+  both); the original only falls more slowly (seconds). So RCModel1's bike steering (spring 0.012) is not too stiff
+  in SnapTiles; what keeps it from flopping while parked is presumably the tyre's sideways grip at standstill.
+  Not changed (it governs every vehicle).
+- **1wheel** (`harness_axes4.rcs`): all chip axes match the original. Two plates of its flywheel face the direction
+  of travel and brake SnapTiles' rider with ~350 N each at 5.8 m/s; the original rides at 7.5 m/s and yawed 160°
+  while idle, i.e. its flywheel (a Wheel with reaction) spun up after the landing — spinning plates average less drag.
+  A transient of its control; not chased further.
+- **First frame**: running only the first frame's physics before the script (knob `firstScriptAfterPhysics`)
+  helps baloon4 and 3wheel but worsens the bike, 15cpHeri and satellite (upright mismatches 10 → 11). Not adopted.
+- Still open: Talon, DUCKER under Up, the bike's stop, 1wheel's speed.
