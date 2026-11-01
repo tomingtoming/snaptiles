@@ -3,9 +3,11 @@
 //!
 //! The prototype covers the boundary only: boxes on a ground plane, a Lua script with a few read APIs (`_X/_Y/_Z`,
 //! `_KEY`, `_TICKS`, `out`), an instruction budget, and a flat state array the page reads without crossing the
-//! boundary per value. The real physics layer (`src/physics/world.ts`) is not ported yet.
+//! boundary per value (`proto_physics`). The real physics layer (`src/physics/world.ts`) is ported in [`physics`]
+//! (stage 2a); the simulation on top of it (stage 2b) will replace this prototype `Core`.
 
-mod physics;
+mod proto_physics;
+pub mod physics;
 pub mod ffi;
 pub mod rc;
 pub mod model;
@@ -14,7 +16,7 @@ use mlua::{HookTriggers, Lua, Value, VmState};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-pub use physics::Physics;
+pub use proto_physics::Physics;
 
 /// Script frames per second and physics steps per frame, as in the TypeScript simulation.
 pub const FRAME_RATE: f64 = 30.0;
