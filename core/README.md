@@ -31,9 +31,13 @@ only and points the C compiler, archiver and linker at `emcc.exe`/`emar.exe` (cu
 Emscripten is used because C (Lua) does not build for `wasm32-unknown-unknown`.
 
 `core/pkg` is committed so `bun run build` works without emsdk: **rebuild it (`bun run build:core`) after changing
-`core/src`** and commit the new `snaptiles_core.{js,wasm}`. `snaptiles_core.d.ts` there is written by hand; keep it, the
-`EXPORTED_FUNCTIONS` list in `.cargo/config.toml`, `src/ffi.rs` and the decoder in `src/sim/rust-simulation.ts` in step
-(bump `LAYOUT_VERSION` in both when the buffer layout changes).
+`core/src`** and commit the new `snaptiles_core.{js,wasm}`. The page's view of the core is generated, not written by
+hand: `tests/bindings.rs` writes `pkg/snaptiles_core.d.ts` (one method per `extern "C" fn core_*` in `src/ffi.rs`) and
+`../src/sim/core-layout.ts` (the state buffer's slot indices and strides from the `layout!` lists in `src/state.rs`,
+the layout version, the text separator, the key count, and `ApiName` from the script API table), and checks that
+`.cargo/config.toml` exports exactly those functions. `cargo test` fails when they are stale;
+`UPDATE_BINDINGS=1 cargo test --release --test bindings` rewrites them. `tests/core-layout.test.ts` (vitest) checks
+the decoded buffer against the core's own API. Bump `LAYOUT_VERSION` when the buffer layout changes.
 
 ## Measured (2026-11-01, this machine)
 

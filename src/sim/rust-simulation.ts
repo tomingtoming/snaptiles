@@ -1,8 +1,8 @@
 // A running model on the Rust core (core/, built with Emscripten into core/pkg): the same surface the page and the
 // probes use on `Simulation`. The model and its assembly for drawing come from the TypeScript parser and assembler
 // (identical to the Rust ones, checked by the stage-1 oracle); bodies, Vals, keys and the script run in the core.
-// Per frame the core writes one flat f64 state buffer (layout in core/src/state.rs) that this class decodes from
-// HEAPF64 without per-value calls. The module is loaded on first use, so the TypeScript core never downloads it.
+// Per frame the core writes one flat f64 state buffer (layout in core/src/state.rs, indices generated into core-layout.ts) that this class decodes from
+// HEAPF64 without per-value calls. The module is loaded on first use.
 import * as THREE from 'three';
 import { assemble, type Assembly, type TileInstance } from '../model/assemble';
 import { parseRc, type RcModel } from '../rc/parser';
@@ -10,15 +10,11 @@ import type { KeyState } from '../input/keys';
 import type { SnapTilesCoreModule } from '../../core/pkg/snaptiles_core.js';
 import { FRAME_RATE, type BodyView, type PhysicsView, type Pose, type SimView, type TileBodyView, type ValState } from './sim-view';
 
-// ---- state buffer layout (core/src/state.rs) ----
-const LAYOUT_VERSION = 1;
-const HEADER = 20;
-const TILE_STRIDE = 17;
-const BALL_STRIDE = 12;
-const CRATE_STRIDE = 10;
-const SHELL_STRIDE = 3;
-const KEY_COUNT = 17;
-const SEP = '\u001f';
+// the state buffer layout, separator, key count and API names are generated from the core (core/tests/bindings.rs)
+import {
+  BALL, BALL_STRIDE, CRATE, CRATE_STRIDE, HEADER, HEADER_LENGTH, KEY_COUNT, LAYOUT_VERSION, SHELL, SHELL_STRIDE, TEXT_SEP,
+  TILE, TILE_STRIDE, type ApiName,
+} from './core-layout';
 
 let corePromise: Promise<SnapTilesCoreModule> | null = null;
 /** load (once) and instantiate the Emscripten module */
@@ -159,7 +155,7 @@ export class RustSimulation implements SimView {
     m._free(ptr);
     if (code !== 0) throw new Error(m.UTF8ToString(m._core_error(this.id)) || 'model failed to load');
     const names = m.UTF8ToString(m._core_val_names(this.id));
-    this.valOrder = (names ? names.split(SEP) : []).map((n) => this.vals.get(n));
+    this.valOrder = (names ? names.split(TEXT_SEP) : []).map((n) => this.vals.get(n));
     this.buildTiles();
     this.ticks = 0;
     this.read();
@@ -214,62 +210,67 @@ export class RustSimulation implements SimView {
     const m = this.m;
     if (!m || this.id < 0) return;
     const len = m._core_state_len(this.id);
-    if (len < HEADER) return;
+    if (len < HEADER_LENGTH) return;
     const h = m.HEAPF64;
     let o = m._core_state_ptr(this.id) / 8;
-    if (h[o] !== LAYOUT_VERSION) throw new Error(`core state layout ${h[o]} (expected ${LAYOUT_VERSION}); rebuild core/pkg`);
-    const nTiles = h[o + 1], nBalls = h[o + 2], nCrates = h[o + 3], nShells = h[o + 4], nVals = h[o + 5];
-    const n3 = h[o + 6], n2 = h[o + 7];
-    this.ticks = h[o + 8];
-    this.zoomFov = h[o + 9];
+    const at = (slot: number) => h[o + slot];
+    if (at(HEADER.VERSION) !== LAYOUT_VERSION) throw new Error(`core state layout ${at(HEADER.VERSION)} (expected ${LAYOUT_VERSION}); rebuild core/pkg`);
+    const nTiles = at(HEADER.TILES), nBalls = at(HEADER.BALLS), nCrates = at(HEADER.CRATES), nShells = at(HEADER.SHELLS), nVals = at(HEADER.VALS);
+    const n3 = at(HEADER.LINES3D), n2 = at(HEADER.LINES2D);
+    this.ticks = at(HEADER.TICKS);
+    this.zoomFov = at(HEADER.ZOOM);
     const wind = this.physics.wind;
-    wind.x = h[o + 10]; wind.y = h[o + 11]; wind.z = h[o + 12];
-    const outGen = h[o + 13], outRows = h[o + 14], errorGen = h[o + 15], hasError = h[o + 16];
+    wind.x = at(HEADER.WIND_X); wind.y = at(HEADER.WIND_Y); wind.z = at(HEADER.WIND_Z);
+    const outGen = at(HEADER.OUT_GENERATION), outRows = at(HEADER.OUT_ROWS), errorGen = at(HEADER.ERROR_GENERATION), hasError = at(HEADER.HAS_ERROR);
     if (outGen !== this.outGen) {
       this.outGen = outGen;
       const s = m.UTF8ToString(m._core_out(this.id));
-      this.out = outRows > 0 ? s.split(SEP) : [];
+      this.out = outRows > 0 ? s.split(TEXT_SEP) : [];
     }
     if (errorGen !== this.errorGen) {
       this.errorGen = errorGen;
       this.scriptError = hasError ? m.UTF8ToString(m._core_error(this.id)) : null;
     }
-    o += HEADER;
+    o += HEADER_LENGTH;
     const tiles = this.physics.tiles;
     if (tiles.length !== nTiles) throw new Error(`core has ${nTiles} tiles, the assembly ${tiles.length}`);
     for (let i = 0; i < nTiles; i++, o += TILE_STRIDE) {
       const t = tiles[i];
-      t.position.set(h[o], h[o + 1], h[o + 2]);
-      t.quaternion.set(h[o + 3], h[o + 4], h[o + 5], h[o + 6]);
-      t.vel.set(h[o + 7], h[o + 8], h[o + 9]);
+      t.position.set(at(TILE.PX), at(TILE.PY), at(TILE.PZ));
+      t.quaternion.set(at(TILE.QX), at(TILE.QY), at(TILE.QZ), at(TILE.QW));
+      t.vel.set(at(TILE.VX), at(TILE.VY), at(TILE.VZ));
       const lin = t.body.lin;
-      lin.x = h[o + 10]; lin.y = h[o + 11]; lin.z = h[o + 12];
-      t.spin = h[o + 13];
-      t.spinAngle = h[o + 14];
-      t.jetPower = h[o + 15];
-      t.body.handle = h[o + 16];
+      lin.x = at(TILE.BVX); lin.y = at(TILE.BVY); lin.z = at(TILE.BVZ);
+      t.spin = at(TILE.SPIN);
+      t.spinAngle = at(TILE.SPIN_ANGLE);
+      t.jetPower = at(TILE.JET_POWER);
+      t.body.handle = at(TILE.BODY);
     }
     const balls = this.physics.balls;
     balls.length = Math.min(balls.length, nBalls);
     for (let i = 0; i < nBalls; i++, o += BALL_STRIDE) {
       const b = balls[i] ?? (balls[i] = { body: new RustFreeBody(), radius: 0, color: [1, 0, 1], fixed: false });
-      setBody(b.body, h, o, false);
-      b.color[0] = h[o + 7]; b.color[1] = h[o + 8]; b.color[2] = h[o + 9];
-      b.radius = h[o + 10];
-      b.fixed = h[o + 11] !== 0;
+      setPose(b.body, h, o, BALL);
+      b.color[0] = at(BALL.R); b.color[1] = at(BALL.G); b.color[2] = at(BALL.B);
+      b.radius = at(BALL.RADIUS);
+      b.fixed = at(BALL.FIXED) !== 0;
     }
     const crates = this.physics.crates;
     crates.length = Math.min(crates.length, nCrates);
-    for (let i = 0; i < nCrates; i++, o += CRATE_STRIDE) setBody(crates[i] ?? (crates[i] = new RustFreeBody()), h, o, true);
+    for (let i = 0; i < nCrates; i++, o += CRATE_STRIDE) {
+      const c = crates[i] ?? (crates[i] = new RustFreeBody());
+      setPose(c, h, o, CRATE);
+      c.v.x = at(CRATE.VX); c.v.y = at(CRATE.VY); c.v.z = at(CRATE.VZ);
+    }
     const shells = this.physics.projectiles;
     shells.length = Math.min(shells.length, nShells);
     for (let i = 0; i < nShells; i++, o += SHELL_STRIDE) {
       const s = shells[i] ?? (shells[i] = { body: new RustFreeBody() });
-      s.body.t.x = h[o]; s.body.t.y = h[o + 1]; s.body.t.z = h[o + 2];
+      s.body.t.x = at(SHELL.PX); s.body.t.y = at(SHELL.PY); s.body.t.z = at(SHELL.PZ);
     }
     for (let i = 0; i < nVals; i++) {
       const v = this.valOrder[i];
-      if (v) v.value = h[o + i];
+      if (v) v.value = at(i);
     }
     o += nVals;
     this.lines3d = n3 > 0 ? Array.from(h.subarray(o, o + n3)) : [];
@@ -324,8 +325,8 @@ export class RustSimulation implements SimView {
   }
 
   /** the script API for probes and tests (`api()._KEY(0)`): numeric arguments only, one core call each */
-  api(): Record<string, (...args: number[]) => number> {
-    return new Proxy({}, {
+  api(): Record<ApiName, (...args: number[]) => number> {
+    return new Proxy({} as Record<ApiName, (...args: number[]) => number>, {
       get: (_t, name) => (...args: number[]) => {
         const m = this.m;
         if (!m || this.id < 0 || typeof name !== 'string') return 0;
@@ -343,8 +344,8 @@ export class RustSimulation implements SimView {
   }
 }
 
-function setBody(b: RustFreeBody, h: Float64Array, o: number, withVel: boolean): void {
-  b.t.x = h[o]; b.t.y = h[o + 1]; b.t.z = h[o + 2];
-  b.r.x = h[o + 3]; b.r.y = h[o + 4]; b.r.z = h[o + 5]; b.r.w = h[o + 6];
-  if (withVel) { b.v.x = h[o + 7]; b.v.y = h[o + 8]; b.v.z = h[o + 9]; }
+/** pose of a ball or crate record (both start with PX..QW) */
+function setPose(b: RustFreeBody, h: Float64Array, o: number, r: typeof BALL | typeof CRATE): void {
+  b.t.x = h[o + r.PX]; b.t.y = h[o + r.PY]; b.t.z = h[o + r.PZ];
+  b.r.x = h[o + r.QX]; b.r.y = h[o + r.QY]; b.r.z = h[o + r.QZ]; b.r.w = h[o + r.QW];
 }

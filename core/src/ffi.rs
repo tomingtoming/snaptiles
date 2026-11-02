@@ -14,6 +14,9 @@ use crate::Simulation;
 use std::cell::RefCell;
 use std::ffi::CString;
 
+/// separator of the multi-row strings (`core_out` rows, `core_val_names`)
+pub const TEXT_SEP: &str = "\u{1f}";
+
 struct Slot {
     sim: Option<Simulation>,
     /// load error (parse/assemble) when `sim` is None
@@ -224,7 +227,7 @@ pub extern "C" fn core_error(id: u32) -> *const u8 {
 /// `out()` rows of the last frame, joined with U+001F (unit separator); the header carries their count.
 #[no_mangle]
 pub extern "C" fn core_out(id: u32) -> *const u8 {
-    let s = with_slot(id, String::new(), |slot| slot.sim.as_ref().map(|sim| sim.out.join("\u{1f}")).unwrap_or_default());
+    let s = with_slot(id, String::new(), |slot| slot.sim.as_ref().map(|sim| sim.out.join(TEXT_SEP)).unwrap_or_default());
     text_out(&s)
 }
 
@@ -232,7 +235,7 @@ pub extern "C" fn core_out(id: u32) -> *const u8 {
 #[no_mangle]
 pub extern "C" fn core_val_names(id: u32) -> *const u8 {
     let s = with_slot(id, String::new(), |slot| {
-        slot.sim.as_ref().map(|sim| sim.state().vars.vals.iter().map(|v| v.name.clone()).collect::<Vec<_>>().join("\u{1f}")).unwrap_or_default()
+        slot.sim.as_ref().map(|sim| sim.state().vars.vals.iter().map(|v| v.name.clone()).collect::<Vec<_>>().join(TEXT_SEP)).unwrap_or_default()
     });
     text_out(&s)
 }

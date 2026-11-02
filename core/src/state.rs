@@ -1,6 +1,7 @@
 //! The per-frame state buffer the page reads straight out of module memory (`HEAPF64`), one flat `f64` array per
 //! simulation, rewritten after every step and command. `src/sim/rust-simulation.ts` decodes it; keep both in step
-//! (bump [`LAYOUT_VERSION`] when the layout changes).
+//! (bump [`LAYOUT_VERSION`] when the layout changes). The slot names are the `layout!` lists below; `tests/bindings.rs`
+//! generates the page's `src/sim/core-layout.ts` from them, so the decoder cannot drift from this file.
 //!
 //! ```text
 //! header (HEADER = 20 slots)
@@ -39,11 +40,33 @@ use crate::physics::math::{from_rotation, from_vector};
 use crate::Simulation;
 
 pub const LAYOUT_VERSION: f64 = 1.0;
-pub const HEADER: usize = 20;
-pub const TILE_STRIDE: usize = 17;
-pub const BALL_STRIDE: usize = 12;
-pub const CRATE_STRIDE: usize = 10;
-pub const SHELL_STRIDE: usize = 3;
+
+/// One record layout: a module of slot indices plus the names in order (its length is the stride). The page's
+/// decoder reads the same indices from `src/sim/core-layout.ts`, which `tests/bindings.rs` generates from these.
+macro_rules! layout {
+    ($module:ident, $names:ident, $stride:ident: $($field:ident),+ $(,)?) => {
+        #[allow(dead_code)]
+        pub mod $module {
+            layout!(@index 0usize; $($field),+);
+        }
+        pub const $names: &[&str] = &[$(stringify!($field)),+];
+        pub const $stride: usize = $names.len();
+    };
+    (@index $n:expr; $field:ident $(, $rest:ident)*) => {
+        pub const $field: usize = $n;
+        layout!(@index $n + 1; $($rest),*);
+    };
+    (@index $n:expr;) => {};
+}
+
+layout!(header, HEADER_FIELDS, HEADER:
+    VERSION, TILES, BALLS, CRATES, SHELLS, VALS, LINES3D, LINES2D, TICKS, ZOOM, WIND_X, WIND_Y, WIND_Z,
+    OUT_GENERATION, OUT_ROWS, ERROR_GENERATION, HAS_ERROR, MODEL_GENERATION, SPARE_18, SPARE_19);
+layout!(tile, TILE_FIELDS, TILE_STRIDE:
+    PX, PY, PZ, QX, QY, QZ, QW, VX, VY, VZ, BVX, BVY, BVZ, SPIN, SPIN_ANGLE, JET_POWER, BODY);
+layout!(ball, BALL_FIELDS, BALL_STRIDE: PX, PY, PZ, QX, QY, QZ, QW, R, G, B, RADIUS, FIXED);
+layout!(krate, CRATE_FIELDS, CRATE_STRIDE: PX, PY, PZ, QX, QY, QZ, QW, VX, VY, VZ);
+layout!(shell, SHELL_FIELDS, SHELL_STRIDE: PX, PY, PZ);
 
 /// generations the header carries (kept by the caller between writes)
 #[derive(Default, Clone, Debug)]
@@ -60,24 +83,24 @@ pub fn write_state(sim: &Simulation, gens: &Generations, buf: &mut Vec<f64>) {
     let w = &s.world;
     let n_vals = s.vars.vals.len();
     buf.resize(HEADER, 0.0);
-    buf[0] = LAYOUT_VERSION;
-    buf[1] = w.tiles.len() as f64;
-    buf[2] = w.balls.len() as f64;
-    buf[3] = w.crates.len() as f64;
-    buf[4] = w.projectiles.len() as f64;
-    buf[5] = n_vals as f64;
-    buf[6] = s.lines3d.len() as f64;
-    buf[7] = s.lines2d.len() as f64;
-    buf[8] = s.ticks;
-    buf[9] = s.zoom_fov;
-    buf[10] = w.wind.x;
-    buf[11] = w.wind.y;
-    buf[12] = w.wind.z;
-    buf[13] = gens.out as f64;
-    buf[14] = sim.out.len() as f64;
-    buf[15] = gens.error as f64;
-    buf[16] = if sim.script_error.is_some() { 1.0 } else { 0.0 };
-    buf[17] = gens.model as f64;
+    buf[header::VERSION] = LAYOUT_VERSION;
+    buf[header::TILES] = w.tiles.len() as f64;
+    buf[header::BALLS] = w.balls.len() as f64;
+    buf[header::CRATES] = w.crates.len() as f64;
+    buf[header::SHELLS] = w.projectiles.len() as f64;
+    buf[header::VALS] = n_vals as f64;
+    buf[header::LINES3D] = s.lines3d.len() as f64;
+    buf[header::LINES2D] = s.lines2d.len() as f64;
+    buf[header::TICKS] = s.ticks;
+    buf[header::ZOOM] = s.zoom_fov;
+    buf[header::WIND_X] = w.wind.x;
+    buf[header::WIND_Y] = w.wind.y;
+    buf[header::WIND_Z] = w.wind.z;
+    buf[header::OUT_GENERATION] = gens.out as f64;
+    buf[header::OUT_ROWS] = sim.out.len() as f64;
+    buf[header::ERROR_GENERATION] = gens.error as f64;
+    buf[header::HAS_ERROR] = if sim.script_error.is_some() { 1.0 } else { 0.0 };
+    buf[header::MODEL_GENERATION] = gens.model as f64;
     buf.reserve(w.tiles.len() * TILE_STRIDE + w.balls.len() * BALL_STRIDE + w.crates.len() * CRATE_STRIDE + w.projectiles.len() * SHELL_STRIDE + n_vals + s.lines3d.len() + s.lines2d.len());
     for (i, tb) in w.tiles.iter().enumerate() {
         let p = w.pose(i);
@@ -85,24 +108,28 @@ pub fn write_state(sim: &Simulation, gens: &Generations, buf: &mut Vec<f64>) {
         let b = &w.world.bodies[tb.body];
         let bv = from_vector(b.linvel());
         let (q, pos) = (p.quaternion, p.position);
-        buf.extend_from_slice(&[pos.x, pos.y, pos.z, q.x, q.y, q.z, q.w, v.x, v.y, v.z, bv.x, bv.y, bv.z, tb.spin, tb.spin_angle, tb.jet_power, tb.body.into_raw_parts().0 as f64]);
+        let rec: [f64; TILE_STRIDE] = [pos.x, pos.y, pos.z, q.x, q.y, q.z, q.w, v.x, v.y, v.z, bv.x, bv.y, bv.z, tb.spin, tb.spin_angle, tb.jet_power, tb.body.into_raw_parts().0 as f64];
+        buf.extend_from_slice(&rec);
     }
     for ball in &w.balls {
         let b = &w.world.bodies[ball.body];
         let t = from_vector(b.translation());
         let q = from_rotation(*b.rotation());
-        buf.extend_from_slice(&[t.x, t.y, t.z, q.x, q.y, q.z, q.w, ball.color[0], ball.color[1], ball.color[2], ball.radius, if ball.fixed { 1.0 } else { 0.0 }]);
+        let rec: [f64; BALL_STRIDE] = [t.x, t.y, t.z, q.x, q.y, q.z, q.w, ball.color[0], ball.color[1], ball.color[2], ball.radius, if ball.fixed { 1.0 } else { 0.0 }];
+        buf.extend_from_slice(&rec);
     }
     for &h in &w.crates {
         let b = &w.world.bodies[h];
         let t = from_vector(b.translation());
         let q = from_rotation(*b.rotation());
         let v = from_vector(b.linvel());
-        buf.extend_from_slice(&[t.x, t.y, t.z, q.x, q.y, q.z, q.w, v.x, v.y, v.z]);
+        let rec: [f64; CRATE_STRIDE] = [t.x, t.y, t.z, q.x, q.y, q.z, q.w, v.x, v.y, v.z];
+        buf.extend_from_slice(&rec);
     }
     for p in &w.projectiles {
         let t = from_vector(w.world.bodies[p.body].translation());
-        buf.extend_from_slice(&[t.x, t.y, t.z]);
+        let rec: [f64; SHELL_STRIDE] = [t.x, t.y, t.z];
+        buf.extend_from_slice(&rec);
     }
     buf.extend(s.vars.vals.iter().map(|v| v.value));
     buf.extend_from_slice(&s.lines3d);
