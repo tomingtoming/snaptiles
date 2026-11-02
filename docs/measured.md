@@ -459,3 +459,34 @@ Corpus: runs scoring above 1 21 → 20, median 0.29 → 0.28.
 - **First frame**: running only the first frame's physics before the script (knob `firstScriptAfterPhysics`)
   helps baloon4 and 3wheel but worsens the bike, 15cpHeri and satellite (upright mismatches 10 → 11). Not adopted.
 - Still open: Talon, DUCKER under Up, the bike's stop, 1wheel's speed.
+
+**2026-11-02 — spring joints under a landing load (Talon), on the Rust core.** Talon's idle run has no attitude
+control (its Lua only poses the legs); it lands with its centre of mass at the rear edge of its feet in both programs
+(the original at z 0.08 against support near 0.23) and the original stands, SnapTiles tips forward over 40 frames.
+More solver substeps make it fall sooner (not a numerical instability). Doubling the spring joints' damping ratio
+(`SPRING_ZETA` [0.1, 0.4] → [0.2, 0.8]) makes Talon idle and DUCKER under Up stand and improves the corpus (runs
+above 1 21 → 17, upright mismatches 10 → 8; DUCKER idle and fw worse) but breaks the commanded step response
+(spring 0.2 reaches 0.74 of the swing after 3 frames against the original's 1.23). Not adopted.
+`rc_models42.sh` + `harness_land.rcs` (`land_<A>_<spring>_<damper>`): a body of Core, two Chips and eight Weights on
+two legs folded A° down through spring joints, level Frame feet, dropped from the spawn height; replay with
+`orig_compare --self --chips=20 --frames=240`. Body-over-foot height h (legs 30°, rigid 0.30):
+
+| case | settled h orig / SnapTiles | overshoot above settled | dip below settled |
+|---|---|---|---|
+| spring 1 | 0.276 / 0.300 | 0.02 / 0.01 | 0.01 / 0.00 |
+| 0.2, damper 0.5 | 0.244 / 0.286 | 0.02 / 0.20 | 0.05 / 0.15 |
+| 0.1, damper 0.5 (and 1: identical) | 0.186 / 0.244 | 0.03 / 0.11 | 0.06 / 0.30 |
+| 0.1, damper 0 | 0.194 / 0.244 | 0.03 / 0.26 | 0.08 / 0.34 |
+| 0.1, damper 0.5, 1.5× body | 0.165 / 0.234 | 0.01 / 0.21 | 0.04 / 0.34 |
+| legs 60°, 0.2, damper 0.5 | 0.458 / 0.472 | 0.02 / 0.12 | 0.01 / 0.05 |
+
+The original's joints give at the impact within one frame, dip only a few centimetres below where they settle, never
+rebound, and creep to the settled angle over 10–20 frames; the damper value makes no difference. They also settle
+1.6–2.3× lower than the 3.7·10⁶·spring² torsion spring that fits the cantilevered arm (`rc_models33.sh`), and even
+spring 1 sags 0.024 (feet slide outward only 1–2 cm). SnapTiles' motor spring stores the impact and throws the body
+0.1–0.26 m up. Tried on the Rust core and not adopted: the damping scaled ×2/×4 (rebound less, step response too slow);
+rapier 0.36's joint softness (a locked joint, natural frequency f0·spring^p, damping ratio 1–30) with the command
+applied as a servo — it can match this table (f0 60, p 1, ratio 10) and the step response (0.56/1.10/1.02 against
+0.47/1.23/0.97) but makes the arm sag test too stiff (spring 0.1: 43.9° vs 41.3°) and the corpus worse (above 1
+21 → 26, mismatches 10 → 15), Talon still falling. The original's joint is neither a constant torsion spring nor a
+mass-normalised soft constraint; its law under external load is still open.

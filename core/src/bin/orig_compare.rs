@@ -1,7 +1,7 @@
 //! Replay the original-exe measurement harness on the Rust core (the former `tools/orig-compare.ts`):
 //!
 //!   cargo run --release --bin orig_compare -- <model.txt> <out.csv> [--allwheels] [--power=2500] [--on=31] [--off=150]
-//!       [--frames=330] [--geomAt=30] [--self] [--nocourse] [--key=N:from:to] [--chips6|--chips10|--turn|--wheels|--arm|--fuel]
+//!       [--frames=330] [--geomAt=30] [--self] [--nocourse] [--key=N:from:to] [--chips6|--chips10|--chips=N|--turn|--wheels|--arm|--fuel]
 //!
 //! Every frame in [on, off] the Val ENGINE is forced to `power` (the harness scenario in the original sets POWER on
 //! every wheel; `--allwheels` gives the Basic car's front wheels power=±Engine too); `--self` leaves ENGINE to the
@@ -27,7 +27,9 @@ fn main() {
     let file = pos.first().expect("usage: orig_compare <model.txt> <out.csv> [options]");
     let out_file = pos.get(1).map(|s| s.as_str()).unwrap_or("orig-compare.csv").to_string();
     let (power, on, off, frames, geom_at) = (opt("power", 2500.0), opt("on", 31.0) as i64, opt("off", 150.0) as i64, opt("frames", 330.0) as i64, opt("geomAt", 30.0) as i64);
-    let (chips6, chips10, self_drive, turn, wheels, arm, fuel) = (flag("chips6"), flag("chips10"), flag("self"), flag("turn"), flag("wheels"), flag("arm"), flag("fuel"));
+    let (chips6, self_drive, turn, wheels, arm, fuel) = (flag("chips6"), flag("self"), flag("turn"), flag("wheels"), flag("arm"), flag("fuel"));
+    // --chips10 (harness_servo2.rcs) or --chips=N (harness_land.rcs: N = 20): x,y,z of chips 0..N-1
+    let chips_n = if flag("chips10") { 10 } else { opt("chips", 0.0) as usize };
     let key: Option<Vec<i64>> = args.iter().find_map(|a| a.strip_prefix("--key=").map(|v| v.split(':').map(|x| x.parse().unwrap()).collect()));
 
     let mut src = String::from_utf8_lossy(&fs::read(file).expect("model")).into_owned();
@@ -47,8 +49,8 @@ fn main() {
     if !has_engine && !chips6 && !self_drive {
         panic!("model has no ENGINE val");
     }
-    let header = if chips10 {
-        format!("frame,{}", (0..10).map(|c| format!("x{c},y{c},z{c}")).collect::<Vec<_>>().join(","))
+    let header = if chips_n > 0 {
+        format!("frame,{}", (0..chips_n).map(|c| format!("x{c},y{c},z{c}")).collect::<Vec<_>>().join(","))
     } else if fuel {
         "frame,x,y,z,vx,vy,vz,fuel,fuelmax,fuel0,fuelmax0,fuel1,chips".into()
     } else if arm {
@@ -78,9 +80,9 @@ fn main() {
         }
         sim.step();
         let chips = a(&sim, "_CHIPS", 0.0);
-        let row = if chips10 {
+        let row = if chips_n > 0 {
             let m = chips - 1.0;
-            let cols: Vec<String> = (0..10).map(|c| if (c as f64) <= m { ["_X", "_Y", "_Z"].map(|f| f4(a(&sim, f, c as f64))).join(",") } else { ",,".into() }).collect();
+            let cols: Vec<String> = (0..chips_n).map(|c| if (c as f64) <= m { ["_X", "_Y", "_Z"].map(|f| f4(a(&sim, f, c as f64))).join(",") } else { ",,".into() }).collect();
             format!("{n},{}", cols.join(","))
         } else if fuel {
             let xs = ["_X", "_Y", "_Z", "_VX", "_VY", "_VZ"].map(|f| f4(a(&sim, f, 0.0))).join(",");
