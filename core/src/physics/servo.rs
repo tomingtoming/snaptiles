@@ -28,16 +28,18 @@ pub(crate) struct Anchor {
 }
 
 impl World {
-    /// a joint with spring < 1: a torsion spring toward its (possibly animated) angle, SPRING_K·spring² N·m/rad,
+    /// a joint with spring < 1: a torsion spring toward its (possibly animated) angle, SPRING_K·spring² N·m/rad (softer
+    /// when its subtree is light, SPRING_K_INERTIA_*),
     /// damped by the damper's ratio over the inertia it swings. The target is taken the short way round from the
     /// current angle (G.txt's legs command "current + 20°" and wrap at ±180°).
     pub(crate) fn spring_motor(&mut self, i: usize, env: Env) {
         let tile = self.tile(self.tiles[i].tile);
         let s = js_max(0.0, tile_attr(tile, "spring", env, 1.0));
-        let k = SPRING_K * s.powf(SPRING_K_P);
+        let inertia = js_max(1e-3, self.tiles[i].spring_inertia);
+        let k = SPRING_K * s.powf(SPRING_K_P) * js_max(SPRING_K_INERTIA_FLOOR, js_min(1.0, (inertia / SPRING_K_INERTIA_REF).powf(SPRING_K_INERTIA_P)));
         let damper = if tile.attrs.get("damper").is_some() { tile_attr(tile, "damper", env, 0.5) } else { tile_attr(tile, "dumper", env, 0.5) };
         let zeta = SPRING_ZETA[0] + (SPRING_ZETA[1] - SPRING_ZETA[0]) * js_min(1.0, js_max(0.0, damper) / 0.5);
-        let c = 2.0 * zeta * (k * js_max(1e-3, self.tiles[i].spring_inertia)).sqrt();
+        let c = 2.0 * zeta * (k * inertia).sqrt();
         let want = if self.tiles[i].animated { joint_sign(tile.spec.joint, tile.dir) * (tile_attr(tile, "angle", env, 0.0) - self.tiles[i].rest_angle) * std::f64::consts::PI / 180.0 } else { 0.0 };
         let target = want.sin().atan2(want.cos());
         self.tiles[i].servo_angle = target;

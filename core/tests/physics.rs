@@ -436,3 +436,32 @@ Body {{ Core(){{ N:Frame(angle=A,spring={spring},damper=0.5){{ N:Chip(){{ N:Chip
         assert!((el - want).abs() < 2.0, "spring {spring}: {el:.1}° vs {want}");
     }
 }
+
+#[test]
+fn a_spring_joint_gives_more_when_its_subtree_is_light() {
+    // tools/orig-harness/rc_models44.sh (swap_0.1_w2): a bridge built as one chain from foot A — leg A up 30°, spring
+    // joint A, a body of two Chips with four Weights (option 2), spring joint B, leg B down 30°, foot B. Both joints carry
+    // the same torque; the original settles at fold A 25.5° (the body beyond it) and B 19.0° (only leg B and foot B).
+    let mut sim = Sim::new(
+        "Val { A(default=0,min=-180,max=180) }
+Key { }
+Body { Core(){ N:Frame(angle=-30){ N:Chip(angle=30,spring=0.1,damper=0.5){ W:Weight(option=2){ } E:Weight(option=2){ } N:Chip(){ W:Weight(option=2){ } E:Weight(option=2){ } N:Frame(angle=30,spring=0.1,damper=0.5){ N:Chip(angle=-30){ } } } } } } }",
+        true,
+    );
+    for _ in 1..=240 {
+        sim.step();
+    }
+    let p = |c: usize| [sim.x(c), sim.y(c), sim.z(c)];
+    let sub = |a: [f64; 3], b: [f64; 3]| [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+    let angle = |a: [f64; 3], b: [f64; 3]| {
+        let dot = a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        (dot / (a[0].hypot(a[1]).hypot(a[2]) * b[0].hypot(b[1]).hypot(b[2]))).acos() * 180.0 / PI
+    };
+    let u = sub(p(5), p(2));
+    let hinge_a = [p(2)[0] - u[0] / 2.0, p(2)[1] - u[1] / 2.0, p(2)[2] - u[2] / 2.0];
+    let hinge_b = [p(5)[0] + u[0] / 2.0, p(5)[1] + u[1] / 2.0, p(5)[2] + u[2] / 2.0];
+    let (fold_a, fold_b) = (angle(sub(hinge_a, p(1)), u), angle(u, sub(p(8), hinge_b)));
+    assert!((fold_a - 25.5).abs() < 2.5, "fold A {fold_a:.1}° vs 25.5");
+    assert!((fold_b - 19.0).abs() < 4.0, "fold B {fold_b:.1}° vs 19.0");
+    assert!(30.0 - fold_b > 1.8 * (30.0 - fold_a), "B sags {:.1}°, A {:.1}°", 30.0 - fold_b, 30.0 - fold_a);
+}

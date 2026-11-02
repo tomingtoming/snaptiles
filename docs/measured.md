@@ -513,3 +513,25 @@ subtree overdamped and a heavy one ring) passes the step response at T = 0.01–
 against 0.47/1.23/0.97) but still rebounds here — on landing the moving inertia is the heavy body, not the leg — and
 leaves Talon falling (corpus above 1 21 → 19). Not adopted. The law under external load stays open; the next
 measurement would vary the side of the joint the mass sits on (a heavy leg under a light body).
+
+**2026-11-02 — which side sets the give (adopted).** `rc_models44.sh` (`swap_<spring>_w<option>`): a symmetric
+bridge built as one chain from foot A (the Core): leg A up 30°, spring joint A, a body of two Chips and four Weights,
+spring joint B, leg B down 30°, foot B. Both joints carry the same torque; beyond joint A is the body and leg B
+(heavy), beyond joint B only leg B and foot B (light). Settled sag (30° minus the fold):
+
+| case | orig A / B | SnapTiles before (A / B) | now (A / B) |
+|---|---|---|---|
+| spring 1, w2 | 1.2 / 0.8° | 0 / 0 | 0 / 0 |
+| 0.2, w1 / w2 / w4 | 1.4 / 1.9, 2.3 / 3.3, 4.2 / 5.9° | 0.5 / 0.5, 1.0 / 0.9, 2.3 / 1.9° | — / —, 1.0 / 2.6, 2.2 / 4.0° |
+| 0.1, w1 / w2 / w4 | 2.6 / 6.2, 4.5 / 11.0, 6.9 / 19.2° | 1.8 / 1.8, 3.6 / 3.5, 7.5 / 7.1° | — / —, 3.5 / 7.9, 7.6 / 16.5° |
+
+So the give of a spring joint depends on what hangs beyond it: with a heavy subtree it matches the 3.7·10⁶·spring²
+torsion spring (as the cantilevered arm did), with a light one it gives 2.4–2.8× more. From these and the
+rc_models43 legs the stiffness factor is ≈ 0.32 for subtrees of 9–19 kg·m² about the axis, ≈ 0.5 at 33 kg·m², 1 for
+the arm. SnapTiles now scales SPRING_K by clamp((I/300 kg·m²)^0.31, 0.32, 1) (`SPRING_K_INERTIA_*`); the step
+response and the arm's sag tests are unchanged, `a_spring_joint_gives_more_when_its_subtree_is_light` checks this
+bridge. Corpus: runs above 1 21 → 18, median 0.29, upright mismatches 10 (Talon idle now stands, 3.52 → 0.58;
+RCModel1 bike idle 1.58 → 0.37, human 1.04 → 0.33, 3wheel 0.96 → 0.50; the bike under Up now rides 227 m and falls
+where it rode 368 m upright — the original stops after 8 m either way). Still open: Talon under Up, DUCKER under Up,
+the bike's stop, the landing rebound of rc_models42 (the original's spring joints still absorb the impact; this
+changes their stiffness, not that).

@@ -154,6 +154,14 @@ pub const ROTOR_DRAG_M: f64 = 1.56;
 pub const ROTOR_DRAG_N: f64 = 2.74;
 pub const SPRING_K: f64 = 3.7e6;
 pub const SPRING_K_P: f64 = 2.0;
+/// A spring joint gives more when what it carries beyond it is light (measured 2026-11-02, `rc_models44.sh`: a bridge
+/// whose two spring joints carry the same torque — the one with the body beyond it sags like SPRING_K, the one with only
+/// a leg and foot beyond it 2.4–2.8× more; `rc_models43.sh` legs likewise). Stiffness × clamp((I/REF)^P, FLOOR, 1) with
+/// I the subtree's inertia about the joint axis: REF 300 kg·m² (the cantilevered arm SPRING_K was fitted on is above
+/// it), P 0.31, FLOOR 0.32 (legs of 9 and 19 kg·m² both need ≈ 0.32, a two-Frame leg of 33 kg·m² ≈ 0.5)
+pub const SPRING_K_INERTIA_REF: f64 = 300.0;
+pub const SPRING_K_INERTIA_P: f64 = 0.31;
+pub const SPRING_K_INERTIA_FLOOR: f64 = 0.32;
 /// damping ratio of a spring joint at damper 0 and at damper ≥ 0.5 (0.5 and 1 run identically in the original)
 pub const SPRING_ZETA: [f64; 2] = [0.1, 0.4]; // lower than the fit: rapier's implicit motor adds damping
 
