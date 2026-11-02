@@ -535,3 +535,15 @@ RCModel1 bike idle 1.58 → 0.37, human 1.04 → 0.33, 3wheel 0.96 → 0.50; the
 where it rode 368 m upright — the original stops after 8 m either way). Still open: Talon under Up, DUCKER under Up,
 the bike's stop, the landing rebound of rc_models42 (the original's spring joints still absorb the impact; this
 changes their stiffness, not that).
+
+**2026-11-03 — load damping of spring joints (adopted, fitted on the corpus).** The landing rigs above show the
+original's spring joints taking an impact without rebound whatever their damper; SnapTiles' damping is over the
+subtree's inertia (a light leg), so under a load coming through the foot it is nearly undamped. Damping over the rest
+of the model's inertia as well (ratio 0.3, independent of damper) removes the rebound in the rigs (overshoot 0.00–0.04
+against the original's 0.01–0.03) but, applied to every joint, slows the commanded step response (an arm on a
+grounded base) and worsens the corpus. Applied only when the joint's subtree touches the ground and the rest of the
+model does not — a stance leg while the other foot is up; the joint then swings the rest of the model — it leaves the
+step response and every other run unchanged and makes Talon walk under Up like the original (1.60 → 0.11): corpus
+runs above 1 18 → 17, median 0.29 → 0.28, upright mismatches 10 → 9 (`SPRING_ZETA_LOAD`, `World::grounded_tiles`).
+The two-legged landing rigs keep rebounding in SnapTiles (both feet are down, so the rule does not apply): the
+original's absorption there is still unexplained.

@@ -12,7 +12,7 @@ use super::pose_balance::{balance_pose, MassPoint};
 use super::world::*;
 use crate::model::{joint_sign, Quat, Vec3, TILE, TILE_T};
 use crate::rc::Env;
-use rapier3d::prelude::{JointAxis, RigidBodyHandle};
+use rapier3d::prelude::{ColliderHandle, JointAxis, RigidBodyHandle};
 use std::collections::HashMap;
 
 /// A loaded contact of a model collider against a fixed collider, remembered before the servos move the model
@@ -32,14 +32,18 @@ impl World {
     /// when its subtree is light, SPRING_K_INERTIA_*),
     /// damped by the damper's ratio over the inertia it swings. The target is taken the short way round from the
     /// current angle (G.txt's legs command "current + 20°" and wrap at ±180°).
-    pub(crate) fn spring_motor(&mut self, i: usize, env: Env) {
+    pub(crate) fn spring_motor(&mut self, i: usize, env: Env, grounded: &[bool]) {
         let tile = self.tile(self.tiles[i].tile);
         let s = js_max(0.0, tile_attr(tile, "spring", env, 1.0));
         let inertia = js_max(1e-3, self.tiles[i].spring_inertia);
         let k = SPRING_K * s.powf(SPRING_K_P) * js_max(SPRING_K_INERTIA_FLOOR, js_min(1.0, (inertia / SPRING_K_INERTIA_REF).powf(SPRING_K_INERTIA_P)));
         let damper = if tile.attrs.get("damper").is_some() { tile_attr(tile, "damper", env, 0.5) } else { tile_attr(tile, "dumper", env, 0.5) };
         let zeta = SPRING_ZETA[0] + (SPRING_ZETA[1] - SPRING_ZETA[0]) * js_min(1.0, js_max(0.0, damper) / 0.5);
-        let c = 2.0 * zeta * (k * inertia).sqrt();
+        let sub = &self.tiles[i].spring_subtree;
+        let on_subtree = grounded.iter().zip(sub).any(|(&g, &s)| g && s);
+        let on_rest = grounded.iter().zip(sub).any(|(&g, &s)| g && !s);
+        let load = if on_subtree && !on_rest { SPRING_ZETA_LOAD * self.tiles[i].spring_inertia_rest.sqrt() } else { 0.0 };
+        let c = 2.0 * k.sqrt() * (zeta * inertia.sqrt() + load);
         let want = if self.tiles[i].animated { joint_sign(tile.spec.joint, tile.dir) * (tile_attr(tile, "angle", env, 0.0) - self.tiles[i].rest_angle) * std::f64::consts::PI / 180.0 } else { 0.0 };
         let target = want.sin().atan2(want.cos());
         self.tiles[i].servo_angle = target;
@@ -47,6 +51,34 @@ impl World {
         if let Some(j) = self.tiles[i].joint.and_then(|h| self.world.impulse_joints.get_mut(h, true)) {
             j.data.set_motor_position(JointAxis::AngX, target as f32, k as f32, c as f32);
         }
+    }
+
+    /// per tile (assembly order): its rigid body touches the ground or a fixed object this step (non-wheel tiles keep
+    /// no collider handle of their own; a tyre counts by its ray contact)
+    pub(crate) fn grounded_tiles(&self) -> Vec<bool> {
+        let wheel_colliders: Vec<ColliderHandle> = self.tiles.iter().filter_map(|t| t.collider).collect();
+        let mut by_body: Vec<(RigidBodyHandle, bool)> = Vec::new();
+        let mut out = vec![false; self.a().tiles.len()];
+        for tb in &self.tiles {
+            let body = match by_body.iter().find(|(h, _)| *h == tb.body) {
+                Some(&(_, g)) => g,
+                None => {
+                    let g = self.world.bodies[tb.body].colliders().iter().any(|&ch| {
+                        !wheel_colliders.contains(&ch)
+                            && self.world.narrow_phase.contact_pairs_with(ch).any(|p| {
+                                let other = if p.collider1 == ch { p.collider2 } else { p.collider1 };
+                                p.has_any_active_contact() && self.world.colliders[other].parent().is_none_or(|b| self.world.bodies[b].is_fixed())
+                            })
+                    });
+                    by_body.push((tb.body, g));
+                    g
+                }
+            };
+            if body || tb.contact_point.is_some() {
+                out[tb.tile] = true;
+            }
+        }
+        out
     }
 
     /// current angle of an animated joint, measured from the two bodies' rotations (rad)

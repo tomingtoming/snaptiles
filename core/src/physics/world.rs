@@ -162,6 +162,12 @@ pub const SPRING_K_P: f64 = 2.0;
 pub const SPRING_K_INERTIA_REF: f64 = 300.0;
 pub const SPRING_K_INERTIA_P: f64 = 0.31;
 pub const SPRING_K_INERTIA_FLOOR: f64 = 0.32;
+/// A spring joint whose subtree stands on the ground while the rest of the model does not (a stance leg while the
+/// other foot is up) swings the rest of the model, not its subtree: it is damped over that inertia too, at this ratio
+/// whatever its damper (measured 2026-11-02, `rc_models42.sh`: the original's legs take a landing without rebound and
+/// damper 0, 0.5 and 1 settle alike). Fitted on the corpus: Talon under Up walks like the original (1.60 → 0.11), no
+/// other run changes by more than 0.15; the commanded step response (arm in the air) is untouched.
+pub const SPRING_ZETA_LOAD: f64 = 0.3;
 /// damping ratio of a spring joint at damper 0 and at damper ≥ 0.5 (0.5 and 1 run identically in the original)
 pub const SPRING_ZETA: [f64; 2] = [0.1, 0.4]; // lower than the fit: rapier's implicit motor adds damping
 
@@ -263,6 +269,9 @@ pub struct TileBody {
     /// spring < 1: a revolute joint held by a position motor (SPRING_K·spring²), and the inertia it swings
     pub springy: bool,
     pub spring_inertia: f64,
+    /// spring joints: the rest of the model's inertia about the axis, and which tiles are in the subtree
+    pub spring_inertia_rest: f64,
+    pub spring_subtree: Vec<bool>,
     /// a wheel carrying chips is a rotor: they turn with its spin (`rotor_of` on each of them: the wheel's tile
     /// index); its inertia and the mass that sets its air drag
     pub rotor_of: Option<usize>,
@@ -788,6 +797,8 @@ impl World {
                 animated,
                 springy,
                 spring_inertia: 0.0,
+                spring_inertia_rest: 0.0,
+                spring_subtree: Vec::new(),
                 rotor_of: None,
                 rotor_inertia: 0.0,
                 rotor_mass: 0.0,
@@ -821,7 +832,12 @@ impl World {
             let t0 = &a.tiles[self.tiles[i].tile];
             let (anchor, n) = (t0.anchor, t0.axis.normalize());
             let mut inertia = 0.0;
+            let mut total = 0.0;
+            let mut subtree = vec![false; a.tiles.len()];
             for t in &a.tiles {
+                let r = t.position.sub(anchor);
+                let r = r.sub(n.scale(r.dot(n)));
+                total += t.mass * (r.length_sq() + (TILE * TILE) / 12.0);
                 let mut p = Some(t.id);
                 while let Some(pi) = p {
                     if pi == t0.id {
@@ -832,11 +848,14 @@ impl World {
                 if p.is_none() {
                     continue;
                 }
+                subtree[t.id] = true;
                 let r = t.position.sub(anchor);
                 let r = r.sub(n.scale(r.dot(n)));
                 inertia += t.mass * (r.length_sq() + (TILE * TILE) / 12.0);
             }
             self.tiles[i].spring_inertia = inertia;
+            self.tiles[i].spring_inertia_rest = js_max(0.0, total - inertia);
+            self.tiles[i].spring_subtree = subtree;
         }
         if ROTOR {
             for wi in 0..self.tiles.len() {
@@ -948,13 +967,14 @@ impl World {
             b.reset_torques(false);
         }
         // simultaneous servos (default): balance the component's mass pose after all commanded poses are applied
+        let grounded = if self.tiles.iter().any(|t| t.springy) { self.grounded_tiles() } else { Vec::new() };
         let mass_before = self.servo_mass_points();
         let anchors = self.servo_contact_anchors();
         let mut changed_roots: Vec<usize> = Vec::new();
         for i in 0..self.tiles.len() {
             let (joint, springy, animated) = (self.tiles[i].joint, self.tiles[i].springy, self.tiles[i].animated);
             if springy && joint.is_some() {
-                self.spring_motor(i, env);
+                self.spring_motor(i, env, &grounded);
                 continue;
             }
             let tile = self.tile(self.tiles[i].tile);
