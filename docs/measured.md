@@ -490,3 +490,26 @@ applied as a servo — it can match this table (f0 60, p 1, ratio 10) and the st
 0.47/1.23/0.97) but makes the arm sag test too stiff (spring 0.1: 43.9° vs 41.3°) and the corpus worse (above 1
 21 → 26, mismatches 10 → 15), Talon still falling. The original's joint is neither a constant torsion spring nor a
 mass-normalised soft constraint; its law under external load is still open.
+
+**2026-11-02 — the same, scaled (one round).** `rc_models43.sh` (`law_<spring>_L<segments>_w<option>`): the
+rc_models42 body with its four Weights at option 1/2/4 (529/932/1739 kg in all) on legs of one or two Frames, 30°
+down, damper 0.5. Settled fold angle (30° unloaded) and an effective stiffness from the static torque estimate
+(half the weight at the foot minus the leg's own weight; the estimate reads SnapTiles' motor springs ~1.4× too stiff,
+so compare the columns rather than with 3.7·10⁶·spring²):
+
+| case | fold orig / SnapTiles | k estimate orig / SnapTiles (N·m/rad) |
+|---|---|---|
+| spring 1, L1, 932 kg | 28.3° / 30.0° | 121 000 / rigid |
+| spring 1, L2, 554 kg | 29.1° / 30.0° | 214 000 / rigid |
+| 0.2, L1, 529 / 932 / 1739 kg | 27.2 / 25.4 / 22.1° — 29.5 / 29.0 / 28.1° | 42 000 / 46 000 / 51 000 — 217 000 / 209 000 / 204 000 |
+| 0.2, L2, 554 kg | 26.4° / 29.0° | 55 000 / 200 000 |
+| 0.1, L1, 529 / 932 / 1739 kg | 23.2 / 18.9 / 12.4° — 28.1 / 26.3 / 22.8° | 17 000 / 20 000 / 24 000 — 60 000 / 57 000 / 56 000 |
+| 0.1, L2, 554 / 958 kg | 21.5 / 16.2° — 26.0 / 22.4° | 24 000 / 27 000 — 49 000 / 48 000 |
+
+In this load case the original's spring joints are 2–5× softer than SnapTiles' (the gap shrinks with load and with a
+longer, heavier leg beyond the joint), and its spring-1 joints give too (≈1.5·10⁵ N·m/rad, as the 2026-10-27 arm's
+0.7° under 1913 N·m). A damping proportional to stiffness (c = k·T, the ODE-like form that would make a light
+subtree overdamped and a heavy one ring) passes the step response at T = 0.01–0.02 s (spring 0.2: 0.51/1.07/0.98
+against 0.47/1.23/0.97) but still rebounds here — on landing the moving inertia is the heavy body, not the leg — and
+leaves Talon falling (corpus above 1 21 → 19). Not adopted. The law under external load stays open; the next
+measurement would vary the side of the joint the mass sits on (a heavy leg under a light body).
