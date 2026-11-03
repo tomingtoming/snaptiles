@@ -30,6 +30,11 @@ The browser build needs [emsdk](https://emscripten.org/docs/getting_started/down
 only and points the C compiler, archiver and linker at `emcc.exe`/`emar.exe` (current emsdk ships no `.bat`).
 Emscripten is used because C (Lua) does not build for `wasm32-unknown-unknown`.
 
+`.cargo/config.toml` also sets `CFLAGS` so Lua's string-hash seed is fixed (`luai_makeseed`): with it, and with
+`math.randomseed` fixed at load and `_RND` kept per simulation, a run repeats exactly from the same inputs (the page's
+replays and rewind rely on it; `tests/debug.rs` checks it). lua-src does not tell cargo to rebuild when `CFLAGS`
+changes: after changing it, `cargo clean -p mlua-sys --release` (and again with `--target wasm32-unknown-emscripten`).
+
 `core/pkg` is committed so `bun run build` works without emsdk: **rebuild it (`bun run build:core`) after changing
 `core/src`** and commit the new `snaptiles_core.{js,wasm}`. The page's view of the core is generated, not written by
 hand: `tests/bindings.rs` writes `pkg/snaptiles_core.d.ts` (one method per `extern "C" fn core_*` in `src/ffi.rs`) and

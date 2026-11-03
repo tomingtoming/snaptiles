@@ -6,6 +6,7 @@
 //! Lua integer when it is integral (`Number.isInteger`), else as a float, and every Lua number reads back as `f64`.
 
 use crate::js;
+use mlua::debug::DebugEvent;
 use mlua::{HookTriggers, Lua, LuaOptions, StdLib, Value, VmState};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -165,6 +166,11 @@ pub struct LuaEngine {
     /// line before the Lua block's first line: error lines are reported relative to the file
     pub line_offset: i64,
     pub max_instructions_per_call: u32,
+    /// globals that exist before the model's chunk runs (API, libraries, COMPAT): hidden from [`LuaEngine::watch`]
+    baseline: Vec<String>,
+    /// file lines of the page's breakpoints, and the snapshot taken at the first one hit in the current call
+    pub breakpoints: Rc<RefCell<Vec<i64>>>,
+    pub break_hit: Rc<RefCell<Option<String>>>,
 }
 
 impl Default for LuaEngine {
@@ -175,7 +181,17 @@ impl Default for LuaEngine {
 
 impl LuaEngine {
     pub fn new() -> Self {
-        LuaEngine { lua: None, error: None, out: Rc::new(RefCell::new(Vec::new())), frame_fn: None, line_offset: 0, max_instructions_per_call: MAX_INSTRUCTIONS_PER_CALL }
+        LuaEngine {
+            lua: None,
+            error: None,
+            out: Rc::new(RefCell::new(Vec::new())),
+            frame_fn: None,
+            line_offset: 0,
+            max_instructions_per_call: MAX_INSTRUCTIONS_PER_CALL,
+            baseline: Vec::new(),
+            breakpoints: Rc::new(RefCell::new(Vec::new())),
+            break_hit: Rc::new(RefCell::new(None)),
+        }
     }
 
     pub fn lua(&self) -> Option<&Lua> {
@@ -192,18 +208,19 @@ impl LuaEngine {
     pub fn load(&mut self, source: &str, register: impl FnOnce(&Lua) -> mlua::Result<()>, prelude: &str, line_offset: i64) {
         self.line_offset = line_offset;
         self.dispose();
-        let lua = match Lua::new_with(StdLib::TABLE | StdLib::STRING | StdLib::UTF8 | StdLib::MATH, LuaOptions::default()) {
-            Ok(l) => l,
-            Err(e) => {
-                self.error = Some(error_message(&e));
-                return;
-            }
-        };
+        // The debug library is loaded only to read a breakpoint's locals: its getlocal/getinfo are kept in the registry
+        // and the `debug` global is removed before any model code runs.
+        // SAFETY: the debug library is never reachable from the model's code (removed from the globals below).
+        let lua = unsafe { Lua::unsafe_new_with(StdLib::TABLE | StdLib::STRING | StdLib::UTF8 | StdLib::MATH | StdLib::DEBUG, LuaOptions::default()) };
         self.error = None;
         self.out.borrow_mut().clear();
         let setup = (|| -> mlua::Result<()> {
-            register(&lua)?;
             let g = lua.globals();
+            let debug: mlua::Table = g.get("debug")?;
+            lua.set_named_registry_value("snaptiles_getlocal", debug.get::<mlua::Function>("getlocal")?)?;
+            lua.set_named_registry_value("snaptiles_getinfo", debug.get::<mlua::Function>("getinfo")?)?;
+            g.set("debug", Value::Nil)?;
+            register(&lua)?;
             let out = self.out.clone();
             g.set("print", lua.create_function(move |lua, args: mlua::MultiValue| {
                 let args: Vec<Value> = args.into_iter().collect();
@@ -225,9 +242,20 @@ impl LuaEngine {
         }
         let result = (|| -> mlua::Result<()> {
             lua.load(COMPAT).set_name("compat").exec()?;
+            // Lua 5.4 seeds math.random from the clock: a fixed seed keeps runs (and replays) identical
+            lua.load("math.randomseed(24301)").set_name("seed").exec()?;
             if !prelude.is_empty() {
                 lua.load(prelude).set_name("prelude").exec()?;
             }
+            self.baseline = lua
+                .globals()
+                .pairs::<Value, Value>()
+                .filter_map(|kv| kv.ok())
+                .filter_map(|(k, _)| match k {
+                    Value::String(s) => Some(s.to_string_lossy().to_string()),
+                    _ => None,
+                })
+                .collect();
             self.arm_budget(&lua);
             // full-width spaces (U+3000) appear as indentation in Shift-JIS era scripts
             lua.load(source.replace('\u{3000}', " ")).set_name("model").exec()?;
@@ -297,7 +325,21 @@ impl LuaEngine {
 
     fn arm_budget(&self, lua: &Lua) {
         let remaining = Cell::new(self.max_instructions_per_call.max(1) as i64);
-        let _ = lua.set_hook(HookTriggers::new().every_nth_instruction(QUANTUM), move |_, _| {
+        let breakpoints = self.breakpoints.borrow().clone();
+        let mut triggers = HookTriggers::new().every_nth_instruction(QUANTUM);
+        if !breakpoints.is_empty() {
+            triggers = triggers.every_line();
+        }
+        let (hit, line_offset) = (self.break_hit.clone(), self.line_offset);
+        let _ = lua.set_hook(triggers, move |lua, debug| {
+            if debug.event() == DebugEvent::Line {
+                if hit.borrow().is_none() && debug.source().source.as_deref().is_some_and(|s| s.contains("model")) {
+                    if let Some(line) = debug.current_line().map(|l| l as i64 + line_offset).filter(|l| breakpoints.contains(l)) {
+                        *hit.borrow_mut() = Some(break_snapshot(lua, line));
+                    }
+                }
+                return Ok(VmState::Continue);
+            }
             remaining.set(remaining.get() - QUANTUM as i64);
             if remaining.get() <= 0 {
                 Err(mlua::Error::runtime("instruction budget exceeded"))
@@ -305,6 +347,26 @@ impl LuaEngine {
                 Ok(VmState::Continue)
             }
         });
+    }
+
+    /// the model's own globals (not functions) and their values, sorted by name, for the page's watch list
+    pub fn watch(&self) -> Vec<(String, String)> {
+        let Some(lua) = &self.lua else { return Vec::new() };
+        let mut out: Vec<(String, String)> = lua
+            .globals()
+            .pairs::<Value, Value>()
+            .filter_map(|kv| kv.ok())
+            .filter_map(|(k, v)| match (k, &v) {
+                (_, Value::Function(_) | Value::Nil | Value::Thread(_) | Value::UserData(_) | Value::LightUserData(_)) => None,
+                (Value::String(s), _) => {
+                    let name = s.to_string_lossy().to_string();
+                    (!self.baseline.contains(&name)).then(|| (name, watch_value(lua, &v, 1)))
+                }
+                _ => None,
+            })
+            .collect();
+        out.sort();
+        out
     }
 
     pub fn dispose(&mut self) {
@@ -342,4 +404,65 @@ fn js_min(a: f64, b: f64) -> f64 {
     } else {
         a.min(b)
     }
+}
+
+/// A value as the watch list and breakpoint snapshots show it: numbers like JavaScript prints them, strings quoted,
+/// tables one level deep (at most 8 entries).
+pub fn watch_value(lua: &Lua, v: &Value, depth: u32) -> String {
+    match v {
+        Value::String(s) => format!("{:?}", s.to_string_lossy()),
+        Value::Table(t) if depth > 0 => {
+            let mut items = Vec::new();
+            let mut n = 0;
+            for (k, x) in t.clone().pairs::<Value, Value>().filter_map(|kv| kv.ok()) {
+                n += 1;
+                if items.len() < 8 {
+                    let key = match &k {
+                        Value::Integer(_) | Value::Number(_) => format!("[{}]", watch_value(lua, &k, 0)),
+                        _ => js_string(lua, &k),
+                    };
+                    items.push(format!("{key}={}", watch_value(lua, &x, depth - 1)));
+                }
+            }
+            if n > items.len() {
+                items.push(format!("\u{2026} {n}"));
+            }
+            format!("{{{}}}", items.join(", "))
+        }
+        Value::Table(_) => "{\u{2026}}".into(),
+        Value::Function(_) => "function".into(),
+        Value::Integer(i) => js::print_number(*i as f64),
+        Value::Number(x) => js::print_number(*x),
+        other => js_string(lua, other),
+    }
+}
+
+/// The locals of the model function running at a breakpoint (read with the registry's `debug.getlocal`), as
+/// `line US name RS value US name RS value ...` (US = U+001F, RS = U+001E); the page adds the globals from
+/// [`LuaEngine::watch`].
+fn break_snapshot(lua: &Lua, line: i64) -> String {
+    let mut parts = vec![line.to_string()];
+    let (Ok(getlocal), Ok(getinfo)) =
+        (lua.named_registry_value::<mlua::Function>("snaptiles_getlocal"), lua.named_registry_value::<mlua::Function>("snaptiles_getinfo"))
+    else {
+        return parts.join("\u{1f}");
+    };
+    // the hooked function's stack level as seen from a call made inside the hook: the first that runs model code
+    let level = (1..8).find(|&l| {
+        matches!(getinfo.call::<Value>((l, "S")), Ok(Value::Table(t)) if t.get::<String>("source").is_ok_and(|s| s.contains("model")))
+    });
+    if let Some(level) = level {
+        for i in 1..200 {
+            match getlocal.call::<(Value, Value)>((level, i)) {
+                Ok((Value::String(name), v)) => {
+                    let name = name.to_string_lossy().to_string();
+                    if !name.starts_with('(') && !matches!(v, Value::Function(_)) {
+                        parts.push(format!("{name}\u{1e}{}", watch_value(lua, &v, 1)));
+                    }
+                }
+                _ => break,
+            }
+        }
+    }
+    parts.join("\u{1f}")
 }

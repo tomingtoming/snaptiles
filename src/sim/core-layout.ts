@@ -4,6 +4,8 @@
 export const LAYOUT_VERSION = 1;
 /** separator of the multi-row strings (`core_out`, `core_val_names`) */
 export const TEXT_SEP = '\u001f';
+/** separator of the records of `core_lua_watch` */
+export const RECORD_SEP = '\u001e';
 export const KEY_COUNT = 17;
 export const HEADER = {
   VERSION: 0,

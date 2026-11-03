@@ -6,7 +6,7 @@
 //!
 //! The test also checks that `.cargo/config.toml` exports exactly those functions. It fails when a generated file is
 //! out of date; `UPDATE_BINDINGS=1 cargo test --release --test bindings` rewrites them.
-use snaptiles_core::ffi::TEXT_SEP;
+use snaptiles_core::ffi::{RECORD_SEP, TEXT_SEP};
 use snaptiles_core::sim::keys::KEY_COUNT;
 use snaptiles_core::state::*;
 use std::fs;
@@ -92,6 +92,7 @@ fn layout_ts() -> String {
     );
     s += &format!("export const LAYOUT_VERSION = {LAYOUT_VERSION};\n");
     s += &format!("/** separator of the multi-row strings (`core_out`, `core_val_names`) */\nexport const TEXT_SEP = '\\u{:04x}';\n", TEXT_SEP.chars().next().unwrap() as u32);
+    s += &format!("/** separator of the records of `core_lua_watch` */\nexport const RECORD_SEP = '\\u{:04x}';\n", RECORD_SEP.chars().next().unwrap() as u32);
     s += &format!("export const KEY_COUNT = {KEY_COUNT};\n");
     s += &record("HEADER", HEADER_FIELDS, "HEADER_LENGTH");
     s += &record("TILE", TILE_FIELDS, "TILE_STRIDE");

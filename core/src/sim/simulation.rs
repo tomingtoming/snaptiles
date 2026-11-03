@@ -183,6 +183,8 @@ pub struct Simulation {
     pub script_error: Option<String>,
     /// `out()` rows as of the last frame
     pub out: Vec<String>,
+    /// this simulation's `_RND` generator, swapped in for every call that can run the script (replays repeat exactly)
+    rng: std::cell::Cell<u64>,
 }
 
 impl Simulation {
@@ -222,7 +224,7 @@ impl Simulation {
             pen3: [0.0; 3],
             pen2: [0.0; 2],
         };
-        Ok(Simulation { state: Rc::new(RefCell::new(state)), lua: LuaEngine::new(), rc_script: None, script_error: None, out: Vec::new() })
+        Ok(Simulation { state: Rc::new(RefCell::new(state)), lua: LuaEngine::new(), rc_script: None, script_error: None, out: Vec::new(), rng: std::cell::Cell::new(0) })
     }
 
     /// Parse and start in one go.
@@ -239,8 +241,17 @@ impl Simulation {
         self.state.borrow_mut()
     }
 
+    /// Run `f` with this simulation's `_RND` state in the shared generator.
+    fn with_rng<R>(&self, f: impl FnOnce() -> R) -> R {
+        crate::sim::seed_random(self.rng.get());
+        let r = f();
+        self.rng.set(crate::sim::random_state());
+        r
+    }
+
     /// Assemble, build the bodies, load the script and run OnInit.
     pub fn start(&mut self) -> Result<(), String> {
+        self.rng.set(0);
         {
             let mut guard = self.state.borrow_mut();
             let s = &mut *guard;
@@ -260,7 +271,10 @@ impl Simulation {
             s.ticks = 0.0;
             s.started = true;
         }
+        let rng = self.rng.get();
+        crate::sim::seed_random(rng);
         self.load_script();
+        self.rng.set(crate::sim::random_state());
         Ok(())
     }
 
@@ -290,7 +304,9 @@ impl Simulation {
             world.reset_crates();
             s.ticks = 0.0;
         }
+        crate::sim::seed_random(self.rng.get());
         self.call_lua("OnReset");
+        self.rng.set(crate::sim::random_state());
     }
 
     fn lang(&self) -> Option<ScriptLang> {
@@ -374,6 +390,13 @@ impl Simulation {
 
     /// One fixed step: keys → vals → script → clamp → physics.
     pub fn step(&mut self) {
+        crate::sim::seed_random(self.rng.get());
+        *self.lua.break_hit.borrow_mut() = None;
+        self.step_inner();
+        self.rng.set(crate::sim::random_state());
+    }
+
+    fn step_inner(&mut self) {
         {
             let mut guard = self.state.borrow_mut();
             let s = &mut *guard;
@@ -442,7 +465,22 @@ impl Simulation {
     /// `sim.api()[name](...args)` with numeric arguments
     pub fn api(&self, name: &str, args: &[f64]) -> f64 {
         let a: Vec<Arg> = args.iter().map(|&x| Arg::Num(x)).collect();
-        self.state.borrow_mut().call_api(name, &a).num()
+        self.with_rng(|| self.state.borrow_mut().call_api(name, &a).num())
+    }
+
+    /// the Lua block's own globals and their values (the page's watch list)
+    pub fn lua_watch(&self) -> Vec<(String, String)> {
+        self.lua.watch()
+    }
+
+    /// file lines where the Lua block stops for inspection (empty: none, and no line hook)
+    pub fn set_breakpoints(&mut self, lines: Vec<i64>) {
+        *self.lua.breakpoints.borrow_mut() = lines;
+    }
+
+    /// the breakpoint snapshot of the last step (`line US name RS value ...`), if a breakpoint was hit in it
+    pub fn break_hit(&self) -> Option<String> {
+        self.lua.break_hit.borrow().clone()
     }
 
     /// a static ground-like collider (friction 1, the ground's collision group), for probes that build terrain

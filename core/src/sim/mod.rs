@@ -27,6 +27,11 @@ pub fn random() -> f64 {
     })
 }
 
+/// The generator's state (a simulation keeps its own between calls, so two running side by side do not interleave).
+pub fn random_state() -> u64 {
+    RNG.with(|r| r.get())
+}
+
 /// Reseed [`random`] (tests and replays).
 pub fn seed_random(seed: u64) {
     RNG.with(|r| r.set(if seed == 0 { 0x9E37_79B9_7F4A_7C15 } else { seed }));

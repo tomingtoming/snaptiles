@@ -274,3 +274,40 @@ pub unsafe extern "C" fn core_api(id: u32, name: *const u8, len: usize, argc: u3
         r
     })
 }
+
+/// Separator between the records of [`core_lua_watch`] (U+001E); a record's fields are split by [`TEXT_SEP`].
+pub const RECORD_SEP: &str = "\u{1e}";
+
+/// The Lua block's own globals (not functions) and their values, as `name US value RS name US value ...`, sorted by
+/// name. The page asks for it only while its watch list is open.
+#[no_mangle]
+pub extern "C" fn core_lua_watch(id: u32) -> *const u8 {
+    let s = with_slot(id, String::new(), |slot| {
+        slot.sim.as_ref().map(|sim| sim.lua_watch().into_iter().map(|(n, v)| format!("{n}{TEXT_SEP}{v}")).collect::<Vec<_>>().join(RECORD_SEP)).unwrap_or_default()
+    });
+    text_out(&s)
+}
+
+/// Breakpoints of the Lua block as file lines, comma-separated UTF-8 (empty: none). A step that runs one of them
+/// records a snapshot ([`core_break`]); the step itself always completes.
+///
+/// # Safety
+/// `ptr` must point to `len` readable bytes.
+#[no_mangle]
+pub unsafe extern "C" fn core_set_breakpoints(id: u32, ptr: *const u8, len: usize) {
+    let text = text_in(ptr, len);
+    let lines: Vec<i64> = text.split(',').filter_map(|x| x.trim().parse().ok()).collect();
+    with_slot(id, (), |slot| {
+        if let Some(sim) = slot.sim.as_mut() {
+            sim.set_breakpoints(lines);
+        }
+    });
+}
+
+/// The snapshot of the breakpoint hit in the last step: `line US name RS value US name RS value ...` (the model
+/// function's locals at that line); empty when none was hit.
+#[no_mangle]
+pub extern "C" fn core_break(id: u32) -> *const u8 {
+    let s = with_slot(id, String::new(), |slot| slot.sim.as_ref().and_then(|sim| sim.break_hit()).unwrap_or_default());
+    text_out(&s)
+}
