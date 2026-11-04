@@ -161,3 +161,36 @@ button:disabled { opacity: .4; cursor: default !important; }
 @media (max-width: 800px) { #source-hint { display: none; } } /* touch layouts: no Esc/Tab, and the row is needed for the panel */
 .share-run { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; min-height: 32px; }
 .share-run[hidden] { display: none; }
+
+/* debug panel (src/debug/panel.ts): docked over the bottom of the 3D view */
+#debug-toggle { background: transparent; color: var(--ink); border: 1px solid #333a42; border-radius: 6px; min-width: 34px; height: 30px; font-size: 14px; cursor: pointer; }
+#debug-toggle[aria-pressed='true'] { background: #303840; border-color: var(--accent); }
+#debug { position: absolute; left: 0; right: 0; bottom: 0; height: min(42%, 340px); min-height: 200px; display: flex; flex-direction: column; background: rgba(22, 25, 29, 0.95); color: var(--ink); border-top: 1px solid #39424c; font-size: 12px; z-index: 2; }
+#debug[hidden] { display: none; }
+.debug-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; }
+.debug-bar button, .bp-add button, #debug-break button { min-width: 32px; min-height: 28px; background: #303840; color: var(--ink); border: 1px solid #59636e; border-radius: 4px; cursor: pointer; }
+#debug-timeline { flex: 1; min-width: 80px; }
+#debug-frame { font: 12px var(--mono); color: var(--dim); white-space: nowrap; }
+.debug-cols { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(180px, 1fr) 2fr minmax(180px, 1fr); gap: 8px; padding: 0 8px 8px; }
+.debug-col { min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+.debug-col h3 { margin: 2px 0 4px; font-size: 12px; color: var(--dim); font-weight: 600; }
+#debug-legend span { margin-left: 8px; font-weight: 400; }
+#debug-graph { flex: 1; width: 100%; min-height: 80px; background: #15181c; border-radius: 4px; }
+#debug-watch-empty { color: var(--dim); margin: 4px 0; }
+#debug-watch-empty[hidden] { display: none; }
+.watch-row { display: grid; grid-template-columns: auto auto 1fr auto; gap: 6px; align-items: center; font: 12px var(--mono); padding: 1px 2px; border-radius: 3px; cursor: pointer; }
+.watch-row.changed { animation: watch-flash 0.6s; }
+@keyframes watch-flash { from { background: #4a5560; } to { background: transparent; } }
+.watch-kind { color: var(--dim); font-size: 10px; }
+.watch-value { text-align: right; overflow-wrap: anywhere; }
+.bp-add { display: flex; gap: 4px; }
+.bp-add input { width: 5em; min-height: 28px; background: var(--bg); color: var(--ink); border: 1px solid #59636e; border-radius: 4px; }
+.bp { margin: 4px 4px 0 0; min-height: 26px; background: #3a2a2a; color: #ffb4ab; border: 1px solid #8c4a44; border-radius: 12px; cursor: pointer; }
+#debug-break { margin-top: 6px; padding: 6px; border: 1px solid #ff8a80; border-radius: 4px; }
+#debug-break[hidden] { display: none; }
+.break-head { color: #ffb4ab; margin-bottom: 4px; }
+.break-locals { font: 12px var(--mono); }
+.debugging #keys { bottom: calc(min(42%, 340px) + 12px); }
+.building #debug { display: none; }
+@media (max-width: 800px) { .debug-cols { grid-template-columns: 1fr 1fr; } .debug-cols .debug-col:nth-child(2) { display: none; } #debug-replay { display: none; } }
+.building #debug-toggle { display: none; } /* the editor needs the bar's height on phones; the panel serves the running model */

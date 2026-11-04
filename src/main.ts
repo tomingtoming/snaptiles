@@ -6,6 +6,7 @@ import { KeyState, KEY_TABLE } from './input/keys';
 import type { SimView } from './sim/sim-view';
 import type { RustSimulation } from './sim/rust-simulation';
 import { decodeRecording, decodeText, encodeRecording, encodeText, type Recording } from './sim/replay';
+import { DebugPanel } from './debug/panel';
 import { Sfx } from './audio/sfx';
 import { SAMPLES } from './samples';
 
@@ -47,6 +48,34 @@ let keyCaps: { el: HTMLElement; n: number }[] = [];
 // only awaits settled promises (microtasks)
 const rustSimulation = import('./sim/rust-simulation').then((m) => { void m.loadRustCore(); return m.RustSimulation; });
 
+// the debug panel: rewinding re-runs the recorded run to a frame in a fresh simulation and swaps it in
+const debug = new DebugPanel({
+  sim: () => sim,
+  paused: () => paused,
+  setPaused: (p) => { paused = p; },
+  seek: seekTo,
+  step: () => { if (sim && !builder?.active) { sim.step(); debug.afterStep(sim); } },
+  source: sourceEl,
+});
+async function seekTo(frame: number, timeline: Recording): Promise<void> {
+  const current = sim;
+  if (!current) return;
+  const request = loadGeneration;
+  const next = new (await rustSimulation)(current.source, keys);
+  await next.start();
+  next.player = timeline;
+  for (let i = 0; i < frame; i++) next.step();
+  if (request !== loadGeneration || sim !== current) { await next.dispose(); return; }
+  sim = next;
+  (window as unknown as { __sim: SimView }).__sim = next;
+  scene.rebuild(next.assembly!.tiles, next.env);
+  scene.setLines3d(next.lines3d);
+  scene.sync(next.physics);
+  lastCoreVel = null; lastShells = next.physics.projectiles.length; crateVel.length = 0;
+  debug.attach(next, true);
+  await current.dispose();
+}
+
 async function load(source: string, request: number, player: Recording | null = null): Promise<boolean> {
   if (request !== loadGeneration) return false;
   const focusBeforeLoad = document.activeElement;
@@ -74,6 +103,7 @@ async function load(source: string, request: number, player: Recording | null = 
     const t2 = performance.now();
     next.player = player; // a shared run replays from the first step
     sim = next;
+    debug.attach(next, false);
     (window as unknown as { __sim: SimView }).__sim = next;
     scene.rebuild(next.assembly!.tiles, next.env);
     scene.setLines3d([]);
@@ -253,6 +283,8 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (e.code === 'Space') { e.preventDefault(); paused = !paused; } // Space carries no key number in the original
+  if (e.code === 'Period' && debug.open) debug.stepForward(); // . / , step one frame (debug panel open)
+  if (e.code === 'Comma' && debug.open) void debug.stepBack();
   // the original's default scenario: H drops a ball (r 0.6, specific gravity 0.3) 6 m up at x = 2, J cycles the wind
   if (e.code === 'KeyH' && sim) { const n = sim.physics.balls.length; sim.physics.addBall(0.6, 2, 6 + n, n / 10, 0.3); }
   if (e.code === 'KeyJ' && sim) { windLevel = (windLevel + 1) % 4; sim.physics.wind.set([0, 5, 16, 50][windLevel], 0, 0); }
@@ -349,6 +381,7 @@ function frame(now: number): void {
       sim.step();
       acc -= FIXED;
       n++;
+      if (debug.afterStep(sim)) { acc = 0; break; } // a breakpoint pauses the page
     }
     if (n === 4) acc = 0;
     scene.sync(sim.physics);
@@ -364,6 +397,7 @@ function frame(now: number): void {
     updateSound(sim);
   }
   if (builder?.active) { acc = 0; scene.updateEditorCamera(); }
+  if (!builder?.active) debug.update(sim);
   scene.render();
 }
 function updateSound(s: SimView): void {
@@ -427,18 +461,19 @@ function drawHud(buf: number[], s: SimView): void {
     hudCtx.fillText('\u23F8', w / 2, h / 2);
   }
   if (sim?.replaying && sim.player) {
-    const size = Math.max(12, Math.round(h / 30));
+    // top centre, clear of the Val (left) and out() (right) boxes
+    const size = Math.max(12, Math.min(15, Math.round(h / 48)));
     hudCtx.font = `${size}px system-ui, sans-serif`;
-    hudCtx.textAlign = 'left';
+    hudCtx.textAlign = 'center';
     hudCtx.textBaseline = 'top';
-    const text = `\u25B6 リプレイ ${(sim.frame / 30).toFixed(1)} / ${(sim.player.frames / 30).toFixed(1)} s ・ キーで操作を引き継ぐ`;
-    const width = hudCtx.measureText(text).width + 16;
+    const text = `\u25B6 リプレイ ${(sim.frame / 30).toFixed(1)} / ${(sim.player.frames / 30).toFixed(1)} 秒 ・ キーで操作を引き継ぐ`;
+    const width = hudCtx.measureText(text).width + 20;
     hudCtx.fillStyle = 'rgba(16,20,24,0.62)';
     hudCtx.beginPath();
-    hudCtx.roundRect(12, 12, width, size + 12, 8);
+    hudCtx.roundRect(w / 2 - width / 2, 12, width, size + 12, 8);
     hudCtx.fill();
     hudCtx.fillStyle = '#fff';
-    hudCtx.fillText(text, 20, 18);
+    hudCtx.fillText(text, w / 2, 18);
   }
   // the original's dials: speed in km/h and altitude in m (the compass is the camera's job here)
   const core = s.physics.tiles[0];
@@ -456,10 +491,11 @@ function drawHud(buf: number[], s: SimView): void {
     const height = (rows.length - 1) * step + size + 12;
     hudCtx.fillStyle = 'rgba(16,20,24,0.62)';
     hudCtx.beginPath();
-    hudCtx.roundRect(w - 12 - width + 8, h - 12 - height + 6, width, height, 8);
+    const bottom = h - 12 - (debug.open ? debug.panel.offsetHeight : 0); // above the debug panel when it is open
+    hudCtx.roundRect(w - 12 - width + 8, bottom - height + 6, width, height, 8);
     hudCtx.fill();
     hudCtx.fillStyle = '#fff';
-    rows.forEach((r, i) => hudCtx.fillText(r, w - 12, h - 12 - i * step));
+    rows.forEach((r, i) => hudCtx.fillText(r, w - 12, bottom - i * step));
   }
   if (buf.length === 0) return;
   hudCtx.lineWidth = 1.5;

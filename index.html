@@ -13,6 +13,7 @@
       <header id="bar">
         <nav id="samples"></nav>
         <button id="viewmode" type="button" aria-label="視点を切り替える">◎</button>
+        <button id="debug-toggle" type="button" aria-pressed="false" aria-label="デバッグ" title="デバッグ：Luaの変数・グラフ・巻き戻し・ブレークポイント">🐞</button>
         <button id="mute" type="button" aria-label="消音">🔊</button>
         <button id="open-model" type="button">開く</button>
         <input id="model-file" type="file" accept=".rc,.rcd,.txt" hidden />
@@ -55,13 +56,33 @@
       <pre id="vals"></pre>
       <pre id="out"></pre>
       <div id="keys"></div>
+      <section id="debug" hidden aria-label="デバッグ">
+        <div class="debug-bar">
+          <button id="debug-start" type="button" aria-label="最初へ" title="最初へ">⏮</button>
+          <button id="debug-back" type="button" aria-label="1コマ戻る" title="1コマ戻る（,）">◀|</button>
+          <button id="debug-play" type="button" aria-label="一時停止">⏸</button>
+          <button id="debug-forward" type="button" aria-label="1コマ進む" title="1コマ進む（.）">|▶</button>
+          <input id="debug-timeline" type="range" min="0" max="0" value="0" step="1" aria-label="タイムライン（ドラッグで巻き戻し）" />
+          <span id="debug-frame"></span>
+          <button id="debug-replay" type="button">最初から再生</button>
+        </div>
+        <div class="debug-cols">
+          <div class="debug-col"><h3>ウォッチ</h3><div id="debug-watch-body"></div><p id="debug-watch-empty">Val と Lua の変数がここに出ます</p></div>
+          <div class="debug-col"><h3>グラフ<span id="debug-legend"></span></h3><canvas id="debug-graph"></canvas></div>
+          <div class="debug-col"><h3>ブレークポイント</h3>
+            <div class="bp-add"><input id="debug-bp-line" type="number" min="1" placeholder="行" aria-label="ブレークポイントの行番号" /><button id="debug-bp-add" type="button">追加</button><button id="debug-bp-caret" type="button" title="ソース欄のカーソルがある行">カーソル行</button></div>
+            <div id="debug-bp-list"></div>
+            <div id="debug-break" hidden role="status"></div>
+          </div>
+        </div>
+      </section>
     </main>
     <dialog id="share-dialog" aria-labelledby="share-title">
       <h2 id="share-title">共有リンク</h2>
       <p>リンクを作った時点の編集内容を開けます。</p>
       <label for="share-url">モデルのURL</label>
       <input id="share-url" type="text" readonly />
-      <label id="share-run-row" class="share-run" hidden><input id="share-run" type="checkbox" checked /> いまの走り（<span id="share-run-length"></span> 秒）も含める</label>
+      <label id="share-run-row" class="share-run" hidden><input id="share-run" type="checkbox" /> いまの走り（<span id="share-run-length"></span> 秒）も含める</label>
       <p id="share-status" role="status"></p>
       <div class="share-actions"><button id="copy-link" type="button">リンクをコピー</button><form method="dialog"><button>閉じる</button></form></div>
     </dialog>
@@ -131,6 +152,8 @@
       <p><strong>接続方向：</strong>N / W / E / Sの追加ボタンに、選んだ部品からその方向へ接続している子の数を表示します。「空き」は子がない方向です。同じ方向への追加・貼り付けもできるため、角度が同じだと部品が重なる場合があります。3D画面の選択部品に出るN / W / E / Sの印を押しても、同じように追加・貼り付けできます。</p>
       <p><strong>複数選択：</strong>3D画面でShift / Ctrl＋クリックすると、部品を選択に加える・外すことができます（タッチでは「複数選択」を押してからタップ）。青い枠が追加で選んだ部品です。種類・角度・色・削除はまとめて変わり、Undoも1回で戻ります。一覧から選ぶか「選択を解除」で1つの選択に戻ります。</p>
       <p><strong>スクリプト：</strong>「スクリプト（Lua）」の「Luaへ移動」でLuaの部分へ移動します（無ければOnFrameのひな形を追加）。関数を検索して説明を見ながらカーソル位置に挿入でき、値の表示・キー操作・高さや傾きを保つ制御のひな形もあります。エラーの行番号が出たら、ステータスの下の「エラーの行へ」でその行を選択します。</p>
+      <p><strong>デバッグ（🐞）：</strong>実行中の走りは毎フレーム記録されています。🐞で開く欄では、ValとLuaの変数を見られます（☐で選ぶとグラフ表示）。|▶ / ◀| または . / , で1コマ進む・戻る。タイムラインをドラッグすると、その時点まで巻き戻せます（記録した入力で最初から計算し直すので、同じ結果になります）。行番号か「カーソル行」でブレークポイントを置くと、その行を実行したフレームで一時停止し、その行のローカル変数を表示します（そのフレームは最後まで実行されます）。</p>
+      <p><strong>走りの共有：</strong>共有リンクで「いまの走りも含める」を選ぶと、操作の記録がリンクに入ります。開いた人の画面で同じ走りが再生され、キーを押すとそこから操作を引き継げます。</p>
       <p><strong>部品を探す：</strong>部品一覧の「探す…」から、名前・種類を部分一致で検索できます。結果を選んで「選択へ」を押すと部品を選択し、画面もその部品へ移動します。検索はモデルやUndo履歴を変更しません。</p>
       <p><strong>部品名：</strong>「名前・接続先」の「部品名…」で設定・解除できます。名前は大文字で保存され、一覧とスクリプトで使えます。変更・解除してもソース内の参照は書き換えません。コピー・反転した枝には、重複しない別名を付けます。</p>
       <p><strong>枝の移動：</strong>部品を選び「名前・接続先」を開いて「枝を移動…」を押すと、子ごと別の親・方向へ移せます。名前は保たれますが、部品番号や姿勢が変わる場合があります。スクリプトの番号参照は自動では直しません。</p>

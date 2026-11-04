@@ -16,12 +16,14 @@ try {
  await page.click('#build');
  const frames=await page.evaluate(()=>window.__sim.recording.frames);
  await page.click('#share-model');
- await page.waitForFunction(()=>document.getElementById('share-url').value.includes('&r='));
+ // the model alone by default; ticking the run adds it to the link
+ await page.waitForFunction(()=>document.getElementById('share-url').value.includes('#m='));
  assert.equal(await page.isVisible('#share-run'),true);
- assert.equal(await page.isChecked('#share-run'),true);
+ assert.equal(await page.isChecked('#share-run'),false);
+ assert.equal((await page.inputValue('#share-url')).includes('&r='),false);
+ await page.check('#share-run');
+ await page.waitForFunction(()=>document.getElementById('share-url').value.includes('&r='));
  const url=await page.inputValue('#share-url');
- // unchecking drops the run from the link
- await page.uncheck('#share-run'); await page.waitForFunction(()=>{const v=document.getElementById('share-url').value;return v&&!v.includes('&r=');});
  const trace=await page.evaluate(()=>window.__trace);
  const page2=await browser.newPage();
  await page2.goto(url); await page2.waitForFunction(()=>window.__sim);
@@ -38,5 +40,5 @@ try {
  await page3.goto(url); await page3.waitForFunction(()=>window.__sim?.replaying);
  await page3.focus('#view'); await page3.keyboard.down('ArrowDown');
  await page3.waitForFunction(()=>!window.__sim.replaying); await page3.keyboard.up('ArrowDown');
- console.log(`Replay: ${frames}-frame run in the link (${url.length} chars), ${compared} frames identical in a new page, unchecking drops it, a key takes over pass`);
+ console.log(`Replay: ${frames}-frame run in the link (${url.length} chars), ${compared} frames identical in a new page, off by default, a key takes over pass`);
 }finally{await browser.close();}
