@@ -193,7 +193,8 @@ and the comparison tools against the original under `tools/orig-harness/`.
 
 The live site (snaptiles.toming.app only) loads Cloudflare Web Analytics to count visits: no cookies, no personal
 data. Nothing collects models, runs or challenge results; personal bests stay in the browser's local storage, and
-share and record links carry their data in the URL.
+share and record links carry their data in the URL fragment, which the beacon does not send (its payload's
+`location` is the page URL without `#…`; checked 2026-11-04).
 
 ## License
 
