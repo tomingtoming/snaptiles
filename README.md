@@ -189,6 +189,12 @@ Optional checks with models kept outside this repository:
 `bun run tools/editor-corpus.ts <model-directory>` (parsing, assembly and reversible edits)
 and the comparison tools against the original under `tools/orig-harness/`.
 
+## Privacy
+
+The live site (snaptiles.toming.app only) loads Cloudflare Web Analytics to count visits: no cookies, no personal
+data. Nothing collects models, runs or challenge results; personal bests stay in the browser's local storage, and
+share and record links carry their data in the URL.
+
 ## License
 
 AGPL-3.0-or-later.

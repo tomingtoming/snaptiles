@@ -14,6 +14,14 @@ import { SAMPLES } from './samples';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('view');
+// Cloudflare Web Analytics (no cookies, no personal data), on the production host only: local runs and tests stay out
+if (location.hostname === 'snaptiles.toming.app') {
+  const beacon = document.createElement('script');
+  beacon.defer = true;
+  beacon.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+  beacon.dataset.cfBeacon = JSON.stringify({ token: 'c7f0e1e7c1374cacacd923e51e765def' });
+  document.head.append(beacon);
+}
 const sourceEl = $<HTMLTextAreaElement>('source');
 const statusEl = $('status');
 const valsEl = $('vals');
