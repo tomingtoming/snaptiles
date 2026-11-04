@@ -23,6 +23,8 @@ if (location.hostname === 'snaptiles.toming.app') {
   document.head.append(beacon);
 }
 const sourceEl = $<HTMLTextAreaElement>('source');
+/** `?bare`: no course blocks or crates (measurement probes) */
+const BARE = new URLSearchParams(location.search).has('bare');
 const statusEl = $('status');
 const valsEl = $('vals');
 const outEl = $('out');
@@ -82,7 +84,7 @@ async function seekTo(frame: number, timeline: Recording): Promise<void> {
   const current = sim;
   if (!current) return;
   const request = loadGeneration;
-  const next = new (await rustSimulation)(current.source, keys, current.scenario);
+  const next = new (await rustSimulation)(current.source, keys, { scenario: current.scenario, bare: current.bare });
   await next.start();
   next.player = timeline;
   for (let i = 0; i < frame; i++) next.step();
@@ -117,7 +119,7 @@ async function load(source: string, request: number, player: Recording | null = 
     if (old) await old.dispose();
     if (request !== loadGeneration) return false;
     const t0 = performance.now();
-    const made = new (await rustSimulation)(source, keys, challenge.active);
+    const made = new (await rustSimulation)(source, keys, { scenario: challenge.active, bare: BARE });
     next = made;
     const t1 = performance.now();
     await next.start();

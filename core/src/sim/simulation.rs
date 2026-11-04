@@ -468,6 +468,11 @@ impl Simulation {
         self.with_rng(|| self.state.borrow_mut().call_api(name, &a).num())
     }
 
+    /// one script API call with any arguments, under this simulation's `_RND` state
+    pub fn api_call(&self, name: &str, args: &[Arg]) -> Ret {
+        self.with_rng(|| self.state.borrow_mut().call_api(name, args))
+    }
+
     /// the Lua block's own globals and their values (the page's watch list)
     pub fn lua_watch(&self) -> Vec<(String, String)> {
         self.lua.watch()

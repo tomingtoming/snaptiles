@@ -8,10 +8,9 @@ import { SAMPLES } from '../src/samples';
 // with key presses, a reset, a ball and wind among the inputs.
 describe('recordings', () => {
   it('replay a run exactly after encoding', async () => {
-    (globalThis as unknown as { __tune?: unknown }).__tune = { noCourse: true };
     const car = SAMPLES.find((s) => s.name === 'car')!.source;
     const keys = new KeyState(new EventTarget());
-    const live = new RustSimulation(car, keys);
+    const live = new RustSimulation(car, keys, { bare: true });
     const trace: string[] = [];
     const snap = (s: RustSimulation) => JSON.stringify([s.corePosition().toArray(), [...s.vals.values()].map((v) => v.value), s.out]);
     try {
@@ -28,7 +27,7 @@ describe('recordings', () => {
       }
       const code = await encodeRecording(live.recording);
       expect(code.length).toBeLessThan(400);
-      const replay = new RustSimulation(car, new KeyState(new EventTarget()));
+      const replay = new RustSimulation(car, new KeyState(new EventTarget()), { bare: true });
       try {
         await replay.start();
         replay.player = await decodeRecording(code);
@@ -42,7 +41,6 @@ describe('recordings', () => {
       } finally { await replay.dispose(); }
     } finally {
       await live.dispose();
-      (globalThis as unknown as { __tune?: unknown }).__tune = undefined;
     }
   }, 30000);
 });

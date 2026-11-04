@@ -5,13 +5,11 @@ const [spec, ...files] = process.argv.slice(2);
 const [codes, ms = '4000'] = spec.split(':');
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
-await page.goto('http://127.0.0.1:5173/', { waitUntil: 'networkidle' });
+await page.goto('http://127.0.0.1:5173/?bare', { waitUntil: 'networkidle' });
 for (const f of files) {
   const buf = readFileSync(f);
   let text = new TextDecoder('utf-8', { fatal: false }).decode(buf);
   if (/�/.test(text)) text = new TextDecoder('shift_jis').decode(buf);
-  // bare ground by default: the course's wall 40 m south is reached within the 4 s probe by fast cars
-  await page.evaluate((c) => { window.__tune = c; }, { noCourse: true, ...JSON.parse(process.env.TUNE ?? '{}') });
   await page.fill('#source', text);
   await page.click('#run');
   await page.waitForTimeout(1500);
@@ -22,7 +20,7 @@ for (const f of files) {
   const r = await page.evaluate(() => {
     const s = window.__sim; const tb = s.physics.tiles[0]; const p = s.physics.pose(tb);
     const q = p.quaternion; const upY = 1 - 2 * (q.x * q.x + q.z * q.z);
-    const v = s.physics.velocity(tb, p);
+    const v = s.physics.velocity(tb);
     return { x: p.position.x, y: p.position.y, z: p.position.z, upY: +upY.toFixed(2), kmh: +(v.length() * 3.6).toFixed(1), err: s.scriptError ?? '' };
   });
   for (const c of codes.split('+')) await page.keyboard.up(c);
@@ -30,7 +28,7 @@ for (const f of files) {
     await page.waitForTimeout(Number(process.env.TAIL));
     const r2 = await page.evaluate(() => {
       const s = window.__sim; const tb = s.physics.tiles[0]; const p = s.physics.pose(tb); const q = p.quaternion;
-      return { upY: +(1 - 2 * (q.x * q.x + q.z * q.z)).toFixed(2), y: p.position.y, kmh: +(s.physics.velocity(tb, p).length() * 3.6).toFixed(1) };
+      return { upY: +(1 - 2 * (q.x * q.x + q.z * q.z)).toFixed(2), y: p.position.y, kmh: +(s.physics.velocity(tb).length() * 3.6).toFixed(1) };
     });
     r.upY = r2.upY; r.y = r2.y; r.kmh = r2.kmh;
   }

@@ -12,7 +12,7 @@ try {
  const check=await page.evaluate(()=>{
    const scene=window.__scene; scene.group.updateMatrixWorld(true);
    let bottom=Infinity, extent=0;
-   scene.group.traverse(mesh=>{
+   scene.group.traverse(/** @param {any} mesh */ mesh=>{
      if(!mesh.geometry)return;
      mesh.geometry.computeBoundingBox(); const b=mesh.geometry.boundingBox;
      for(const x of [b.min.x,b.max.x]) for(const y of [b.min.y,b.max.y]) for(const z of [b.min.z,b.max.z]) {

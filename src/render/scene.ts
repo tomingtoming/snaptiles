@@ -116,7 +116,8 @@ export class SceneView {
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
   camera: THREE.PerspectiveCamera;
-  private selectedId: number | null = null;
+  /** read by the browser probes (tools/) */
+  selectedId: number | null = null;
   private directionOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   private directionMarks = ['N', 'W', 'E', 'S'].map((dir) => {
     const group = document.createElementNS(this.directionOverlay.namespaceURI, 'g');
@@ -131,16 +132,20 @@ export class SceneView {
   });
   /** Set by the editor: clicking an N/W/E/S mark adds there, like the panel's edge buttons. */
   onDirectionPick?: (dir: 'N' | 'W' | 'E' | 'S') => void;
-  private selectionBox: THREE.BoxHelper | null = null;
-  private views = new Map<number, TileView>();
+  /** read by the browser probes (tools/) */
+  selectionBox: THREE.BoxHelper | null = null;
+  /** read by the browser probes (tools/) */
+  views = new Map<number, TileView>();
   private plateGeo = new THREE.BoxGeometry(TILE, TILE_T, TILE);
   // a tyre is drawn as a short cylinder (0.12 m wide) with a pale spoke; the physics sphere has the same radius
   private wheelGeo = new THREE.CylinderGeometry(TILE / 2, TILE / 2, TILE * 0.2, 24);
   private spokeGeo = new THREE.BoxGeometry(TILE * 0.8, TILE * 0.22, TILE * 0.12);
   private spokeMat = new THREE.MeshStandardMaterial({ color: 0xd0d4d8, roughness: 0.6 });
   private cowlGeos = new Map<string, THREE.BufferGeometry>();
-  private group = new THREE.Group();
-  private lines: THREE.LineSegments;
+  /** read by the browser probes (tools/) */
+  group = new THREE.Group();
+  /** read by the browser probes (tools/) */
+  lines: THREE.LineSegments;
   private linesGeo = new THREE.BufferGeometry();
   camYaw = 0.6;
   camPitch = 0.35;
@@ -541,7 +546,8 @@ export class SceneView {
   }
 
   private spinQuat = new THREE.Quaternion();
-  private shellPool: THREE.Mesh[] = [];
+  /** read by the browser probes (tools/) */
+  shellPool: THREE.Mesh[] = [];
   private shellGeo = new THREE.SphereGeometry(0.18, 12, 8);
   private shellMat = new THREE.MeshStandardMaterial({ color: 0xffc040, emissive: 0xff7000, emissiveIntensity: 1.2 });
   syncProjectiles(list: { body: { translation(): { x: number; y: number; z: number } } }[]): void {

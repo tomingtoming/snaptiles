@@ -254,26 +254,35 @@ pub extern "C" fn core_tile_body_mass(id: u32, tile: u32) -> f64 {
     })
 }
 
-/// Ad-hoc script API call (`sim.api()[name](...)`) with up to six numeric arguments (`argc` of them); for probes and
-/// tests, never per frame. A string result reads NaN.
+/// Ad-hoc script API call (`sim.api()[name](...)`) for probes, tests and the page's tools, never per frame. `args` is
+/// UTF-8: each argument `n<number>` or `s<text>`, joined with U+001F; the result comes back the same way (`n…`/`s…`).
 ///
 /// # Safety
-/// `name` must point to `len` readable bytes.
-#[allow(clippy::too_many_arguments)]
+/// `name` must point to `len` readable bytes and `args` to `args_len`.
 #[no_mangle]
-pub unsafe extern "C" fn core_api(id: u32, name: *const u8, len: usize, argc: u32, a0: f64, a1: f64, a2: f64, a3: f64, a4: f64, a5: f64) -> f64 {
+pub unsafe extern "C" fn core_api(id: u32, name: *const u8, len: usize, args: *const u8, args_len: usize) -> *const u8 {
     let name = text_in(name, len);
-    with_slot(id, 0.0, |slot| {
-        let Some(sim) = slot.sim.as_mut() else { return 0.0 };
-        let all = [a0, a1, a2, a3, a4, a5];
-        let args: Vec<Arg> = all[..(argc as usize).min(6)].iter().map(|&x| Arg::Num(x)).collect();
-        let r = match sim.state_mut().call_api(&name, &args) {
-            Ret::Num(x) => x,
-            Ret::Str(_) => f64::NAN,
+    let text = text_in(args, args_len);
+    let args: Vec<Arg> = if text.is_empty() {
+        Vec::new()
+    } else {
+        text.split(TEXT_SEP)
+            .map(|a| match a.split_at(a.len().min(1)) {
+                ("s", rest) => Arg::Str(rest.to_string()),
+                (_, rest) => Arg::Num(rest.parse::<f64>().unwrap_or(f64::NAN)),
+            })
+            .collect()
+    };
+    let out = with_slot(id, "n0".to_string(), |slot| {
+        let Some(sim) = slot.sim.as_ref() else { return "n0".to_string() };
+        let r = match sim.api_call(&name, &args) {
+            Ret::Num(x) => format!("n{}", crate::js::number_to_string(x)),
+            Ret::Str(s) => format!("s{s}"),
         };
         refresh(slot);
         r
-    })
+    });
+    text_out(&out)
 }
 
 /// Separator between the records of [`core_lua_watch`] (U+001E); a record's fields are split by [`TEXT_SEP`].

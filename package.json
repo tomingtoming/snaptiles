@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:core": "powershell -ExecutionPolicy Bypass -File core/build-wasm.ps1",
-    "test": "vitest run",
+    "test": "tsc -p tools && vitest run",
+    "check:tools": "tsc -p tools",
     "preview": "vite preview",
     "test:plane": "node tools/editor-ci.mjs plane-control-probe.mjs editor-plane-build-probe.mjs",
     "test:editor:scale": "node tools/editor-ci.mjs editor-scale-probe.mjs",
@@ -22,6 +23,7 @@
     "three": "^0.186.1"
   },
   "devDependencies": {
+    "@types/node": "^26.6.6",
     "@types/three": "^0.186.0",
     "playwright": "^1.59.0",
     "typescript": "^5.9.2",

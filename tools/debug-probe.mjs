@@ -21,7 +21,7 @@ try {
  await page.fill('#source',MODEL); await page.focus('#source'); await page.keyboard.press('Control+Enter');
  await page.waitForFunction(()=>window.__sim?.model.script);
  // a trace of the core position by frame, kept across simulation swaps (rewind)
- await page.evaluate(()=>{window.__trace={};const wrap=()=>{const s=window.__sim;if(!s||s.__wrapped)return;s.__wrapped=true;const step=s.step.bind(s);s.step=()=>{step();if(!(s.frame in window.__trace))window.__trace[s.frame]=s.corePosition().toArray().join(',');};};setInterval(wrap,5);wrap();});
+ await page.evaluate(()=>{window.__trace={};const wrap=()=>{const s=/** @type {any} */(window.__sim);if(!s||s.__wrapped)return;s.__wrapped=true;const step=s.step.bind(s);s.step=()=>{step();if(!(s.frame in window.__trace))window.__trace[s.frame]=s.corePosition().toArray().join(',');};};setInterval(wrap,5);wrap();});
  await page.focus('#view'); await page.keyboard.down('ArrowUp');
  await page.waitForFunction(()=>window.__sim.frame>=60); await page.keyboard.up('ArrowUp');
  await page.click('#debug-toggle');

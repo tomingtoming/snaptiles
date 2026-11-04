@@ -8,10 +8,9 @@ the probes take file paths.
 |---|---|
 | `shot.mjs <url> <prefix> [@sample] [--file=path] [keys…]` | screenshots after holding keys (`ArrowUp:1500`, chords `ArrowUp+ArrowLeft:1500`) |
 | `dump.mjs <url> [@sample] [keys…]` / `dump-file.mjs <url> <file> [type] [keys]` | per-tile rest/world poses and normals |
-| `drive-probe.mjs <keys:ms> <file…>` | holds keys, reports distance / speed / upright (`TUNE` json env, `TAIL` ms) |
+| `drive-probe.mjs <keys:ms> <file…>` | holds keys on bare ground (`?bare`), reports distance / speed / upright (`TAIL` ms) |
 | `track-probe.mjs <file> <keys> [samples]` | core pose every 250 ms while keys are held |
 | `delta-probe.mjs <file> <phase1> <phase2> <expr>` | evaluates an expression before/after adding keys (control response signs) |
-| `tune-probe.mjs <idleMs> <file…>` | sweeps `_AX/_AZ/_W*` sign conventions against self-balancing models |
 | `foldsign.ts <file…>` (bun) | scores the 64 joint-sign conventions by wheels at ground level, at rest |
 | `restdump.ts` / `lowest.ts` (bun) | rest-pose heights, lowest tiles |
 | `census.ts` (bun) | which sides children attach to on triangle cowls |
@@ -31,5 +30,5 @@ TypeScript `drive-compare`, `geom-compare`, `orig-compare`, `step-compare` and `
 | `--bin orig_compare -- <model> <out.csv> [--allwheels] [--power=] [--on=] [--off=] [--self] [--nocourse] [--key=N:a:b] [--turn\|--wheels\|--arm\|--fuel\|--chips6\|--chips10]` | the original-exe harness: forces ENGINE, dumps the rest pose at frame 30 and the per-frame state in the original's columns |
 | `--features tools --bin terrain -- <scene\|all> <dir>` / `-- step <out.csv> --h=0.10` | terrain probes of `orig-harness/terrains.json` and the step probe, for `terraindiff.py` / `stepdiff.py` |
 
-The physics keeps no runtime knobs: `window.__tune` is read only for `noCourse` (bare ground). Probes that still pass
-other `TUNE` knobs (`drive-probe.mjs`, `tune-probe.mjs`) date from the TypeScript core and now measure the defaults.
+The physics keeps no runtime knobs. The page's `?bare` query drops the course blocks and crates (bare ground) for
+measurement probes; tests pass `{ bare: true }` to `RustSimulation`.

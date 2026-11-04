@@ -13,8 +13,8 @@ await page.click('#run');
 await page.waitForTimeout(6500);
 const state = () => page.evaluate(() => {
   const sim = window.__sim;
-  const arms = sim.physics.tiles.filter((t) => t.tile.type === 'arm').map((t) => ({ i: t.tile.chipIndex, e: sim.physics.armCharge.get(t.tile.id) ?? 0, opt: t.tile.option }));
-  return { tick: sim.physics.tick, shells: sim.physics.projectiles.length, arms: arms.slice(0, 3), status: document.getElementById('status').textContent, out: document.getElementById('out').textContent.slice(0, 120) };
+  const arms = sim.physics.tiles.filter((t) => t.tile.type === 'arm').map((t) => ({ i: t.tile.chipIndex, opt: t.tile.option }));
+  return { tick: sim.ticks, shells: sim.physics.projectiles.length, arms: arms.slice(0, 3), status: document.getElementById('status').textContent, out: document.getElementById('out').textContent.slice(0, 120) };
 });
 console.log('before', JSON.stringify(await state()));
 for (const spec of keys) {

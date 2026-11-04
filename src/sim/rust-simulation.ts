@@ -96,6 +96,11 @@ class RustPhysics implements PhysicsView {
   }
 }
 
+export interface SimOptions {
+  scenario?: Scenario | null;
+  bare?: boolean;
+}
+
 export class RustSimulation implements SimView {
   readonly core = 'rust' as const;
   model: RcModel;
@@ -124,8 +129,14 @@ export class RustSimulation implements SimView {
   /** the breakpoint snapshot of the last step, if one was hit: its file line and the locals there */
   breakHit: { line: number; locals: [string, string][] } | null = null;
 
+  readonly scenario: Scenario | null;
+  /** bare ground: no course blocks or crates (tests, measurements; the page's `?bare`) */
+  readonly bare: boolean;
+
   /** a challenge's course replaces the default course (and, when it brings one, the ground) */
-  constructor(readonly source: string, private keys: KeyState, readonly scenario: Scenario | null = null) {
+  constructor(readonly source: string, private keys: KeyState, options: SimOptions = {}) {
+    this.scenario = options.scenario ?? null;
+    this.bare = options.bare ?? false;
     this.model = parseRc(source);
     this.physics = new RustPhysics(this, () => this.freeCore());
     this.physics.wind.onSet = (x, y, z) => this.command({ frame: this.frame, kind: 'wind', args: [x || 0, y || 0, z || 0] });
@@ -161,9 +172,8 @@ export class RustSimulation implements SimView {
     const bytes = new TextEncoder().encode(this.source);
     const ptr = m._malloc(Math.max(1, bytes.length));
     m.HEAPU8.set(bytes, ptr);
-    const noCourse = (globalThis as unknown as { __tune?: { noCourse?: boolean } }).__tune?.noCourse ?? false;
     const sc = this.scenario;
-    const code = m._core_load(this.id, ptr, bytes.length, (noCourse || sc ? 1 : 0) | (sc?.ground ? 2 : 0));
+    const code = m._core_load(this.id, ptr, bytes.length, (this.bare || sc ? 1 : 0) | (sc?.ground ? 2 : 0));
     m._free(ptr);
     if (code !== 0) throw new Error(m.UTF8ToString(m._core_error(this.id)) || 'model failed to load');
     for (const solid of [...(sc?.ground ?? []), ...(sc?.solids ?? [])]) {
@@ -405,21 +415,34 @@ export class RustSimulation implements SimView {
     return v ? new THREE.Vector3(v.x, v.y, v.z) : new THREE.Vector3();
   }
 
-  /** the script API for probes and tests (`api()._KEY(0)`): numeric arguments only, one core call each */
-  api(): Record<ApiName, (...args: number[]) => number> {
-    return new Proxy({} as Record<ApiName, (...args: number[]) => number>, {
-      get: (_t, name) => (...args: number[]) => {
-        const m = this.m;
-        if (!m || this.id < 0 || typeof name !== 'string') return 0;
-        this.pushInput();
-        const bytes = new TextEncoder().encode(name);
-        const ptr = m._malloc(Math.max(1, bytes.length));
-        m.HEAPU8.set(bytes, ptr);
-        const a = args.map(Number);
-        const r = m._core_api(this.id, ptr, bytes.length, Math.min(6, a.length), a[0] ?? 0, a[1] ?? 0, a[2] ?? 0, a[3] ?? 0, a[4] ?? 0, a[5] ?? 0);
-        m._free(ptr);
-        this.read();
-        return r;
+  /** one script API call (probes, tests, tools; never per frame): numbers and strings in, a number or a string out */
+  apiValue(name: ApiName, ...args: (number | string)[]): number | string {
+    const m = this.m;
+    if (!m || this.id < 0) return 0;
+    this.pushInput();
+    const put = (text: string): [number, number] => {
+      const bytes = new TextEncoder().encode(text);
+      const ptr = m._malloc(Math.max(1, bytes.length));
+      m.HEAPU8.set(bytes, ptr);
+      return [ptr, bytes.length];
+    };
+    const [namePtr, nameLen] = put(name);
+    const [argsPtr, argsLen] = put(args.map((a) => (typeof a === 'string' ? `s${a}` : `n${a}`)).join(TEXT_SEP));
+    const r = m.UTF8ToString(m._core_api(this.id, namePtr, nameLen, argsPtr, argsLen));
+    m._free(namePtr);
+    m._free(argsPtr);
+    this.read();
+    return r.startsWith('s') ? r.slice(1) : Number(r.slice(1));
+  }
+
+  /** the script API as an object (`api()._GET(0, 'ANGLE')`): numbers and strings in, numbers out (a text result is NaN;
+   *  `apiValue` keeps it) */
+  api(): Record<ApiName, (...args: (number | string)[]) => number> {
+    return new Proxy({} as Record<ApiName, (...args: (number | string)[]) => number>, {
+      get: (_t, name) => (...args: (number | string)[]) => {
+        if (typeof name !== 'string') return 0;
+        const r = this.apiValue(name as ApiName, ...args);
+        return typeof r === 'number' ? r : Number.NaN;
       },
     });
   }

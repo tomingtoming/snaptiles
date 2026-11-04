@@ -21,8 +21,7 @@ end
 
 describe('the decoded state buffer agrees with the core', () => {
   it('tiles, header, Vals, out rows, lines, balls and wind', async () => {
-    (globalThis as unknown as { __tune?: unknown }).__tune = { noCourse: true };
-    const sim = new RustSimulation(MODEL, new KeyState(new EventTarget()));
+    const sim = new RustSimulation(MODEL, new KeyState(new EventTarget()), { bare: true });
     try {
       await sim.start();
       for (let i = 0; i < 20; i++) sim.step();
@@ -57,7 +56,6 @@ describe('the decoded state buffer agrees with the core', () => {
       expect(sim.physics.balls[0].body.translation().y).toBeLessThan(6);
     } finally {
       await sim.dispose();
-      (globalThis as unknown as { __tune?: unknown }).__tune = undefined;
     }
   }, 20000);
 });

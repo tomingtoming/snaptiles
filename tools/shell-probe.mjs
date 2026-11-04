@@ -17,7 +17,7 @@ for (let i = 0; i < 12; i++) {
     const arm = s.physics.tiles.find((t) => t.tile.type === 'arm');
     const pose = s.physics.pose(arm); const q = pose.quaternion;
     const n = [2 * (q.x * q.y - q.w * q.z), 1 - 2 * (q.x * q.x + q.z * q.z), 2 * (q.y * q.z + q.w * q.x)].map((v) => +v.toFixed(2));
-    return { tick: s.physics.tick, charge: s.physics.armCharge.get(arm.tile.id), P: s.vals.get('P').value, armPos: [pose.position.x, pose.position.y, pose.position.z].map((v) => +v.toFixed(2)), n, shells: s.physics.projectiles.map((p) => { const t = p.body.translation(); return [+t.x.toFixed(1), +t.y.toFixed(1), +t.z.toFixed(1)]; }) };
+    return { tick: s.ticks, P: s.vals.get('P').value, armPos: [pose.position.x, pose.position.y, pose.position.z].map((v) => +v.toFixed(2)), n, shells: s.physics.projectiles.map((p) => { const t = p.body.translation(); return [+t.x.toFixed(1), +t.y.toFixed(1), +t.z.toFixed(1)]; }) };
   })));
 }
 await page.keyboard.up(key);

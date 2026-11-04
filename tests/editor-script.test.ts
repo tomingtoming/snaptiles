@@ -43,9 +43,8 @@ describe('Lua errors name the file line', () => {
   it.each([['Lua {\n', 5], ['Lua\n{\n', 6]])('with the section opened as %j', async (open, line) => {
     const { RustSimulation } = await import('../src/sim/rust-simulation');
     const { KeyState } = await import('../src/input/keys');
-    (globalThis as unknown as { __tune?: unknown }).__tune = { noCourse: true };
     const src = `${BODY}${open}function OnFrame()\n  P = nosuch.field\nend\n}\n`;
-    const sim = new RustSimulation(src, new KeyState(new EventTarget()));
+    const sim = new RustSimulation(src, new KeyState(new EventTarget()), { bare: true });
     try {
       await sim.start(); sim.step();
       expect(sim.scriptError).toMatch(new RegExp(`line ${line}:`));

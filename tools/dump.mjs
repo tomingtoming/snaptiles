@@ -38,7 +38,6 @@ const rows = await page.evaluate(() => {
       rest: [rest.x, rest.y, rest.z].map((v) => +v.toFixed(2)),
       pos: [p.x, p.y, p.z].map((v) => +v.toFixed(2)),
       normal: [x, y, z].map((v) => +v.toFixed(2)),
-      joint: tb.joint ? (typeof tb.joint.angle === "function" ? +tb.joint.angle().toFixed(2) : "n/a") : null,
     });
   }
   return { out, vals: document.getElementById('vals')?.textContent, status: document.getElementById('status')?.textContent };

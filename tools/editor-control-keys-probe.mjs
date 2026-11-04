@@ -17,7 +17,7 @@ try{
  await page.click('#run');await page.waitForFunction(()=>window.__sim?.assembly?.tiles.length===7);
  const names=['ST_STEER_1','ST_STEER_2','ST_STEER_3','ST_POWER_1'];
  const values=()=>page.evaluate(names=>names.map(n=>window.__sim.env(n)),names);
- for(const [key,expected] of [['ArrowUp',[0,-25,0,0]],['ArrowRight',[30,0,0,0]],['a',[0,0,-30,0]],['z',[0,0,0,3000]]]){
+ for(const [key,expected] of /** @type {[string, number[]][]} */([['ArrowUp',[0,-25,0,0]],['ArrowRight',[30,0,0,0]],['a',[0,0,-30,0]],['z',[0,0,0,3000]]])){
   await page.keyboard.down(key);await page.waitForFunction(({names,expected})=>names.every((n,i)=>window.__sim.env(n)===expected[i]),{names,expected});
   await page.keyboard.up(key);await page.waitForFunction(names=>names.every(n=>window.__sim.env(n)===0),names);
  }

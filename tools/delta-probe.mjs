@@ -9,7 +9,6 @@ if (/�/.test(text)) text = new TextDecoder('shift_jis').decode(buf);
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 640, height: 480 } });
 await page.goto('http://127.0.0.1:5173/', { waitUntil: 'networkidle' });
-if (process.env.TUNE) await page.evaluate((c) => { window.__tune = c; }, JSON.parse(process.env.TUNE));
 await page.fill('#source', text);
 await page.click('#run');
 await page.waitForTimeout(1200);
