@@ -4,6 +4,8 @@ import { BuildPanel } from './editor/panel';
 import { SceneView } from './render/scene';
 import { KeyState, KEY_TABLE } from './input/keys';
 import type { SimView } from './sim/sim-view';
+import type { RustSimulation } from './sim/rust-simulation';
+import { decodeRecording, decodeText, encodeRecording, encodeText, type Recording } from './sim/replay';
 import { Sfx } from './audio/sfx';
 import { SAMPLES } from './samples';
 
@@ -36,7 +38,7 @@ let lastShells = 0;
 let lastCoreVel: { x: number; y: number; z: number } | null = null;
 const crateVel: ({ x: number; y: number; z: number } | null)[] = [];
 const scene = new SceneView(canvas);
-let sim: SimView | null = null;
+let sim: RustSimulation | null = null;
 let loadGeneration = 0;
 let builder: BuildPanel;
 let keyCaps: { el: HTMLElement; n: number }[] = [];
@@ -45,7 +47,7 @@ let keyCaps: { el: HTMLElement; n: number }[] = [];
 // only awaits settled promises (microtasks)
 const rustSimulation = import('./sim/rust-simulation').then((m) => { void m.loadRustCore(); return m.RustSimulation; });
 
-async function load(source: string, request: number): Promise<boolean> {
+async function load(source: string, request: number, player: Recording | null = null): Promise<boolean> {
   if (request !== loadGeneration) return false;
   const focusBeforeLoad = document.activeElement;
   builder?.close();
@@ -59,17 +61,18 @@ async function load(source: string, request: number): Promise<boolean> {
   (window as unknown as { __sim: SimView | null }).__sim = null;
   scene.clearModel();
   hudCtx.clearRect(0, 0, hud.width, hud.height);
-  let next: SimView | null = null;
+  let next: RustSimulation | null = null;
   try {
     if (old) await old.dispose();
     if (request !== loadGeneration) return false;
     const t0 = performance.now();
-    const made: SimView = new (await rustSimulation)(source, keys);
+    const made = new (await rustSimulation)(source, keys);
     next = made;
     const t1 = performance.now();
     await next.start();
     if (request !== loadGeneration) { await next.dispose(); return false; }
     const t2 = performance.now();
+    next.player = player; // a shared run replays from the first step
     sim = next;
     (window as unknown as { __sim: SimView }).__sim = next;
     scene.rebuild(next.assembly!.tiles, next.env);
@@ -340,6 +343,8 @@ function frame(now: number): void {
     const FIXED = sim.frameDt();
     let n = 0;
     if (paused) acc = 0;
+    // a key held during a replay takes the run over from there (it keeps recording)
+    if (sim.replaying && keys.anyDown()) sim.player = null;
     while (acc >= FIXED && n < 4) {
       sim.step();
       acc -= FIXED;
@@ -420,6 +425,20 @@ function drawHud(buf: number[], s: SimView): void {
     hudCtx.textBaseline = 'middle';
     hudCtx.fillStyle = 'rgba(255,255,255,0.7)';
     hudCtx.fillText('\u23F8', w / 2, h / 2);
+  }
+  if (sim?.replaying && sim.player) {
+    const size = Math.max(12, Math.round(h / 30));
+    hudCtx.font = `${size}px system-ui, sans-serif`;
+    hudCtx.textAlign = 'left';
+    hudCtx.textBaseline = 'top';
+    const text = `\u25B6 リプレイ ${(sim.frame / 30).toFixed(1)} / ${(sim.player.frames / 30).toFixed(1)} s ・ キーで操作を引き継ぐ`;
+    const width = hudCtx.measureText(text).width + 16;
+    hudCtx.fillStyle = 'rgba(16,20,24,0.62)';
+    hudCtx.beginPath();
+    hudCtx.roundRect(12, 12, width, size + 12, 8);
+    hudCtx.fill();
+    hudCtx.fillStyle = '#fff';
+    hudCtx.fillText(text, 20, 18);
   }
   // the original's dials: speed in km/h and altitude in m (the compass is the camera's job here)
   const core = s.physics.tiles[0];
@@ -502,23 +521,31 @@ const shareStatus = $('share-status');
 const copyLink = $<HTMLButtonElement>('copy-link');
 let shareGeneration = 0;
 shareDialog.addEventListener('close', () => { ++shareGeneration; });
-$('share-model').addEventListener('click', async () => {
+const shareRun = $<HTMLInputElement>('share-run');
+const shareRunRow = $('share-run-row');
+async function makeShareLink(): Promise<void> {
   const text = sourceEl.value;
   const request = ++shareGeneration;
   shareUrl.value = ''; copyLink.disabled = true;
   shareStatus.textContent = 'リンクを作成しています…';
-  shareDialog.showModal();
+  // the run can travel only with the model it was driven on
+  const run = sim && sim.source === text && sim.recording.frames > 0 ? sim.recording : null;
+  shareRunRow.hidden = !run;
+  if (run) $('share-run-length').textContent = (run.frames / 30).toFixed(1);
   try {
     if (!parseRc(text).body) throw new Error('Body がありません');
     const hash = await encodeHash(text);
+    const recording = run && shareRun.checked ? await encodeRecording(run) : null;
     if (request !== shareGeneration || !shareDialog.open) return;
-    const url = new URL(location.href); url.hash = `m=${hash}`;
+    const url = new URL(location.href); url.hash = `m=${hash}${recording ? `&r=${recording}` : ''}`;
     shareUrl.value = url.href; copyLink.disabled = false;
     shareStatus.textContent = ''; shareUrl.focus(); shareUrl.select();
   } catch (error) {
     if (request === shareGeneration && shareDialog.open) shareStatus.textContent = `リンクを作れませんでした: ${error instanceof Error ? error.message : String(error)}`;
   }
-});
+}
+$('share-model').addEventListener('click', () => { shareDialog.showModal(); void makeShareLink(); });
+shareRun.addEventListener('change', () => void makeShareLink());
 copyLink.addEventListener('click', async () => {
   const request = shareGeneration;
   copyLink.disabled = true;
@@ -532,26 +559,8 @@ copyLink.addEventListener('click', async () => {
     }
   } finally { if (request === shareGeneration) copyLink.disabled = false; }
 });
-async function encodeHash(text: string): Promise<string> {
-  const cs = new CompressionStream('deflate-raw');
-  const w = cs.writable.getWriter();
-  void w.write(new TextEncoder().encode(text));
-  void w.close();
-  const bytes = new Uint8Array(await new Response(cs.readable).arrayBuffer());
-  let bin = '';
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-async function decodeHash(h: string): Promise<string> {
-  const b64 = h.replace(/-/g, '+').replace(/_/g, '/');
-  const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
-  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
-  const ds = new DecompressionStream('deflate-raw');
-  const w = ds.writable.getWriter();
-  void w.write(bytes);
-  void w.close();
-  return new TextDecoder().decode(await new Response(ds.readable).arrayBuffer());
-}
+const encodeHash = encodeText;
+const decodeHash = decodeText;
 async function publishHash(text: string, request: number): Promise<void> {
   const sample = SAMPLES.find((s) => s.source === text);
   const h = sample ? `#${sample.name}` : `#m=${await encodeHash(text)}`;
@@ -564,14 +573,20 @@ const loadAndShare = async (text: string, request = ++loadGeneration) => {
 
 async function boot(): Promise<void> {
   const request = ++loadGeneration;
-  const h = location.hash.slice(1);
+  // #m=<model>[&r=<run>] or #<sample>[&r=<run>]
+  const [h, runCode] = location.hash.slice(1).split('&r=');
+  let player: Recording | null = null;
+  if (runCode) {
+    try { player = await decodeRecording(runCode); } catch { player = null; }
+    if (request !== loadGeneration) return;
+  }
   if (h.startsWith('m=')) {
     try {
       const text = await decodeHash(h.slice(2));
       if (request !== loadGeneration) return;
       builder.loadSource(text);
       refreshSampleButtons();
-      await load(text, request);
+      await load(text, request, player);
       return;
     } catch {
       /* fall through to the sample */
@@ -581,7 +596,8 @@ async function boot(): Promise<void> {
   const idx = Math.max(0, SAMPLES.findIndex((s) => s.name === h));
   builder.loadSource(SAMPLES[idx].source);
   refreshSampleButtons();
-  await loadAndShare(SAMPLES[idx].source, request);
+  if (player) await load(SAMPLES[idx].source, request, player);
+  else await loadAndShare(SAMPLES[idx].source, request);
 }
 builder = new BuildPanel(sourceEl, scene, statusEl, () => { ++loadGeneration; paused = true; sfx.update(0, 0); });
 void boot();

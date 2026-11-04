@@ -12,9 +12,10 @@ import { FRAME_RATE, type BodyView, type PhysicsView, type Pose, type SimView, t
 
 // the state buffer layout, separator, key count and API names are generated from the core (core/tests/bindings.rs)
 import {
-  BALL, BALL_STRIDE, CRATE, CRATE_STRIDE, HEADER, HEADER_LENGTH, KEY_COUNT, LAYOUT_VERSION, SHELL, SHELL_STRIDE, TEXT_SEP,
+  BALL, BALL_STRIDE, CRATE, CRATE_STRIDE, HEADER, HEADER_LENGTH, KEY_COUNT, LAYOUT_VERSION, RECORD_SEP, SHELL, SHELL_STRIDE, TEXT_SEP,
   TILE, TILE_STRIDE, type ApiName,
 } from './core-layout';
+import { Recording, type Command, type FrameInput } from './replay';
 
 let corePromise: Promise<SnapTilesCoreModule> | null = null;
 /** load (once) and instantiate the Emscripten module */
@@ -113,11 +114,19 @@ export class RustSimulation implements SimView {
   private outGen = 0;
   private errorGen = 0;
   private disposed = false;
+  /** every step's inputs and the page's commands since the start: a replay, a rewind or a share link repeat it */
+  recording = new Recording();
+  /** while set and not exhausted, steps take their inputs and commands from it instead of the keys */
+  player: Recording | null = null;
+  /** steps since the start (`ticks` restarts at a reset, this does not) */
+  frame = 0;
+  /** the breakpoint snapshot of the last step, if one was hit: its file line and the locals there */
+  breakHit: { line: number; locals: [string, string][] } | null = null;
 
-  constructor(private source: string, private keys: KeyState) {
+  constructor(readonly source: string, private keys: KeyState) {
     this.model = parseRc(source);
     this.physics = new RustPhysics(this, () => this.freeCore());
-    this.physics.wind.onSet = (x, y, z) => { if (this.m && this.id >= 0) { this.m._core_set_wind(this.id, x || 0, y || 0, z || 0); this.read(); } };
+    this.physics.wind.onSet = (x, y, z) => this.command({ frame: this.frame, kind: 'wind', args: [x || 0, y || 0, z || 0] });
     for (const v of this.model.vals) {
       this.vals.set(v.name.toUpperCase(), {
         name: v.name.toUpperCase(),
@@ -165,7 +174,39 @@ export class RustSimulation implements SimView {
     this.physics.tiles = (this.assembly?.tiles ?? []).map((t, i) => new RustTileBody(t, this, i));
   }
 
+  /** true while the steps come from `player` */
+  get replaying(): boolean {
+    return !!this.player && this.frame < this.player.frames;
+  }
+
+  /** a page command (reset, ball, wind): recorded; one issued during a replay ends the replay there */
+  private command(c: Command): number {
+    if (this.replaying) this.player = null;
+    return this.apply(c);
+  }
+
+  private apply(c: Command): number {
+    if (!this.m || this.id < 0) return -1;
+    this.recording.commands.push({ ...c, frame: this.frame } as Command);
+    if (c.kind === 'reset') {
+      this.resetCore();
+      return 0;
+    }
+    if (c.kind === 'wind') {
+      this.m._core_set_wind(this.id, c.args[0], c.args[1], c.args[2]);
+      this.read();
+      return 0;
+    }
+    const i = this.m._core_add_ball(this.id, ...c.args);
+    this.read();
+    return i;
+  }
+
   reset(): void {
+    this.command({ frame: this.frame, kind: 'reset' });
+  }
+
+  private resetCore(): void {
     if (!this.assembly || !this.m || this.id < 0) return;
     this.m._core_reset(this.id);
     this.read(); // default Vals back from the core
@@ -185,24 +226,58 @@ export class RustSimulation implements SimView {
     this.id = -1;
   }
 
-  private pushInput(): void {
-    if (!this.m || this.id < 0) return;
-    let mask = 0;
-    for (let n = 0; n < KEY_COUNT; n++) if (this.keys.isDown(n)) mask |= 1 << n;
+  /** the live input: held keys, pointer, view size and gamepad axes */
+  private liveInput(): FrameInput {
+    let keys = 0;
+    for (let n = 0; n < KEY_COUNT; n++) if (this.keys.isDown(n)) keys |= 1 << n;
     const ms = this.keys.mouse;
-    const w = typeof innerWidth === 'number' ? innerWidth : 640;
-    const h = typeof innerHeight === 'number' ? innerHeight : 480;
-    this.m._core_set_input(this.id, mask, ms.x, ms.y, ms.l, ms.r, ms.m, w, h);
-    const a = this.keys.axes;
-    this.m._core_set_axes(this.id, a[0] ?? 0, a[1] ?? 0, a[2] ?? 0, a[3] ?? 0, a[4] ?? 0, a[5] ?? 0);
+    return {
+      keys, mx: ms.x, my: ms.y, ml: ms.l, mr: ms.r, mm: ms.m,
+      width: typeof innerWidth === 'number' ? innerWidth : 640,
+      height: typeof innerHeight === 'number' ? innerHeight : 480,
+      axes: [0, 1, 2, 3, 4, 5].map((i) => this.keys.axes[i] ?? 0),
+    };
   }
 
-  /** One fixed step in the core: keys → vals → script → clamp → physics. */
+  private pushInput(input: FrameInput = this.liveInput()): void {
+    if (!this.m || this.id < 0) return;
+    this.m._core_set_input(this.id, input.keys, input.mx, input.my, input.ml, input.mr, input.mm, input.width, input.height);
+    const a = input.axes;
+    this.m._core_set_axes(this.id, a[0], a[1], a[2], a[3], a[4], a[5]);
+  }
+
+  /** One fixed step in the core: keys → vals → script → clamp → physics (inputs from `player` while replaying). */
   step(): void {
     if (!this.m || this.id < 0) return;
-    this.pushInput();
+    let input: FrameInput;
+    if (this.replaying) {
+      for (const c of this.player!.commandsAt(this.frame)) this.apply(c);
+      input = this.player!.inputs[this.frame];
+    } else input = this.liveInput();
+    this.pushInput(input);
+    this.recording.inputs.push(input);
     this.m._core_step(this.id, 1);
+    this.frame++;
     this.read();
+    const hit = this.m.UTF8ToString(this.m._core_break(this.id));
+    this.breakHit = hit ? parseBreak(hit) : null;
+  }
+
+  /** the Lua block's own globals and their values (sorted by name) */
+  luaWatch(): [string, string][] {
+    if (!this.m || this.id < 0) return [];
+    const s = this.m.UTF8ToString(this.m._core_lua_watch(this.id));
+    return s ? s.split(RECORD_SEP).map((r) => { const i = r.indexOf(TEXT_SEP); return [r.slice(0, i), r.slice(i + 1)] as [string, string]; }) : [];
+  }
+
+  /** file lines where the Lua block records its locals (a step always completes) */
+  setBreakpoints(lines: number[]): void {
+    if (!this.m || this.id < 0) return;
+    const bytes = new TextEncoder().encode(lines.join(','));
+    const ptr = this.m._malloc(Math.max(1, bytes.length));
+    this.m.HEAPU8.set(bytes, ptr);
+    this.m._core_set_breakpoints(this.id, ptr, bytes.length);
+    this.m._free(ptr);
   }
 
   /** decode the state buffer */
@@ -279,10 +354,7 @@ export class RustSimulation implements SimView {
   }
 
   addBall(radius: number, x: number, y: number, z: number, gravity: number): number {
-    if (!this.m || this.id < 0) return -1;
-    const i = this.m._core_add_ball(this.id, radius, x, y, z, gravity);
-    this.read();
-    return i;
+    return this.command({ frame: this.frame, kind: 'ball', args: [radius, x, y, z, gravity] });
   }
 
   tileBodyMass(tile: number): number {
@@ -348,4 +420,10 @@ export class RustSimulation implements SimView {
 function setPose(b: RustFreeBody, h: Float64Array, o: number, r: typeof BALL | typeof CRATE): void {
   b.t.x = h[o + r.PX]; b.t.y = h[o + r.PY]; b.t.z = h[o + r.PZ];
   b.r.x = h[o + r.QX]; b.r.y = h[o + r.QY]; b.r.z = h[o + r.QZ]; b.r.w = h[o + r.QW];
+}
+
+/** `line US name RS value US ...` (core_break) */
+function parseBreak(s: string): { line: number; locals: [string, string][] } {
+  const [line, ...rest] = s.split(TEXT_SEP);
+  return { line: Number(line), locals: rest.map((r) => { const i = r.indexOf(RECORD_SEP); return [r.slice(0, i), r.slice(i + 1)] as [string, string]; }) };
 }

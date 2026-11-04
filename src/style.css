@@ -159,3 +159,5 @@ button:disabled { opacity: .4; cursor: default !important; }
 #builder summary { cursor: pointer; min-height: 24px; padding: 6px 0; }
 #source-hint { padding: 2px 12px; font-size: 11px; color: var(--dim); background: #15181c; }
 @media (max-width: 800px) { #source-hint { display: none; } } /* touch layouts: no Esc/Tab, and the row is needed for the panel */
+.share-run { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; min-height: 32px; }
+.share-run[hidden] { display: none; }

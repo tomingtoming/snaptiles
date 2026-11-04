@@ -76,6 +76,11 @@ export class KeyState {
     return this.down.has(n) || this.pad.has(n);
   }
 
+  /** any key number held (keyboard, touch keycaps or gamepad) */
+  anyDown(): boolean {
+    return this.down.size > 0 || this.pad.size > 0;
+  }
+
   /** poll the first connected gamepad (call once per frame) */
   pollGamepad(): void {
     if (typeof navigator === 'undefined' || !navigator.getGamepads) return;
