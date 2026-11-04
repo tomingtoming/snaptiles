@@ -427,6 +427,7 @@ function frame(now: number): void {
   }
   if (builder?.active) { acc = 0; scene.updateEditorCamera(); }
   if (!builder?.active) { debug.update(sim); challenge.update(sim); }
+  challenge.updateBuild(builder?.assembly ?? null, !!builder?.active);
   scene.render();
 }
 function updateSound(s: SimView): void {

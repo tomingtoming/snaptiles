@@ -50,11 +50,22 @@ try {
  await page2.waitForFunction(()=>document.getElementById('challenge-result').open,null,{timeout:30000});
  const body2=await page2.textContent('#challenge-result-body');
  assert.match(body2,new RegExp(`タイム${time} 秒`)); assert.match(body2,/確認済み/);
+ // while building, the cost of the model being edited against the budget
+ await page.click('#build');
+ await page.waitForFunction(()=>!document.getElementById('build-cost').hidden);
+ assert.match(await page.textContent('#build-cost'),/100m走.*コスト 22 \/ 30（残り 8）/);
+ await page.click('#new-model');
+ await page.waitForFunction(()=>document.getElementById('build-cost').textContent.includes('コスト 0 / 30'));
+ await page.click('[data-edge="N"]');
+ await page.waitForFunction(()=>!document.getElementById('build-cost').textContent.includes('コスト 0 /'));
+ await page.fill('#source',MINI); await page.click('#run');
+ await page.waitForFunction(()=>!document.body.classList.contains('building'));
+ assert.equal(await page.isVisible('#build-cost'),false);
  // leaving the challenge
  await page.click('#challenge-quit');
  await page.waitForFunction(()=>window.__sim&&!window.__sim.scenario);
  assert.equal(await page.isVisible('#challenge-banner'),false);
  await page.waitForFunction(()=>!location.hash.includes('&c='));
  assert.ok(await page.evaluate(()=>window.__sim.physics.crates.length)>0);
- console.log(`Challenge: list, banner and over-budget mark, 100m cleared in ${time} s at cost 22, best kept, record link replays and confirms the clear, leaving restores the course pass`);
+ console.log(`Challenge: list, banner and over-budget mark, 100m cleared in ${time} s at cost 22, best kept, build-mode cost, record link replays and confirms the clear, leaving restores the course pass`);
 }finally{await browser.close();}

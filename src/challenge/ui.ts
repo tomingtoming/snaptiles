@@ -2,6 +2,7 @@
 // result with the personal best and a record link. A record link carries the model, the challenge and the run from
 // its first step; the receiving page replays the run, so a clear it shows has been re-run there ("確認済み").
 import type { RustSimulation } from '../sim/rust-simulation';
+import type { Assembly } from '../model/assemble';
 import { FRAME_RATE } from '../sim/sim-view';
 import { SCENARIOS, inGoal, modelCost, type Scenario } from './scenarios';
 
@@ -97,6 +98,19 @@ export class ChallengeUI {
     const state = this.cleared !== null ? '・クリア！' : this.failed ? '・時間切れ' : '';
     const text = `お題：${s.title}｜コスト ${cost} / ${s.budget}${over ? '（予算オーバー・記録なし）' : ''}｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}`;
     if (this.bannerText.textContent !== text) this.bannerText.textContent = text;
+  }
+
+  /** while building: the cost of the model being edited against the challenge's budget */
+  updateBuild(assembly: Assembly | null, building: boolean): void {
+    const el = $('build-cost');
+    const s = this.active;
+    el.hidden = !s || !building;
+    if (!s || !building) return;
+    const cost = assembly ? modelCost(assembly) : 0;
+    const over = cost > s.budget;
+    const text = `お題：${s.title}｜コスト ${cost} / ${s.budget}${over ? `（${cost - s.budget} オーバー）` : `（残り ${s.budget - cost}）`}`;
+    if (el.textContent !== text) el.textContent = text;
+    el.classList.toggle('over', over);
   }
 
   private best(s: Scenario): Best | null {
