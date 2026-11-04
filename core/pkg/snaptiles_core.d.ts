@@ -8,7 +8,7 @@ export interface SnapTilesCoreModule {
   _free(ptr: number): void;
   _core_create(): number;
   _core_free(id: number): void;
-  _core_load(id: number, ptr: number, len: number, noCourse: number): number;
+  _core_load(id: number, ptr: number, len: number, flags: number): number;
   _core_reset(id: number): void;
   _core_set_input(id: number, keys: number, mx: number, my: number, ml: number, mr: number, mm: number, width: number, height: number): void;
   _core_set_axes(id: number, a0: number, a1: number, a2: number, a3: number, a4: number, a5: number): void;
@@ -25,6 +25,7 @@ export interface SnapTilesCoreModule {
   _core_lua_watch(id: number): number;
   _core_set_breakpoints(id: number, ptr: number, len: number): void;
   _core_break(id: number): number;
+  _core_add_solid(id: number, ptr: number, n: number): number;
 }
 declare const SnapTilesCore: (options?: Record<string, unknown>) => Promise<SnapTilesCoreModule>;
 export default SnapTilesCore;

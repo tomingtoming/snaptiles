@@ -16,6 +16,7 @@ import {
   TILE, TILE_STRIDE, type ApiName,
 } from './core-layout';
 import { Recording, type Command, type FrameInput } from './replay';
+import type { Scenario } from '../challenge/scenarios';
 
 let corePromise: Promise<SnapTilesCoreModule> | null = null;
 /** load (once) and instantiate the Emscripten module */
@@ -123,7 +124,8 @@ export class RustSimulation implements SimView {
   /** the breakpoint snapshot of the last step, if one was hit: its file line and the locals there */
   breakHit: { line: number; locals: [string, string][] } | null = null;
 
-  constructor(readonly source: string, private keys: KeyState) {
+  /** a challenge's course replaces the default course (and, when it brings one, the ground) */
+  constructor(readonly source: string, private keys: KeyState, readonly scenario: Scenario | null = null) {
     this.model = parseRc(source);
     this.physics = new RustPhysics(this, () => this.freeCore());
     this.physics.wind.onSet = (x, y, z) => this.command({ frame: this.frame, kind: 'wind', args: [x || 0, y || 0, z || 0] });
@@ -160,9 +162,16 @@ export class RustSimulation implements SimView {
     const ptr = m._malloc(Math.max(1, bytes.length));
     m.HEAPU8.set(bytes, ptr);
     const noCourse = (globalThis as unknown as { __tune?: { noCourse?: boolean } }).__tune?.noCourse ?? false;
-    const code = m._core_load(this.id, ptr, bytes.length, noCourse ? 1 : 0);
+    const sc = this.scenario;
+    const code = m._core_load(this.id, ptr, bytes.length, (noCourse || sc ? 1 : 0) | (sc?.ground ? 2 : 0));
     m._free(ptr);
     if (code !== 0) throw new Error(m.UTF8ToString(m._core_error(this.id)) || 'model failed to load');
+    for (const solid of [...(sc?.ground ?? []), ...(sc?.solids ?? [])]) {
+      const at = m._malloc(solid.length * 24);
+      m.HEAPF64.set(solid.flat(), at / 8);
+      m._core_add_solid(this.id, at, solid.length);
+      m._free(at);
+    }
     const names = m.UTF8ToString(m._core_val_names(this.id));
     this.valOrder = (names ? names.split(TEXT_SEP) : []).map((n) => this.vals.get(n));
     this.buildTiles();

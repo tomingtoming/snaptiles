@@ -104,10 +104,11 @@ pub extern "C" fn core_free(id: u32) {
 /// # Safety
 /// `ptr` must point to `len` readable bytes (or be null).
 #[no_mangle]
-pub unsafe extern "C" fn core_load(id: u32, ptr: *const u8, len: usize, no_course: u32) -> i32 {
+pub unsafe extern "C" fn core_load(id: u32, ptr: *const u8, len: usize, flags: u32) -> i32 {
     let source = text_in(ptr, len);
     with_slot(id, 1, |slot| {
-        let r = Simulation::load(&source, PhysicsOptions { no_course: no_course != 0, ..Default::default() });
+        // flags: bit 0 no course (bare ground), bit 1 no ground either (a challenge brings its own, core_add_solid)
+        let r = Simulation::load(&source, PhysicsOptions { no_course: flags & 1 != 0, no_ground: flags & 2 != 0, ..Default::default() });
         slot.gens.model += 1;
         match r {
             Ok(sim) => {
@@ -310,4 +311,26 @@ pub unsafe extern "C" fn core_set_breakpoints(id: u32, ptr: *const u8, len: usiz
 pub extern "C" fn core_break(id: u32) -> *const u8 {
     let s = with_slot(id, String::new(), |slot| slot.sim.as_ref().and_then(|sim| sim.break_hit()).unwrap_or_default());
     text_out(&s)
+}
+
+/// A static solid for a challenge course: the convex hull of `n` points (`x, y, z` each, `3·n` f64 at `ptr`), with the
+/// ground's friction and collision group. Call after `core_load`, before the first step. Returns 0, or 1 when the
+/// points span no volume.
+///
+/// # Safety
+/// `ptr` must point to `3·n` readable f64.
+#[no_mangle]
+pub unsafe extern "C" fn core_add_solid(id: u32, ptr: *const f64, n: u32) -> i32 {
+    if ptr.is_null() || n < 4 {
+        return 1;
+    }
+    let flat = std::slice::from_raw_parts(ptr, 3 * n as usize);
+    let points: Vec<[f64; 3]> = flat.chunks(3).map(|c| [c[0], c[1], c[2]]).collect();
+    with_slot(id, 1, |slot| {
+        let added = slot.sim.as_mut().is_some_and(|sim| sim.add_solid(&points));
+        if added {
+            refresh(slot);
+        }
+        if added { 0 } else { 1 }
+    })
 }

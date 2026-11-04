@@ -7,6 +7,8 @@ import type { SimView } from './sim/sim-view';
 import type { RustSimulation } from './sim/rust-simulation';
 import { decodeRecording, decodeText, encodeRecording, encodeText, type Recording } from './sim/replay';
 import { DebugPanel } from './debug/panel';
+import { ChallengeUI } from './challenge/ui';
+import { scenarioById } from './challenge/scenarios';
 import { Sfx } from './audio/sfx';
 import { SAMPLES } from './samples';
 
@@ -54,14 +56,25 @@ const debug = new DebugPanel({
   paused: () => paused,
   setPaused: (p) => { paused = p; },
   seek: seekTo,
-  step: () => { if (sim && !builder?.active) { sim.step(); debug.afterStep(sim); } },
+  step: () => { if (sim && !builder?.active) { sim.step(); debug.afterStep(sim); challenge.afterStep(sim); } },
   source: sourceEl,
+});
+// challenges: a course, a budget and a goal; the challenge rides in the URL (&c=) with the model and the run
+const challenge = new ChallengeUI({
+  sim: () => sim,
+  reload: () => void loadAndShare(sourceEl.value),
+  recordLink: async () => {
+    const s = sim!;
+    const url = new URL(location.href);
+    url.hash = `m=${await encodeText(s.source)}${s.scenario ? `&c=${s.scenario.id}` : ''}&r=${await encodeRecording(s.recording)}`;
+    return url.href;
+  },
 });
 async function seekTo(frame: number, timeline: Recording): Promise<void> {
   const current = sim;
   if (!current) return;
   const request = loadGeneration;
-  const next = new (await rustSimulation)(current.source, keys);
+  const next = new (await rustSimulation)(current.source, keys, current.scenario);
   await next.start();
   next.player = timeline;
   for (let i = 0; i < frame; i++) next.step();
@@ -73,6 +86,7 @@ async function seekTo(frame: number, timeline: Recording): Promise<void> {
   scene.sync(next.physics);
   lastCoreVel = null; lastShells = next.physics.projectiles.length; crateVel.length = 0;
   debug.attach(next, true);
+  challenge.attach(next, true);
   await current.dispose();
 }
 
@@ -95,7 +109,7 @@ async function load(source: string, request: number, player: Recording | null = 
     if (old) await old.dispose();
     if (request !== loadGeneration) return false;
     const t0 = performance.now();
-    const made = new (await rustSimulation)(source, keys);
+    const made = new (await rustSimulation)(source, keys, challenge.active);
     next = made;
     const t1 = performance.now();
     await next.start();
@@ -104,6 +118,8 @@ async function load(source: string, request: number, player: Recording | null = 
     next.player = player; // a shared run replays from the first step
     sim = next;
     debug.attach(next, false);
+    scene.setScenario(next.scenario);
+    challenge.attach(next, false);
     (window as unknown as { __sim: SimView }).__sim = next;
     scene.rebuild(next.assembly!.tiles, next.env);
     scene.setLines3d([]);
@@ -170,6 +186,8 @@ for (const s of SAMPLES) {
   });
   samplesEl.append(b);
 }
+// the challenges sit with the samples (both pick what to play); the run bar has no room left on a 380 px panel
+samplesEl.append($('challenge-open'));
 function currentSample(): number {
   const source = sourceEl.value.replace(/\r\n?/g, '\n');
   return SAMPLES.findIndex(sample => sample.source.replace(/\r\n?/g, '\n') === source);
@@ -381,6 +399,7 @@ function frame(now: number): void {
       sim.step();
       acc -= FIXED;
       n++;
+      challenge.afterStep(sim);
       if (debug.afterStep(sim)) { acc = 0; break; } // a breakpoint pauses the page
     }
     if (n === 4) acc = 0;
@@ -397,7 +416,7 @@ function frame(now: number): void {
     updateSound(sim);
   }
   if (builder?.active) { acc = 0; scene.updateEditorCamera(); }
-  if (!builder?.active) debug.update(sim);
+  if (!builder?.active) { debug.update(sim); challenge.update(sim); }
   scene.render();
 }
 function updateSound(s: SimView): void {
@@ -573,7 +592,8 @@ async function makeShareLink(): Promise<void> {
     const hash = await encodeHash(text);
     const recording = run && shareRun.checked ? await encodeRecording(run) : null;
     if (request !== shareGeneration || !shareDialog.open) return;
-    const url = new URL(location.href); url.hash = `m=${hash}${recording ? `&r=${recording}` : ''}`;
+    const course = sim?.scenario ? `&c=${sim.scenario.id}` : '';
+    const url = new URL(location.href); url.hash = `m=${hash}${course}${recording ? `&r=${recording}` : ''}`;
     shareUrl.value = url.href; copyLink.disabled = false;
     shareStatus.textContent = ''; shareUrl.focus(); shareUrl.select();
   } catch (error) {
@@ -599,7 +619,7 @@ const encodeHash = encodeText;
 const decodeHash = decodeText;
 async function publishHash(text: string, request: number): Promise<void> {
   const sample = SAMPLES.find((s) => s.source === text);
-  const h = sample ? `#${sample.name}` : `#m=${await encodeHash(text)}`;
+  const h = (sample ? `#${sample.name}` : `#m=${await encodeHash(text)}`) + (challenge.active ? `&c=${challenge.active.id}` : '');
   if (request === loadGeneration && location.hash !== h) history.replaceState(null, '', h);
 }
 
@@ -609,8 +629,11 @@ const loadAndShare = async (text: string, request = ++loadGeneration) => {
 
 async function boot(): Promise<void> {
   const request = ++loadGeneration;
-  // #m=<model>[&r=<run>] or #<sample>[&r=<run>]
-  const [h, runCode] = location.hash.slice(1).split('&r=');
+  // #m=<model> or #<sample>, then &c=<challenge> and &r=<run> (base64url never holds & or =)
+  const [h, ...rest] = location.hash.slice(1).split('&');
+  const params = new Map(rest.map((p) => { const i = p.indexOf('='); return [p.slice(0, i), p.slice(i + 1)] as [string, string]; }));
+  const runCode = params.get('r');
+  challenge.active = scenarioById(params.get('c'));
   let player: Recording | null = null;
   if (runCode) {
     try { player = await decodeRecording(runCode); } catch { player = null; }

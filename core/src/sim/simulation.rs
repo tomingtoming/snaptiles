@@ -489,6 +489,18 @@ impl Simulation {
         self.state.borrow_mut().world.world.insert_collider(cd, None);
     }
 
+    /// a static ground-like convex solid (a challenge course's box or ramp): false when the points span no volume
+    pub fn add_solid(&mut self, points: &[[f64; 3]]) -> bool {
+        let pts: Vec<rapier3d::math::Vector> = points.iter().map(|p| rapier3d::math::Vector::new(p[0] as f32, p[1] as f32, p[2] as f32)).collect();
+        match rapier3d::geometry::ColliderBuilder::convex_hull(&pts) {
+            Some(cd) => {
+                self.add_ground_collider(cd);
+                true
+            }
+            None => false,
+        }
+    }
+
     /// chip numbers of the Wheel/RLW chips, ascending
     pub fn wheel_chips(&self) -> Vec<usize> {
         let s = self.state.borrow();

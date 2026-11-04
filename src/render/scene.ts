@@ -4,6 +4,8 @@ import { evalExpr, exprIsConstant } from '../rc/expr';
 import { wheelRadius } from '../model/assemble';
 import type { PhysicsView } from '../sim/sim-view';
 import { COURSE, CRATES } from '../model/course';
+import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js';
+import type { Scenario } from '../challenge/scenarios';
 const SPIN_AXIS = new THREE.Vector3(0, 1, 0);
 const UP_AXIS = new THREE.Vector3(0, 1, 0);
 /** the original's built-in views: F8–F12 select A–E, Ctrl+F8–F12 select F–J */
@@ -250,7 +252,9 @@ export class SceneView {
       m.castShadow = true;
       m.receiveShadow = true;
       this.scene.add(m);
+      this.courseMeshes.push(m);
     }
+    this.scene.add(this.scenarioGroup);
 
     for (const c of CRATES) {
       const m = new THREE.Mesh(new THREE.BoxGeometry(c.size, c.size, c.size), new THREE.MeshStandardMaterial({ color: c.color, roughness: 0.8 }));
@@ -469,6 +473,35 @@ export class SceneView {
   }
 
   private crateMeshes: THREE.Mesh[] = [];
+  private courseMeshes: THREE.Mesh[] = [];
+  private scenarioGroup = new THREE.Group();
+
+  /** a challenge's course in place of the default one (null: back to the default course) */
+  setScenario(s: Scenario | null): void {
+    for (const m of [...this.courseMeshes, ...this.crateMeshes]) m.visible = !s;
+    for (const o of this.floor) o.visible = !s?.ground;
+    for (const c of [...this.scenarioGroup.children]) {
+      this.scenarioGroup.remove(c);
+      c.traverse((o) => { if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); } });
+    }
+    if (!s) return;
+    const solid = (points: [number, number, number][], color: number, shadow: boolean) => {
+      const m = new THREE.Mesh(new ConvexGeometry(points.map((p) => new THREE.Vector3(...p))), new THREE.MeshStandardMaterial({ color, roughness: 0.95 }));
+      m.receiveShadow = true;
+      m.castShadow = shadow;
+      this.scenarioGroup.add(m);
+    };
+    for (const g of s.ground ?? []) solid(g, 0xb9c4b0, false);
+    for (const o of s.solids) solid(o, 0x9aa3ab, true);
+    // the goal: a translucent zone with its outline
+    const [x0, x1, y0, y1, z0, z1] = s.goal;
+    const geo = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
+    const zone = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x43a047, transparent: true, opacity: 0.18, depthWrite: false }));
+    zone.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x2e7d32 }));
+    edges.position.copy(zone.position);
+    this.scenarioGroup.add(zone, edges);
+  }
   private ballMeshes: THREE.Mesh[] = [];
   sync(world: PhysicsView): void {
     while (this.ballMeshes.length < world.balls.length) {
