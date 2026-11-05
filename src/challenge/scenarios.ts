@@ -347,6 +347,28 @@ function highlands(): Pick<Scenario, 'ground' | 'terrainFaces' | 'terrainBounds'
 }
 
 const GRASS_RUNWAY = { width: 12, north: -112, south: 8 };
+function canyonAirfield(): Scenario {
+  const xs = Array.from({ length: 21 }, (_, i) => (i - 10) * 12);
+  // Each cross section specifies northing, channel centre, flat floor half-width,
+  // floor elevation and the heights of the west and east walls above it.
+  const sections = [
+    [42, 0, 60, 0, 5, 7], [0, 0, 48, 0, 12, 10], [-60, 0, 36, 0, 24, 30],
+    [-120, 0, 24, 0, 45, 54], [-180, 12, 24, 3, 58, 67],
+    [-240, 36, 24, 6, 70, 62], [-300, 12, 24, 5, 56, 74],
+    [-360, -24, 24, 3, 68, 57], [-420, -24, 36, 1, 43, 50],
+    [-480, 0, 48, 0, 23, 16], [-540, 0, 60, 0, 6, 8],
+  ];
+  const heights = sections.map(([, centre, width, floor, west, east]) => xs.map(x => {
+    const bank = Math.min(1, Math.max(0, (Math.abs(x - centre) - width) / 24));
+    return floor + bank * (x < centre ? west : east);
+  }));
+  return {
+    ...heightfield(xs, sections.map(row => row[0]), heights), runway: GRASS_RUNWAY,
+    id: 'canyon-airfield', title: '峡谷の飛行場', freeDrive: true,
+    description: '北へ離陸すると、谷底が右へ曲がり、次に左へ折れます。地形図の等高線で崖と谷筋を確認できます。',
+    contourInterval: 10, terrainColorRange: [0, 75], solids: [], budget: Infinity, timeLimit: Infinity,
+  };
+}
 const plateau = { ...highlands(), terrainColorRange: [4, 105] as [number, number], contourInterval: 25, runway: GRASS_RUNWAY };
 
 function brakeTrack(normal: boolean): Scenario {
@@ -386,6 +408,7 @@ export const FREE_DRIVES: Scenario[] = [
   islands,
   slickBrakeTrack,
   terraces,
+  canyonAirfield(),
   oval,
   {
     ...sideSlopes,

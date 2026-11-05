@@ -12,7 +12,7 @@ try {
   const terrain = new Map([
     ['terrain-ground', ['terrain-probe.mjs', 'ridge-turn-probe.mjs', 'washboard-probe.mjs', 'hill-climb-probe.mjs', 'grip-probe.mjs', 'oval-probe.mjs']],
     ['terrain-water', ['inlet-probe.mjs', 'buoy-probe.mjs', 'water-log-probe.mjs', 'islands-probe.mjs']],
-    ['terrain-flight', ['flyover-probe.mjs', 'terrain-hover-probe.mjs', 'terrain-map-probe.mjs']],
+    ['terrain-flight', ['canyon-probe.mjs', 'flyover-probe.mjs', 'terrain-hover-probe.mjs', 'terrain-map-probe.mjs']],
   ]);
   const requested = process.argv.slice(2);
   for (const script of (requested.length ? requested.flatMap(name => terrain.get(name) ?? [name]) : defaultScripts)) {

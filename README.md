@@ -64,6 +64,8 @@ checkpoint before the green finish. At **入り江の試走場** (#car&c=tidal-i
 
 On **三段の登坂路** (#car&c=terraced-climb), drive north over 6°, 12° and 18° grades. Pairs of dashed lines enclose a six-metre hill-start practice area on each incline. Between those lines the banner shows north–south speed in cm/s, with uphill or downhill direction so even slow rollback is visible. Each solid white line marks a level landing where you can stop and try a hill approach with less momentum. On the landings, compare entry speeds and ascent times for the three 24 m grades. Try **坂の途中で止まる** in the Lua missions to hold a car inside the marked area on the 12° incline for three seconds.
 
+Launch the stock plane north from **峡谷の飛行場** (#plane&c=canyon-airfield). The canyon bends east, then west. Open the terrain map for 10 m elevation contours.
+
 Drive the stock car clockwise on **バンク付き周回路** (#car&c=banked-oval). Choose **タイムアタックへ** to take the current model straight to the timed start, or **自由走行に戻る** to practise again. Its 295 m lap has two 10° banked curves and a white start line on the western straight. In **バンク周回タイムアタック** (#car&c=oval-lap), pass eight rings in order and compare each of four section times with your fastest recorded lap on this device, then share the timed lap. Resetting the car clears its gates and section times. The overall clock keeps running.
 
 Explore the three islands in **三島の海峡** (#raft&c=three-islands). The pale turquoise map areas are at most 1.2 m deep. Tap the chart to sound a position, or focus it and move the marker in 5 m steps with the arrow keys. Escape clears it. **三島の蛇行航路** (#raft&c=island-passage) follows the channels through three ordered pairs of buoys.
