@@ -52,8 +52,14 @@ Samples: `car` (↑↓ drive, ←→ steer), `plane` (Z/X throttle, then it lift
 itself; a Lua autopilot holds height and level wings, ↓↑ climb/descend, ←→ bank; to land, X to
 zero throttle and hold ↑: it flares by itself and brakes once down),
 `walker` (↑ walk, ←→ turn; a Lua gait), `hover` (jets with a Lua attitude
-hold; ↑↓←→ move, A/D turn), `tank` (A/D turret, Z fire). The course has a
+hold; ↑↓←→ move, A/D turn), `tank` (A/D turret, Z fire). The default course has a
 ramp, kerbs, a gate, a wall and crates to knock over.
+
+Choose **地形・お題** beside the samples for original SnapTiles terrain. Free drive
+includes a kilometre-wide plateau with four peaks, a mountain pass and a six-hump washboard. The humps rise from 12 cm on
+the left to 55 cm on the right. Timed courses include a drive over the pass,
+a steering course, and a flyover with altitude gates. Cross the yellow
+checkpoint before the green finish. **地形図** opens the map while driving.
 
 ## Build visually
 

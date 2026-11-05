@@ -77,6 +77,11 @@ try {
     return false;
   });
   assert.ok(returned, 'car should descend onto the outer plain and climb back');
+  const tunedCar = await page.inputValue('#source');
+  await page.click('#challenge-open');
+  await page.click('#course-restart');
+  await page.waitForFunction(() => window.__sim?.frame < 30 && window.__sim.scenario?.id === 'mountain-drive');
+  assert.equal(await page.inputValue('#source'), tunedCar);
 } finally {
   await browser.close();
 }

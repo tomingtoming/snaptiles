@@ -14,7 +14,7 @@ try {
  const page=await context.newPage();
  await page.goto(base+'#car'); await page.waitForFunction(()=>window.__sim);
  await page.click('#challenge-open');
- assert.equal(await page.locator('#challenge-list button').count(),13); // 2 free drives, 5 challenges, 6 missions
+ assert.deepEqual(await page.locator('#challenge-list h3').allTextContents(), ['自由走行', 'お題（予算内で組んでゴールへ）', 'ミッション（Luaで制御の練習。機体はミッションのものに替わります）']);
  await page.click('#challenge-list button:has-text("100m走")');
  await page.waitForFunction(()=>window.__sim?.scenario?.id==='sprint');
  assert.match(await page.evaluate(()=>location.hash),/&c=sprint/);

@@ -13,7 +13,7 @@
     "preview": "vite preview",
     "test:plane": "node tools/editor-ci.mjs plane-control-probe.mjs editor-plane-build-probe.mjs",
     "test:editor:scale": "node tools/editor-ci.mjs editor-scale-probe.mjs",
-    "test:terrain": "node tools/editor-ci.mjs terrain-probe.mjs ridge-turn-probe.mjs washboard-probe.mjs",
+    "test:terrain": "node tools/editor-ci.mjs terrain-probe.mjs ridge-turn-probe.mjs washboard-probe.mjs flyover-probe.mjs",
     "test:editor": "node tools/editor-ci.mjs",
     "test:editor:firefox": "node tools/editor-ci.mjs editor-firefox-probe.mjs",
     "test:editor:webkit": "node tools/editor-ci.mjs editor-webkit-probe.mjs",

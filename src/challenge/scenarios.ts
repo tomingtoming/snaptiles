@@ -19,12 +19,15 @@ export interface Scenario {
   timeLimit: number;
   /** its own ground (else the endless flat ground), plus obstacles */
   ground?: Solid[];
+  terrainBounds?: [number, number, number, number]; // x min/max, z min/max of the driving area
+  runway?: { width: number; north: number; south: number };
   terrainColorRange?: [number, number]; // elevations of the low and high ground colours
   terrainFaces?: Solid; // exposed triangles of a continuous terrain, in draw order
   solids: Solid[];
   /** the Core has to enter this box: [x0, x1, y0, y1, z0, z1] (challenges) */
   goal?: [number, number, number, number, number, number];
   checkpoint?: Scenario['goal'];
+  showGateAltitude?: boolean;
   /** a mission (a Lua lesson): its starting model, and the state the model has to hold for `seconds` */
   mission?: {
     starter: string;
@@ -84,9 +87,9 @@ const TYPE_LABELS: Record<string, string> = {
 
 /** An original pass between two ridges. Each triangle has its own convex collider so
  * a hull across an entire valley cannot bridge the hollow. Coordinates are in metres. */
-function mountainPass(): Pick<Scenario, 'ground' | 'terrainFaces'> {
+function mountainPass(runway = 0): Pick<Scenario, 'ground' | 'terrainFaces' | 'terrainBounds'> {
   const xs = [-70, -32, -12, 0, 12, 32, 70];
-  const zs = [35, 0, -12, -32, -55, -74, -100, -130];
+  const zs = [35, 0, -12, -32, -55, -74, -100, -130].map(z => z < 0 ? z - runway : z);
   const heights = [
     [0, 0, 0, 0, 0, 0, 0],
     [1, 1, 0, 0, 0, 1, 1],
@@ -102,7 +105,7 @@ function mountainPass(): Pick<Scenario, 'ground' | 'terrainFaces'> {
 
 /** xs increase and zs decrease so the top triangles face upwards. Render faces
  * and convex ground prisms share the same samples and diagonal in every cell. */
-function heightfield(xs: number[], zs: number[], heights: number[][]): Pick<Scenario, 'ground' | 'terrainFaces'> {
+function heightfield(xs: number[], zs: number[], heights: number[][]): Pick<Scenario, 'ground' | 'terrainFaces' | 'terrainBounds'> {
   // A very thin convex hull at this width gives an unreliable running surface.
   const ground = [box(-3000, 3000, -104, -4, -3000, 3000)];
   const vertex = (row: number, col: number): Solid[number] => [xs[col], heights[row][col], zs[row]];
@@ -137,13 +140,13 @@ function heightfield(xs: number[], zs: number[], heights: number[][]): Pick<Scen
       if (col === xs.length - 1) shoulder(b, d);
     }
   }
-  return { ground, terrainFaces };
+  return { ground, terrainFaces, terrainBounds: [xs[0], xs[xs.length - 1], zs[zs.length - 1], zs[0]] };
 }
 
 const pass = mountainPass();
 /** Six transverse humps. The left side barely ripples; the right side reaches
  * axle height. A long flat entry and runout allow a repeatable approach. */
-function washboard(): Pick<Scenario, 'ground' | 'terrainFaces'> {
+function washboard(): Pick<Scenario, 'ground' | 'terrainFaces' | 'terrainBounds'> {
   const xs = [-22, -8, 0, 8, 22];
   const zs = [18, 0, -12];
   const flat = xs.map(() => 0);
@@ -158,7 +161,50 @@ function washboard(): Pick<Scenario, 'ground' | 'terrainFaces'> {
   return heightfield(xs, zs, heights);
 }
 
+/** A kilometre-wide original plateau. Four rounded massifs flank a winding
+ * valley. The central strip is kept level for takeoff. Round the authored
+ * samples to decimetres before passing them to either physics or rendering. */
+function highlands(): Pick<Scenario, 'ground' | 'terrainFaces' | 'terrainBounds'> {
+  const grid = Array.from({ length: 21 }, (_, i) => (i - 10) * 50);
+  const xs = [...grid, -25, 25].sort((a, b) => a - b);
+  const zs = [...grid].reverse();
+  const peaks = [
+    { x: -265, z: -250, height: 118, width: 125, depth: 160 },
+    { x: 210, z: -310, height: 98, width: 135, depth: 110 },
+    { x: 290, z: 145, height: 86, width: 110, depth: 170 },
+    { x: -225, z: 285, height: 64, width: 145, depth: 115 },
+  ];
+  const clamp = (n: number) => Math.max(0, Math.min(1, n));
+  const heights = zs.map(z => xs.map(x => {
+    let h = 9 + 5 * Math.sin((x + z) / 92);
+    for (const peak of peaks) {
+      const dx = (x - peak.x) / peak.width, dz = (z - peak.z) / peak.depth;
+      h += peak.height * Math.exp(-dx * dx - dz * dz);
+    }
+    const valley = clamp((Math.abs(x - 75 * Math.sin(z / 150)) - 20) / 95);
+    h *= 0.25 + 0.75 * valley;
+    const runway = clamp(Math.max(Math.abs(x) - 25, -155 - z, z - 55) / 70);
+    const edge = clamp((500 - Math.max(Math.abs(x), Math.abs(z))) / 100);
+    return Math.round(h * runway * edge * 10) / 10;
+  }));
+  return heightfield(xs, zs, heights);
+}
+
+const GRASS_RUNWAY = { width: 12, north: -112, south: 8 };
+
 export const FREE_DRIVES: Scenario[] = [
+  {
+    ...highlands(),
+    id: 'highlands',
+    runway: GRASS_RUNWAY,
+    title: '四峰高原',
+    description: '1km四方の高原。中央の平地から飛び立つか、四つの山の間の谷筋を走れます。',
+    freeDrive: true,
+    terrainColorRange: [4, 105],
+    budget: Infinity,
+    timeLimit: Infinity,
+    solids: [],
+  },
   {
     ...pass,
     id: 'mountain-drive',
@@ -234,6 +280,19 @@ export const SCENARIOS: Scenario[] = [
     solids: [],
     checkpoint: [-16, -3, 0, 12, -42, -26],
     goal: [4, 20, 0, 8, -114, -91],
+  },
+  {
+    ...mountainPass(120),
+    id: 'pass-flyover',
+    runway: GRASS_RUNWAY,
+    showGateAltitude: true,
+    title: '峠の空路',
+    description: '滑走路を離陸して、峠の黄色い空域から緑のゴールへ。標準のplaneはZで加速、↓で上昇。',
+    budget: 100,
+    timeLimit: 60,
+    solids: [],
+    checkpoint: [-18, 18, 8, 26, -184, -167],
+    goal: [-24, 24, 14, 38, -261, -236],
   },
 ];
 

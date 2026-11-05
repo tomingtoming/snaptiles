@@ -2,6 +2,7 @@
 // result with the personal best and a record link. A record link carries the model, the challenge and the run from
 // its first step; the receiving page replays the run, so a clear it shows has been re-run there ("確認済み").
 import type { RustSimulation } from '../sim/rust-simulation';
+import { TerrainMap } from './terrain-map';
 import type { Assembly } from '../model/assemble';
 import { FRAME_RATE } from '../sim/sim-view';
 import { FREE_DRIVES, MISSIONS, SCENARIOS, MissionProgress, costBreakdown, inGoal, modelCost, type Scenario } from './scenarios';
@@ -22,6 +23,7 @@ export class ChallengeUI {
   active: Scenario | null = null;
   private cleared: number | null = null;
   private failed = false;
+  private terrainMap = new TerrainMap();
   /** a mission's progress (frames held, the pass through its waypoint) */
   private progress: MissionProgress | null = null;
   private progressFor(s: Scenario): MissionProgress {
@@ -36,6 +38,7 @@ export class ChallengeUI {
 
   constructor(private host: ChallengeHost) {
     $('challenge-open').addEventListener('click', () => this.openDialog());
+    $('course-restart').addEventListener('click', () => { this.dialog.close(); this.host.reload(); });
     $('challenge-leave').addEventListener('click', () => { this.dialog.close(); this.select(null); });
     $('challenge-quit').addEventListener('click', () => this.select(null));
     $('challenge-retry').addEventListener('click', () => { this.result.close(); this.host.reload(); });
@@ -66,6 +69,7 @@ export class ChallengeUI {
     };
     const heading = (text: string) => { const h = document.createElement('h3'); h.textContent = text; return h; };
     $('challenge-list').replaceChildren(heading('自由走行'), ...FREE_DRIVES.map(button), heading('お題（予算内で組んでゴールへ）'), ...SCENARIOS.map(button), heading('ミッション（Luaで制御の練習。機体はミッションのものに替わります）'), ...MISSIONS.map(button));
+    $('course-restart').hidden = !this.active;
     $('challenge-leave').hidden = !this.active;
     this.dialog.showModal();
   }
@@ -103,6 +107,7 @@ export class ChallengeUI {
   /** every animation frame: the banner */
   update(sim: RustSimulation | null): void {
     const s = this.active;
+    this.terrainMap.update(s, sim?.physics.tiles[0]?.position, !!sim?.checkpointPassed);
     this.banner.hidden = !s || !sim;
     if (!s || !sim?.assembly) return;
     if (s.freeDrive) {
@@ -116,9 +121,11 @@ export class ChallengeUI {
     this.banner.classList.toggle('over', over);
     const state = this.cleared !== null ? '・クリア！' : this.failed ? '・時間切れ' : '';
     const checkpoint = s.checkpoint ? (!sim.checkpointPassed ? '｜黄色の中間地点へ' : '｜中間地点通過・緑のゴールへ') : '';
+    const zone = !sim.checkpointPassed && s.checkpoint ? s.checkpoint : s.goal;
+    const altitude = s.showGateAltitude && zone ? `（高度${zone[2]}〜${zone[3]}m）` : '';
     const text = s.mission
       ? `ミッション：${s.title}｜${s.mission.via ? (this.progress?.visitedAt != null ? '折り返し済み｜' : '折り返しはまだ｜') : ''}保持 ${((this.progress?.scenario === s ? this.progress.held : 0) / FRAME_RATE).toFixed(1)} / ${s.mission.hold.seconds} 秒｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}｜${s.mission.hint}`
-      : `お題：${s.title}｜コスト ${cost} / ${s.budget}${over ? '（予算オーバー・記録なし）' : ''}｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}${checkpoint}`;
+      : `お題：${s.title}｜コスト ${cost} / ${s.budget}${over ? '（予算オーバー・記録なし）' : ''}｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}${checkpoint}${altitude}`;
     if (this.bannerText.textContent !== text) this.bannerText.textContent = text;
   }
 

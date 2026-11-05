@@ -483,6 +483,11 @@ export class SceneView {
 
   /** a challenge's course in place of the default one (null: back to the default course) */
   setScenario(s: Scenario | null): void {
+    const bounds = s?.terrainBounds;
+    const span = bounds ? Math.max(bounds[1] - bounds[0], bounds[3] - bounds[2]) : 0;
+    this.scene.fog = new THREE.Fog(0xdfe7ee, Math.max(60, span * 0.24), Math.max(220, span * 1.1));
+    this.camera.far = Math.max(500, span * 1.6);
+    this.camera.updateProjectionMatrix();
     for (const m of [...this.courseMeshes, ...this.crateMeshes]) m.visible = !s;
     for (const o of this.floor) o.visible = !s?.ground;
     for (const c of [...this.scenarioGroup.children]) {
@@ -513,6 +518,27 @@ export class SceneView {
       addMesh(geometry, 0xffffff, false);
     } else {
       for (const g of s.ground ?? []) addMesh(hull(g), 0xb9c4b0, false);
+    }
+    if (s.runway) {
+      // Paint the level grass strip. Its collision surface is the terrain itself.
+      const { north, south, width } = s.runway;
+      const positions: number[] = [], colors: number[] = [];
+      const turf = new THREE.Color(0x6c8450), chalk = new THREE.Color(0xece4c4);
+      const paint = (x0: number, x1: number, z0: number, z1: number, y: number, color: THREE.Color) => {
+        positions.push(x0, y, z0, x0, y, z1, x1, y, z0, x1, y, z0, x0, y, z1, x1, y, z1);
+        for (let i = 0; i < 6; i++) colors.push(color.r, color.g, color.b);
+      };
+      const half = width / 2;
+      paint(-half, half, north, south, 0.012, turf);
+      for (let z = north + 8; z < south - 7; z += 12) {
+        paint(-0.18, 0.18, z, z + 5, 0.025, chalk);
+      }
+      for (const z of [north + 1, south - 1.5]) paint(-half + 0.5, half - 0.5, z, z + 0.5, 0.025, chalk);
+      const surface = new THREE.BufferGeometry();
+      surface.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      surface.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      surface.computeVertexNormals();
+      addMesh(surface, 0xffffff, false);
     }
     for (const o of s.solids) addMesh(hull(o), 0x9aa3ab, true);
     // the goal (green) and a mission's waypoint (yellow): translucent zones with their outlines

@@ -202,15 +202,24 @@ button:disabled { opacity: .4; cursor: default !important; }
 #challenge-open { background: transparent; color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; padding: 3px 8px; font: 13px system-ui, sans-serif; white-space: nowrap; cursor: pointer; }
 .building #challenge-open { display: none; }
 #challenge-banner { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; background: rgba(16, 20, 24, 0.72); color: #fff; border-radius: 8px; font: 13px/1.3 system-ui, sans-serif; z-index: 1; max-width: calc(100% - 24px); }
+#challenge-banner { width: max-content; }
 #challenge-banner[hidden] { display: none; }
 #challenge-banner.over { background: rgba(120, 30, 30, 0.8); }
-#challenge-banner button { min-height: 28px; background: #303840; color: var(--ink); border: 1px solid #59636e; border-radius: 4px; cursor: pointer; }
+#challenge-banner button { flex: none; white-space: nowrap; min-height: 28px; background: #303840; color: var(--ink); border: 1px solid #59636e; border-radius: 4px; cursor: pointer; }
 .building #challenge-banner { display: none; }
 #challenge-dialog, #challenge-result { width: min(520px, calc(100vw - 32px)); padding: 20px; border: 1px solid #59636e; border-radius: 8px; background: var(--panel); color: var(--ink); }
+#terrain-map { position: absolute; right: 10px; bottom: 76px; z-index: 2; color: white; background: #20272eef; border-radius: 6px; }
+#terrain-map[hidden], .building #terrain-map, .debugging #terrain-map { display: none; }
+#terrain-map summary { padding: 8px 12px; cursor: pointer; font-size: 13px; }
+#terrain-map svg { display: block; margin-inline: auto; width: min(180px, 38vw); height: min(155px, 25dvh); }
+#terrain-map small { display: block; padding: 3px 8px 7px; font-size: 11px; }
+@media (max-width: 520px) { #challenge-banner { top: 88px; } }
 #challenge-dialog[open] { display: flex; flex-direction: column; gap: 12px; max-height: calc(100dvh - 32px); }
 #challenge-dialog h2 { margin: 0; }
 #challenge-dialog .course-options { overflow-y: auto; overscroll-behavior: contain; }
 #challenge-dialog .course-options > p:first-child { margin-top: 0; }
+#challenge-dialog .share-actions { gap: 6px; }
+#challenge-dialog .share-actions button { padding-inline: 6px; white-space: nowrap; }
 #challenge-dialog .share-actions form { margin-left: auto; }
 #challenge-list { display: grid; gap: 8px; margin: 12px 0; }
 #challenge-list button { text-align: left; padding: 10px 12px; min-height: 44px; background: #303840; color: var(--ink); border: 1px solid #59636e; border-radius: 6px; cursor: pointer; }
