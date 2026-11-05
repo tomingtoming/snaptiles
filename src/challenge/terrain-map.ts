@@ -51,12 +51,32 @@ export function aboveLevel(triangle: Solid, level: number): string {
   return points.length >= 3 ? points.map(p => p.join(',')).join(' ') : '';
 }
 
+/** Height of the topmost projected terrain triangle, including the base under the islands. */
+export function chartHeight(faces: Solid, x: number, z: number): number | undefined {
+  let top: number | undefined;
+  for (let i = 0; i < faces.length; i += 3) {
+    const [ax, ay, az] = faces[i], [bx, by, bz] = faces[i + 1], [cx, cy, cz] = faces[i + 2];
+    const det = (bx - ax) * (cz - az) - (cx - ax) * (bz - az);
+    if (Math.abs(det) < 1e-10) continue;
+    const u = ((x - ax) * (cz - az) - (cx - ax) * (z - az)) / det;
+    const v = ((bx - ax) * (z - az) - (x - ax) * (bz - az)) / det;
+    if (u < -1e-8 || v < -1e-8 || u + v > 1 + 1e-8) continue;
+    const height = ay + u * (by - ay) + v * (cy - ay);
+    top = top === undefined ? height : Math.max(top, height);
+  }
+  return top;
+}
+
 export class TerrainMap {
   private panel = document.querySelector<HTMLDetailsElement>('#terrain-map')!;
   private svg = this.panel.querySelector('svg')!;
   private caption = this.panel.querySelector('small')!;
   private legend = this.panel.querySelector<HTMLElement>('.contour-key')!;
   private sounding = this.panel.querySelector<HTMLElement>('.map-sounding')!;
+  private survey = this.panel.querySelector<HTMLElement>('.map-survey')!;
+  private surveyMark = document.createElementNS(NS, 'path');
+  private selected?: { x: number; z: number };
+  private readonly mapLabel = this.svg.getAttribute('aria-label')!;
   private direction = document.createElementNS(NS, 'polygon');
   private dot = document.createElementNS(NS, 'circle');
   private course: Scenario | null = null;
@@ -65,6 +85,64 @@ export class TerrainMap {
   private ringMarkers: SVGElement[] = [];
   private visibleRingCount = -1;
   private lastTarget: SVGRectElement | null = null;
+
+  constructor() {
+    let down: { id: number; x: number; y: number } | undefined;
+    this.svg.addEventListener('pointerdown', event => {
+      if (event.isPrimary && event.button === 0) down = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    });
+    this.svg.addEventListener('pointercancel', () => { down = undefined; });
+    this.svg.addEventListener('pointerup', event => {
+      if (!down || event.pointerId !== down.id) return;
+      const moved = Math.hypot(event.clientX - down.x, event.clientY - down.y);
+      down = undefined;
+      if (moved > 8) return;
+      // Touch browsers can move a synthesized click to a nearby SVG target. Use the finger coordinates.
+      const transform = this.svg.getScreenCTM();
+      if (!this.course?.shoalDepth || !transform) return;
+      const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(transform.inverse());
+      this.surveyAt(point.x, point.y);
+    });
+    this.svg.addEventListener('keydown', event => {
+      if (!this.course?.shoalDepth || event.ctrlKey || event.altKey || event.metaKey) return;
+      const { x, z } = this.selected ?? { x: Number(this.dot.getAttribute('cx')), z: Number(this.dot.getAttribute('cy')) };
+      const step = 5;
+      switch (event.key) {
+        case 'ArrowLeft': this.surveyAt(x - step, z); break;
+        case 'ArrowRight': this.surveyAt(x + step, z); break;
+        case 'ArrowUp': this.surveyAt(x, z - step); break;
+        case 'ArrowDown': this.surveyAt(x, z + step); break;
+        case 'Enter': case ' ': this.surveyAt(x, z); break;
+        case 'Escape': this.clearSurvey(); break;
+        default: return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+    });
+  }
+
+  private clearSurvey(): void {
+    this.selected = undefined;
+    this.surveyMark.removeAttribute('d');
+    this.survey.textContent = '地図を押して水深を調べる';
+  }
+
+  private surveyAt(rawX: number, rawZ: number): void {
+    const s = this.course;
+    if (!s?.water || !s.terrainFaces || !s.terrainBounds) return;
+    const [left, right, north, south] = s.terrainBounds;
+    const x = Math.max(left, Math.min(right, rawX)), z = Math.max(north, Math.min(south, rawZ));
+    const [xmin, xmax, zmin, zmax, level] = s.water;
+    const ground = chartHeight(s.terrainFaces, x, z);
+    let reading = '水域外';
+    if (ground !== undefined && x >= xmin && x <= xmax && z >= zmin && z <= zmax) {
+      reading = ground >= level ? '陸地・水面より ' + (ground - level).toFixed(2) + 'm' : '水深 ' + (level - ground).toFixed(2) + 'm';
+    }
+    this.selected = { x, z };
+    this.surveyMark.setAttribute('d', 'M-5 0L0 -5L5 0L0 5Z');
+    this.surveyMark.setAttribute('transform', 'translate(' + x + ' ' + z + ')');
+    this.survey.textContent = '◇ ' + (x < 0 ? '西' : '東') + Math.abs(x).toFixed(0) + 'm ' + (z > 0 ? '南' : '北') + Math.abs(z).toFixed(0) + 'm｜' + reading;
+  }
 
   update(s: Scenario | null, core: { position: { x: number; y: number; z: number }; vel: { x: number; z: number } } | undefined, passed: boolean, ringsPassed: number, groundRange?: number): void {
     const bounds = s?.terrainBounds;
@@ -296,6 +374,17 @@ export class TerrainMap {
     const layer = document.createElementNS(NS, 'g');
     layer.setAttribute('clip-path', 'url(#terrain-map-bounds)');
     layer.append(fragment);
+    this.clearSurvey();
+    this.survey.hidden = !s.shoalDepth;
+    this.svg.setAttribute('role', s.shoalDepth ? 'group' : 'img');
+    this.svg.setAttribute('aria-label', s.shoalDepth ? this.mapLabel + '。地図を押すか、矢印キーで5mずつ移動して水深を調べる。' : this.mapLabel);
+    if (s.shoalDepth) this.svg.setAttribute('tabindex', '0');
+    else this.svg.removeAttribute('tabindex');
+    this.surveyMark.setAttribute('stroke', '#fff');
+    this.surveyMark.setAttribute('stroke-width', '2');
+    this.surveyMark.setAttribute('vector-effect', 'non-scaling-stroke');
+    this.surveyMark.setAttribute('fill', '#26313a');
     this.svg.replaceChildren(clip, layer, this.direction, this.dot);
+    if (s.shoalDepth) this.svg.append(this.surveyMark);
   }
 }

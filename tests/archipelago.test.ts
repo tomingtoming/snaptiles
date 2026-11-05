@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { aboveLevel } from '../src/challenge/terrain-map';
+import { aboveLevel, chartHeight } from '../src/challenge/terrain-map';
 import { scenarioById, type Solid } from '../src/challenge/scenarios';
 import { KeyState } from '../src/input/keys';
 import { RustSimulation } from '../src/sim/rust-simulation';
@@ -15,6 +15,7 @@ it.each([[-30, -30, 13], [30, -75, 10], [-30, -120, 8], [45, -120, 2.65], [0, -6
   'reads the collision terrain at (%i,%i) beneath the map', async (x, z, height) => {
     const sea = scenarioById('three-islands')!;
     // Place the probe above each surveyed point; the production colliders are translated together.
+    expect(chartHeight(sea.terrainFaces!, x, z)).toBeCloseTo(height, 2);
     const ground = sea.ground!.map(solid => solid.map(([px, y, pz]): Solid[number] => [px - x, y - height, pz - z]));
     const sim = new RustSimulation('Val {}\nKey {}\nBody { Core(){} }', new KeyState(new EventTarget()), {
       scenario: { ...sea, ground, water: undefined },

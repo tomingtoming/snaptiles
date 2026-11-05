@@ -215,7 +215,7 @@ button:disabled { opacity: .4; cursor: default !important; }
 #terrain-map[open] { width: min(200px, 49vw); }
 #terrain-map summary { padding: 8px 12px; cursor: pointer; font-size: 13px; }
 #terrain-map svg { display: block; margin-inline: auto; width: min(180px, 38vw); height: clamp(32px, calc(100cqh - 104px), 155px); }
-#terrain-map .contour-key[hidden], #terrain-map .map-sounding[hidden] { display: none; }
+#terrain-map .contour-key[hidden], #terrain-map .map-sounding[hidden], #terrain-map .map-survey[hidden] { display: none; }
 #terrain-map .contour-key { padding-top: 0; }
 #terrain-map .contour-key::before { display: inline-block; width: 14px; border-top: 1px solid #e3e4ae; margin-right: 4px; vertical-align: middle; content: ""; }
 #terrain-map .contour-key.shoals::before { border-color: #6cc5be; border-width: 5px; }

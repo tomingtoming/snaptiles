@@ -62,7 +62,7 @@ ordinary pavement. Brake at the white line to compare stopping distances. Timed 
 a steering course, and a flyover with altitude gates. Cross the yellow
 checkpoint before the green finish. At **入り江の試走場** (#car&c=tidal-inlet), drive north from the beach to test whether your model floats. Chip and Frame rafts rise in deep water. Weight ballast can sink them. Select **水上から落とす** to release the current model offshore. In **入り江のブイ航路** (#raft&c=inlet-buoys), drive between the yellow buoys and turn right toward the green pair. **水上の直線試験場** (#raft&c=tow-basin) has a 200 m water lane with distance markers every 25 m and forward drag fitted to measured raft trials. Open **通過記録** for the time and horizontal speed at each pair of buoys. Choose **この走行を基準にする** before testing another model in the same tab to see the differences. **地形図** opens the map while driving.
 
-Explore the three islands in **三島の海峡** (#raft&c=three-islands). The pale turquoise map areas are at most 1.2 m deep. **三島の蛇行航路** (#raft&c=island-passage) follows the channels through three ordered pairs of buoys.
+Explore the three islands in **三島の海峡** (#raft&c=three-islands). The pale turquoise map areas are at most 1.2 m deep. Tap the chart to sound a position, or focus it and move the marker in 5 m steps with the arrow keys. Escape clears it. **三島の蛇行航路** (#raft&c=island-passage) follows the channels through three ordered pairs of buoys.
 
 ## Build visually
 

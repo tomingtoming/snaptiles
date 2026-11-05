@@ -10,6 +10,26 @@ try {
   await page.click('#terrain-map summary');
   assert.match(await page.textContent('.contour-key'), /水深1.2m以内/);
   await page.waitForFunction(() => document.querySelector('.map-sounding').textContent.includes('水深 3.00m'));
+  const chart = page.locator('#terrain-map svg');
+  const sample = async (x, z) => {
+    const where = await chart.evaluate((svg, [x, z]) => {
+      const point = new DOMPoint(x, z).matrixTransform(svg.getScreenCTM());
+      return { x: point.x, y: point.y };
+    }, [x, z]);
+    await page.mouse.click(where.x, where.y);
+    return page.textContent('.map-survey');
+  };
+  const reef = await sample(45, -120);
+  assert(Math.abs(Number(reef.match(/水深 ([\d.]+)/)[1]) - 0.35) < 0.2);
+  assert.match(await sample(-30, -30), /陸地/);
+  await chart.focus();
+  const before = await page.textContent('.map-survey');
+  await page.keyboard.down('ArrowRight');
+  await page.waitForFunction(() => window.__sim.api()._KEY(3) === 0);
+  await page.keyboard.up('ArrowRight');
+  assert.notEqual(await page.textContent('.map-survey'), before);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.textContent('.map-survey'), '地図を押して水深を調べる');
   const firstMarker = page.locator('#terrain-map line[aria-label="ブイ1"]');
   assert.equal(await firstMarker.getAttribute('stroke'), '#ffc747');
   await page.focus('#view');
@@ -58,5 +78,19 @@ try {
   await page.waitForFunction(() => document.getElementById('challenge-result-status').textContent.includes('コピーしました'));
   const link = await page.evaluate(() => navigator.clipboard.readText());
   await verifyCourseReplay(link, time);
-  console.log('Three island channels sailed in', time, 's');
+  for (const [width, height] of [[320, 568], [390, 844], [844, 390]]) {
+    const phone = await browser.newPage({ viewport: { width, height }, isMobile: true, hasTouch: true });
+    await phone.goto(process.argv[2] + '#raft&c=three-islands');
+    await phone.waitForFunction(() => window.__sim?.scenario?.id === 'three-islands');
+    await phone.tap('#terrain-map summary');
+    await phone.waitForFunction(() => document.querySelector('.map-sounding').textContent.includes('水深'));
+    const target = await phone.locator('#terrain-map svg').evaluate(svg => {
+      const p = new DOMPoint(45, -120).matrixTransform(svg.getScreenCTM());
+      return { x: p.x, y: p.y };
+    });
+    await phone.touchscreen.tap(target.x, target.y);
+    assert.match(await phone.textContent('.map-survey'), /東45m 北120m｜水深 0.35m/);
+    await phone.close();
+  }
+  console.log('Three island channels sailed in', time, 's; reef picked accurately at all three touch sizes');
 } finally { await browser.close(); }
