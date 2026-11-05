@@ -320,12 +320,14 @@ const slickBrakeTrack = brakeTrack(false);
 const normalBrakeTrack = brakeTrack(true);
 const offshoreInlet = inlet(true);
 const islands = archipelago();
+const oval = bankedOval();
+
 export const FREE_DRIVES: Scenario[] = [
   inlet(),
   towBasin(),
   islands,
   slickBrakeTrack,
-  bankedOval(),
+  oval,
   {
     ...sideSlopes,
     id: 'cross-slopes',
@@ -371,6 +373,21 @@ export const FREE_DRIVES: Scenario[] = [
 ];
 
 export const SCENARIOS: Scenario[] = [
+  {
+    ...oval, freeDrive: false, id: 'oval-lap', title: 'バンク周回タイムアタック',
+    description: '右回りに黄色いリングを順に抜け、白いスタートラインに戻るまでのタイムを競います。',
+    budget: 45, timeLimit: 90,
+    rings: [
+      { center: [0, 2, -36], heading: 0, radius: 6 },
+      { center: [24, 2, -60], heading: 90, radius: 6 },
+      { center: [48, 2, -36], heading: 180, radius: 6 },
+      { center: [48, 2, 0], heading: 180, radius: 6 },
+      { center: [48, 2, 36], heading: 180, radius: 6 },
+      { center: [24, 2, 60], heading: 270, radius: 6 },
+      { center: [0, 2, 36], heading: 0, radius: 6 },
+      { center: [0, 2, 0], heading: 0, radius: 6 },
+    ],
+  },
   {
     ...islands, freeDrive: false, id: 'island-passage', title: '三島の蛇行航路',
     description: '左の島を右から、次の島を左から抜け、三つ目の島の東へ。黄色のブイの間を、水面近くで北向きに3回通過します。',

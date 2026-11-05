@@ -4,9 +4,9 @@ import { KeyState } from '../src/input/keys';
 import { CAR } from '../src/samples/car';
 import { RustSimulation } from '../src/sim/rust-simulation';
 
-it('completes a clockwise lap of the banked oval using the stock car controls', async () => {
+it.each(['banked-oval', 'oval-lap'])('completes a clockwise lap of %s using the stock car controls', async id => {
   const keys = new KeyState(new EventTarget());
-  const sim = new RustSimulation(CAR, keys, { scenario: scenarioById('banked-oval') });
+  const sim = new RustSimulation(CAR, keys, { scenario: scenarioById(id) });
   const targets = [[0, -18], [0, -36]];
   for (const direction of [1, -1]) {
     for (let i = 1; i <= 12; i++) {
@@ -36,6 +36,7 @@ it('completes a clockwise lap of the banked oval using the stock car controls', 
       sim.step();
     }
     expect(target).toBe(targets.length);
+    if (id === 'oval-lap') expect(sim.ringsPassed).toBe(8);
     expect(worstOffset).toBeLessThan(6);
   } finally { await sim.dispose(); }
 });
