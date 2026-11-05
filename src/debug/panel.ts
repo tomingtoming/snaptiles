@@ -13,6 +13,8 @@ export interface DebugHost {
   seek(frame: number, timeline: Recording): Promise<void>;
   /** one step while paused */
   step(): void;
+  /** run the script to its next line (mid-frame) */
+  stepLine(): void;
   source: HTMLTextAreaElement;
 }
 
@@ -306,12 +308,30 @@ export class DebugPanel {
     log.scrollTop = log.scrollHeight;
   }
 
+  /** the line the script is suspended at (the source view marks it), or null */
+  pausedLine(): number | null {
+    const sim = this.host.sim();
+    return sim?.midFrame && sim.breakHit ? sim.breakHit.line : null;
+  }
+
+  /** run the suspended frame to its end, past any breakpoint */
+  finishFrame(): void {
+    const sim = this.host.sim();
+    if (!sim?.midFrame) return;
+    sim.setBreakpoints([]);
+    this.host.step();
+    sim.setBreakpoints(this.breakpoints);
+    this.breakInfo.hidden = true;
+  }
+
   private showBreak(sim: RustSimulation): void {
     const hit = sim.breakHit!;
     this.breakInfo.hidden = false;
     const head = document.createElement('div');
     head.className = 'break-head';
-    head.textContent = `${hit.line}行目で停止（${sim.frame} フレーム目の実行中、そのフレームは最後まで実行済み）`;
+    head.textContent = sim.midFrame
+      ? `${hit.line}行目で一時停止中（${sim.frame} フレーム目の途中。この行はまだ実行していません）`
+      : `${hit.line}行目で停止（${sim.frame} フレーム目）`;
     const go = document.createElement('button');
     go.type = 'button'; go.textContent = '行へ';
     go.addEventListener('click', () => {
@@ -320,6 +340,18 @@ export class DebugPanel {
       s.focus(); s.setSelectionRange(start, start + (lines[hit.line - 1]?.length ?? 0));
     });
     head.append(' ', go);
+    if (sim.midFrame) {
+      const controls = document.createElement('div');
+      controls.className = 'break-controls';
+      const button = (label: string, title: string, action: () => void) => {
+        const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.title = title;
+        b.addEventListener('click', action); controls.append(b);
+      };
+      button('次の行', 'この行を実行して、次に実行する行で止まる', () => this.host.stepLine());
+      button('このフレームを最後まで', 'ブレークポイントで止まらずにこのフレームを終える', () => this.finishFrame());
+      button('続行', '再生を続ける（次のブレークポイントで止まる）', () => this.host.setPaused(false));
+      head.append(controls);
+    }
     const list = document.createElement('div');
     list.className = 'break-locals';
     if (!hit.locals.length) list.textContent = 'ローカル変数なし';

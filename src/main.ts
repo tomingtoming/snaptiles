@@ -69,7 +69,8 @@ const debug = new DebugPanel({
   paused: () => paused,
   setPaused: (p) => { paused = p; },
   seek: seekTo,
-  step: () => { if (sim && !builder?.active) { sim.step(); debug.afterStep(sim); challenge.afterStep(sim); } },
+  step: () => { if (sim && !builder?.active) { sim.step(); if (!debug.afterStep(sim) && !sim.midFrame) challenge.afterStep(sim); } },
+  stepLine: () => { if (sim && !builder?.active) { sim.stepLine(); if (!debug.afterStep(sim) && !sim.midFrame) challenge.afterStep(sim); } },
   source: sourceEl,
 });
 // the source editor's gutter (line numbers, breakpoints, errors) and colours
@@ -83,6 +84,7 @@ const sourceView = new SourceView(sourceEl, {
   breakpoints: () => debug.breakpointLines(),
   toggleBreakpoint: (line) => debug.toggleBreakpoint(line),
   errorLines: () => [...new Set([errorLine()?.line, liveError?.line].filter((n): n is number => !!n))],
+  currentLine: () => debug.pausedLine(),
   errorMessage: (line) => (liveError?.line === line ? liveError.message : statusEl.textContent ?? undefined),
 });
 new Completion(sourceEl, sourceView.layer);
@@ -467,8 +469,8 @@ function frame(now: number): void {
       sim.step();
       acc -= FIXED;
       n++;
-      challenge.afterStep(sim);
       if (debug.afterStep(sim)) { acc = 0; break; } // a breakpoint pauses the page
+      challenge.afterStep(sim);
     }
     if (n === 4) acc = 0;
     scene.sync(sim.physics);

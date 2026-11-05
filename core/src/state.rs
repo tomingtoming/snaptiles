@@ -21,7 +21,8 @@
 //!  15  error generation bumped whenever the script error changes (fetch it with `core_error`)
 //!  16  has error        1 when the model has a script error
 //!  17  model generation bumped when the bodies are rebuilt (start, reset, a detach): body handles may change
-//!  18, 19 spare (0)
+//!  18  mid frame: 1 while the frame's script is suspended at a breakpoint or a line step (version 2)
+//!  19  spare (0)
 //! tiles, TILE_STRIDE = 17 each
 //!   px py pz  qx qy qz qw     pose as `World::pose` (group body ∘ rest offset, rotor-turned)
 //!   vx vy vz                  velocity of the tile's centre (`World::velocity`)
@@ -39,7 +40,7 @@
 use crate::physics::math::{from_rotation, from_vector};
 use crate::Simulation;
 
-pub const LAYOUT_VERSION: f64 = 1.0;
+pub const LAYOUT_VERSION: f64 = 2.0;
 
 /// One record layout: a module of slot indices plus the names in order (its length is the stride). The page's
 /// decoder reads the same indices from `src/sim/core-layout.ts`, which `tests/bindings.rs` generates from these.
@@ -61,7 +62,7 @@ macro_rules! layout {
 
 layout!(header, HEADER_FIELDS, HEADER:
     VERSION, TILES, BALLS, CRATES, SHELLS, VALS, LINES3D, LINES2D, TICKS, ZOOM, WIND_X, WIND_Y, WIND_Z,
-    OUT_GENERATION, OUT_ROWS, ERROR_GENERATION, HAS_ERROR, MODEL_GENERATION, SPARE_18, SPARE_19);
+    OUT_GENERATION, OUT_ROWS, ERROR_GENERATION, HAS_ERROR, MODEL_GENERATION, MID_FRAME, SPARE_19);
 layout!(tile, TILE_FIELDS, TILE_STRIDE:
     PX, PY, PZ, QX, QY, QZ, QW, VX, VY, VZ, BVX, BVY, BVZ, SPIN, SPIN_ANGLE, JET_POWER, BODY);
 layout!(ball, BALL_FIELDS, BALL_STRIDE: PX, PY, PZ, QX, QY, QZ, QW, R, G, B, RADIUS, FIXED);
@@ -101,6 +102,7 @@ pub fn write_state(sim: &Simulation, gens: &Generations, buf: &mut Vec<f64>) {
     buf[header::ERROR_GENERATION] = gens.error as f64;
     buf[header::HAS_ERROR] = if sim.script_error.is_some() { 1.0 } else { 0.0 };
     buf[header::MODEL_GENERATION] = gens.model as f64;
+    buf[header::MID_FRAME] = if sim.mid_frame() { 1.0 } else { 0.0 };
     buf.reserve(w.tiles.len() * TILE_STRIDE + w.balls.len() * BALL_STRIDE + w.crates.len() * CRATE_STRIDE + w.projectiles.len() * SHELL_STRIDE + n_vals + s.lines3d.len() + s.lines2d.len());
     for (i, tb) in w.tiles.iter().enumerate() {
         let p = w.pose(i);

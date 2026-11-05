@@ -10,6 +10,8 @@ export interface SourceMarks {
   errorLines(): number[];
   /** line → message, shown as the gutter mark's tooltip */
   errorMessage(line: number): string | undefined;
+  /** the line the script is paused at mid-frame, or null */
+  currentLine?(): number | null;
 }
 
 const LUA_KEYWORDS = new Set(['and', 'break', 'do', 'else', 'elseif', 'end', 'false', 'for', 'function', 'goto', 'if', 'in', 'local', 'nil', 'not', 'or', 'repeat', 'return', 'then', 'true', 'until', 'while']);
@@ -115,14 +117,14 @@ export class SourceView {
       this.code.innerHTML = highlightSource(text) + '\n';
     }
     const lines = text.split('\n').length;
-    const bps = this.marks.breakpoints(), errs = this.marks.errorLines();
-    const marks = `${bps.join(',')}|${errs.join(',')}`;
+    const bps = this.marks.breakpoints(), errs = this.marks.errorLines(), cur = this.marks.currentLine?.() ?? null;
+    const marks = `${bps.join(',')}|${errs.join(',')}|${cur}`;
     if (lines !== this.shown.lines || marks !== this.shown.marks) {
       this.shown.lines = lines;
       this.shown.marks = marks;
       const rows: string[] = [];
       for (let n = 1; n <= lines; n++) {
-        const cls = [bps.includes(n) ? 'bp' : '', errs.includes(n) ? 'err' : ''].filter(Boolean).join(' ');
+        const cls = [bps.includes(n) ? 'bp' : '', errs.includes(n) ? 'err' : '', n === cur ? 'cur' : ''].filter(Boolean).join(' ');
         const title = errs.includes(n) ? ` title="${esc(this.marks.errorMessage(n) ?? 'エラー')}"` : '';
         rows.push(`<div data-line="${n}"${cls ? ` class="${cls}"` : ''}${title}>${n}</div>`);
       }

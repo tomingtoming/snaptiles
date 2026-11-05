@@ -60,47 +60,98 @@ fn the_watch_list_shows_the_models_own_globals_only() {
 }
 
 #[test]
-fn a_breakpoint_records_the_locals_at_its_line() {
+fn a_breakpoint_stops_mid_frame_with_the_locals_at_its_line() {
     // the Lua block opens on file line 4 (after Val, Key and Body), so its first line of code is file line 5
     let src = model("function OnFrame()\n  local speed = _TICKS() * 2\n  local name = 'probe'\n  out(0, speed, name)\nend");
     let line = src.lines().position(|l| l.contains("out(0, speed")).unwrap() as i64 + 1;
     let mut sim = Simulation::load(&src, PhysicsOptions { no_course: true, ..Default::default() }).unwrap();
-    sim.step();
+    assert!(sim.step());
     assert!(sim.break_hit().is_none());
     sim.set_breakpoints(vec![Breakpoint { line, after: 1, ..Default::default() }]);
-    sim.step();
+    let pos = sim.core_position();
+    // the step stops on the line, before it runs: no out() yet, no physics, the tick not counted
+    assert!(!sim.step());
+    assert!(sim.mid_frame());
     let snap = sim.break_hit().expect("breakpoint hit");
     let parts: Vec<&str> = snap.split('\u{1f}').collect();
     assert_eq!(parts[0], line.to_string());
     assert!(parts.contains(&"speed\u{1e}2"), "{snap:?}");
     assert!(parts.contains(&"name\u{1e}\"probe\""), "{snap:?}");
-    // the step completed: out() ran after the breakpoint line
-    assert_eq!(sim.out[0], "2 probe");
+    assert_eq!(sim.ticks(), 1.0);
+    assert_eq!(sim.core_position(), pos);
+    // the next step resumes there and completes the frame
     sim.set_breakpoints(Vec::new());
-    sim.step();
-    assert!(sim.break_hit().is_none());
+    assert!(sim.step());
+    assert!(!sim.mid_frame());
+    assert_eq!(sim.out[0], "2 probe");
+    assert_eq!(sim.ticks(), 2.0);
+}
+
+/// steps until the frame completes (a stop mid-frame resumes on the next call)
+fn finish(sim: &mut Simulation) -> u32 {
+    let mut stops = 0;
+    while !sim.step() {
+        stops += 1;
+    }
+    stops
+}
+
+#[test]
+fn stopping_mid_frame_changes_nothing_in_the_run() {
+    let src = model(NOISY);
+    let line = src.lines().position(|l| l.contains("STEER = ")).unwrap_or(0) as i64 + 1;
+    let mut plain = Simulation::load(&src, PhysicsOptions { no_course: true, ..Default::default() }).unwrap();
+    let mut stopped = Simulation::load(&src, PhysicsOptions { no_course: true, ..Default::default() }).unwrap();
+    // a stop on every pass of a line inside the pairs loop and one after it
+    let inner = src.lines().position(|l| l.contains("for k, _ in pairs")).unwrap() as i64 + 1;
+    stopped.set_breakpoints(vec![Breakpoint { line: inner, after: 1, ..Default::default() }, Breakpoint { line, after: 1, ..Default::default() }]);
+    let mut total = 0;
+    for f in 0..90 {
+        if f % 7 == 0 { plain.press(0); stopped.press(0); } else { plain.release(0); stopped.release(0); }
+        assert!(plain.step());
+        total += finish(&mut stopped);
+        assert_eq!(plain.out, stopped.out, "frame {f}");
+        assert_eq!(plain.core_position(), stopped.core_position(), "frame {f}");
+    }
+    assert!(total >= 90, "stopped {total} times");
+}
+
+#[test]
+fn line_steps_walk_the_frame_in_order() {
+    let src = model("function OnFrame()\n  local a = 1\n  local b = a + 1\n  out(0, a + b)\nend");
+    let mut sim = Simulation::load(&src, PhysicsOptions { no_course: true, ..Default::default() }).unwrap();
+    let first = src.lines().position(|l| l.contains("local a = 1")).unwrap() as i64 + 1;
+    let mut lines = Vec::new();
+    while !sim.step_line() {
+        lines.push(sim.break_hit().unwrap().split('\u{1f}').next().unwrap().parse::<i64>().unwrap());
+    }
+    assert_eq!(lines, [first, first + 1, first + 2, first + 3]);
+    assert_eq!(sim.out[0], "3");
+    assert_eq!(sim.ticks(), 1.0);
 }
 
 #[test]
 fn a_breakpoint_can_wait_for_a_condition_or_a_pass_count() {
-    let src = model("function OnFrame()
-  local t = _TICKS()
-  out(0, t)
-end");
+    let src = model("function OnFrame()\n  local t = _TICKS()\n  out(0, t)\nend");
     let line = src.lines().position(|l| l.contains("out(0, t)")).unwrap() as i64 + 1;
     let mut sim = Simulation::load(&src, PhysicsOptions { no_course: true, ..Default::default() }).unwrap();
-    // a condition over a local: stops only on the frame where t == 5
+    // a condition over a local: stops only in the frame where t == 5 (stopped before its tick is counted)
     sim.set_breakpoints(vec![Breakpoint { line, after: 1, condition: Some("t == 5".into()), hits: 0 }]);
-    let stops: Vec<f64> = (0..10).filter_map(|_| { sim.step(); sim.break_hit().map(|_| sim.ticks()) }).collect();
-    assert_eq!(stops, [6.0]); // _TICKS() is 5 inside the frame that ends at tick 6
+    let mut stops = Vec::new();
+    for _ in 0..10 {
+        if !sim.step() {
+            stops.push(sim.ticks());
+            finish(&mut sim);
+        }
+    }
+    assert_eq!(stops, [5.0]);
     // a pass count: the 3rd pass and every pass after it
     sim.set_breakpoints(vec![Breakpoint { line, after: 3, condition: None, hits: 0 }]);
-    let hits: Vec<bool> = (0..5).map(|_| { sim.step(); sim.break_hit().is_some() }).collect();
+    let hits: Vec<bool> = (0..5).map(|_| { let stopped = !sim.step(); if stopped { finish(&mut sim); } stopped }).collect();
     assert_eq!(hits, [false, false, true, true, true]);
     // a broken condition never stops
     sim.set_breakpoints(vec![Breakpoint { line, after: 1, condition: Some("nosuch.field > 1".into()), hits: 0 }]);
-    sim.step();
-    assert!(sim.break_hit().is_none());
+    assert!(sim.step());
     assert!(sim.script_error.is_none());
 }
 

@@ -14,7 +14,7 @@ try {
  const page=await context.newPage();
  await page.goto(base+'#car'); await page.waitForFunction(()=>window.__sim);
  await page.click('#challenge-open');
- assert.equal(await page.locator('#challenge-list button').count(),5); // 3 challenges, 2 missions
+ assert.equal(await page.locator('#challenge-list button').count(),7); // 3 challenges, 4 missions
  await page.click('#challenge-list button:has-text("100m走")');
  await page.waitForFunction(()=>window.__sim?.scenario?.id==='sprint');
  assert.match(await page.evaluate(()=>location.hash),/&c=sprint/);

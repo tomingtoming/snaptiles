@@ -8,6 +8,7 @@
 use crate::js;
 use mlua::debug::DebugEvent;
 use mlua::{HookTriggers, Lua, LuaOptions, StdLib, Value, VmState};
+use mlua::debug::Debug;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -174,6 +175,18 @@ pub struct LuaEngine {
     /// the model's globals right after its chunk ran (before OnInit): a reload keeps a global's running value unless
     /// the new chunk starts it differently
     initial: Vec<(String, Plain)>,
+    /// the frame function suspended at a breakpoint (or a line step): the next [`LuaEngine::frame_step`] resumes it
+    frame_thread: Option<mlua::Thread>,
+    /// stop at the next line the model runs (the page's line step)
+    pub step_line: Rc<Cell<bool>>,
+}
+
+/// How a frame's script call ended: finished (false: the script errored and is now disabled), or suspended mid-frame
+/// at a breakpoint or a line step.
+#[derive(Debug, PartialEq, Eq)]
+pub enum FrameOutcome {
+    Done(bool),
+    Paused,
 }
 
 impl Default for LuaEngine {
@@ -195,6 +208,8 @@ impl LuaEngine {
             breakpoints: Rc::new(RefCell::new(Vec::new())),
             break_hit: Rc::new(RefCell::new(None)),
             initial: Vec::new(),
+            frame_thread: None,
+            step_line: Rc::new(Cell::new(false)),
         }
     }
 
@@ -300,9 +315,63 @@ impl LuaEngine {
 
     /// Run the per-frame function. Returns false if the script errored (and is now disabled).
     pub fn frame(&mut self) -> bool {
-        match self.frame_fn {
-            None => self.error.is_none(),
-            Some(f) => self.call(f),
+        match self.frame_step() {
+            FrameOutcome::Done(ok) => ok,
+            FrameOutcome::Paused => true,
+        }
+    }
+
+    /// true while a frame function is suspended mid-frame
+    pub fn suspended(&self) -> bool {
+        self.frame_thread.is_some()
+    }
+
+    /// Run (or resume) the per-frame function. With breakpoints or a line step pending it runs as a coroutine that a
+    /// stop suspends right at that line ([`FrameOutcome::Paused`]); the next call resumes it where it stopped, so the
+    /// frame computes exactly what an uninterrupted call would. Without them it is a plain call.
+    pub fn frame_step(&mut self) -> FrameOutcome {
+        if let Some(th) = self.frame_thread.take() {
+            return self.resume_frame(th);
+        }
+        let Some(name) = self.frame_fn else { return FrameOutcome::Done(self.error.is_none()) };
+        if self.breakpoints.borrow().is_empty() && !self.step_line.get() {
+            return FrameOutcome::Done(self.call(name));
+        }
+        if self.error.is_some() {
+            return FrameOutcome::Done(false);
+        }
+        let Some(lua) = &self.lua else { return FrameOutcome::Done(false) };
+        let func = match lua.globals().get::<Value>(name) {
+            Ok(Value::Function(f)) => f,
+            _ => return FrameOutcome::Done(true),
+        };
+        let th = match lua.create_thread(func) {
+            Ok(t) => t,
+            Err(e) => {
+                self.error = Some(error_message(&e));
+                return FrameOutcome::Done(false);
+            }
+        };
+        let (triggers, hook) = self.hook();
+        if let Err(e) = th.set_hook(triggers, hook) {
+            self.error = Some(error_message(&e));
+            return FrameOutcome::Done(false);
+        }
+        self.resume_frame(th)
+    }
+
+    fn resume_frame(&mut self, th: mlua::Thread) -> FrameOutcome {
+        let name = self.frame_fn.unwrap_or("OnFrame");
+        match th.resume::<()>(()) {
+            Err(e) => {
+                self.error = Some(file_line(&format!("{name}: {}", error_message(&e)), self.line_offset));
+                FrameOutcome::Done(false)
+            }
+            Ok(()) if th.status() == mlua::thread::ThreadStatus::Resumable => {
+                self.frame_thread = Some(th);
+                FrameOutcome::Paused
+            }
+            Ok(()) => FrameOutcome::Done(true),
         }
     }
 
@@ -329,17 +398,31 @@ impl LuaEngine {
     }
 
     fn arm_budget(&self, lua: &Lua) {
+        let (triggers, hook) = self.hook();
+        let _ = lua.set_hook(triggers, hook);
+    }
+
+    /// The hook: the instruction budget, and (with breakpoints or a line step pending) every model line. A stop records
+    /// the snapshot and asks to yield, which suspends a frame coroutine there; outside one (OnInit, OnReset, a plain
+    /// call) mlua cannot yield and the call simply goes on.
+    fn hook(&self) -> (HookTriggers, impl Fn(&Lua, &Debug) -> mlua::Result<VmState> + 'static) {
         let remaining = Cell::new(self.max_instructions_per_call.max(1) as i64);
         let breakpoints = self.breakpoints.clone();
+        let step_line = self.step_line.clone();
         let mut triggers = HookTriggers::new().every_nth_instruction(QUANTUM);
-        if !breakpoints.borrow().is_empty() {
+        if !breakpoints.borrow().is_empty() || step_line.get() {
             triggers = triggers.every_line();
         }
         let (hit, line_offset) = (self.break_hit.clone(), self.line_offset);
-        let _ = lua.set_hook(triggers, move |lua, debug| {
+        let hook = move |lua: &Lua, debug: &Debug| {
             if debug.event() == DebugEvent::Line {
                 if hit.borrow().is_none() && debug.source().source.as_deref().is_some_and(|s| s.contains("model")) {
                     if let Some(line) = debug.current_line().map(|l| l as i64 + line_offset) {
+                        if step_line.get() {
+                            step_line.set(false);
+                            *hit.borrow_mut() = Some(break_snapshot(lua, line));
+                            return Ok(VmState::Yield);
+                        }
                         let mut bps = breakpoints.borrow_mut();
                         if let Some(bp) = bps.iter_mut().find(|b| b.line == line) {
                             // the hit count counts every pass; the condition is asked only from the `after`-th pass on
@@ -347,6 +430,7 @@ impl LuaEngine {
                             let stop = bp.hits >= bp.after.max(1) && bp.condition.as_deref().is_none_or(|c| condition_holds(lua, c));
                             if stop {
                                 *hit.borrow_mut() = Some(break_snapshot(lua, line));
+                                return Ok(VmState::Yield);
                             }
                         }
                     }
@@ -359,7 +443,8 @@ impl LuaEngine {
             } else {
                 Ok(VmState::Continue)
             }
-        });
+        };
+        (triggers, hook)
     }
 
     /// Replace the running Lua block with `source` (the page's edit while running): the new chunk runs (OnInit does not);
@@ -434,6 +519,7 @@ impl LuaEngine {
     }
 
     pub fn dispose(&mut self) {
+        self.frame_thread = None;
         if let Some(lua) = self.lua.take() {
             lua.remove_hook();
         }

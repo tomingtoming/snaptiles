@@ -187,6 +187,8 @@ pub struct Simulation {
     rng: std::cell::Cell<u64>,
     /// the model source as loaded, with the Lua section of the last reload
     source: String,
+    /// the frame's script is suspended at a breakpoint or a line step: the next step resumes it, then finishes the frame
+    mid_frame: bool,
 }
 
 impl Simulation {
@@ -226,7 +228,7 @@ impl Simulation {
             pen3: [0.0; 3],
             pen2: [0.0; 2],
         };
-        Ok(Simulation { state: Rc::new(RefCell::new(state)), lua: LuaEngine::new(), rc_script: None, script_error: None, out: Vec::new(), rng: std::cell::Cell::new(0), source: source.to_string() })
+        Ok(Simulation { state: Rc::new(RefCell::new(state)), lua: LuaEngine::new(), rc_script: None, script_error: None, out: Vec::new(), rng: std::cell::Cell::new(0), source: source.to_string(), mid_frame: false })
     }
 
     /// Parse and start in one go.
@@ -390,15 +392,34 @@ impl Simulation {
         }
     }
 
-    /// One fixed step: keys → vals → script → clamp → physics.
-    pub fn step(&mut self) {
+    /// One fixed step: keys → vals → script → clamp → physics. A breakpoint (or a line step) suspends the script mid-frame
+    /// and the step returns false; the next step resumes it there and completes the frame.
+    pub fn step(&mut self) -> bool {
         crate::sim::seed_random(self.rng.get());
         *self.lua.break_hit.borrow_mut() = None;
-        self.step_inner();
+        let done = self.step_inner();
         self.rng.set(crate::sim::random_state());
+        done
     }
 
-    fn step_inner(&mut self) {
+    /// Run the script to its next line (starting a frame if none is under way), then stop there mid-frame; true when
+    /// the frame completed instead (no line left).
+    pub fn step_line(&mut self) -> bool {
+        self.lua.step_line.set(true);
+        let done = self.step();
+        self.lua.step_line.set(false);
+        done
+    }
+
+    /// true while a frame is suspended mid-script
+    pub fn mid_frame(&self) -> bool {
+        self.mid_frame
+    }
+
+    fn step_inner(&mut self) -> bool {
+        if self.mid_frame {
+            return self.run_script_and_finish();
+        }
         {
             let mut guard = self.state.borrow_mut();
             let s = &mut *guard;
@@ -421,16 +442,31 @@ impl Simulation {
             s.pen_color = [1.0, 1.0, 1.0];
         }
 
+        if self.lang() == Some(ScriptLang::Lua) && self.script_error.is_none() {
+            self.push_vals_to_lua();
+        }
+        self.run_script_and_finish()
+    }
+
+    /// the frame's script (started or resumed), then — unless it is suspended again — the rest of the frame
+    fn run_script_and_finish(&mut self) -> bool {
         let lang = self.lang();
         if lang == Some(ScriptLang::Lua) && self.script_error.is_none() {
-            self.push_vals_to_lua();
-            let ok = self.lua.frame();
-            self.pull_vals_from_lua();
-            if !ok {
-                self.script_error = self.lua.error.clone();
+            match self.lua.frame_step() {
+                crate::scripting::lua::FrameOutcome::Paused => {
+                    self.mid_frame = true;
+                    self.out = self.lua.out_lines();
+                    return false;
+                }
+                crate::scripting::lua::FrameOutcome::Done(ok) => {
+                    self.pull_vals_from_lua();
+                    if !ok {
+                        self.script_error = self.lua.error.clone();
+                    }
+                    self.out = self.lua.out_lines();
+                }
             }
-            self.out = self.lua.out_lines();
-        } else if self.script_error.is_none() {
+        } else if self.script_error.is_none() && !self.mid_frame {
             if let Some(rc) = self.rc_script.as_mut() {
                 let mut s = self.state.borrow_mut();
                 match rc.run(&mut *s) {
@@ -451,6 +487,9 @@ impl Simulation {
         }
         s.physics_frame();
         s.ticks += 1.0;
+        drop(guard);
+        self.mid_frame = false;
+        true
     }
 
     /// a Val's current value

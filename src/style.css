@@ -252,3 +252,5 @@ button:disabled { opacity: .4; cursor: default !important; }
 #lua-apply[hidden] { display: none; }
 #source-hint.error { color: #ff8a80; }
 #challenge-list h3 { margin: 8px 0 0; font-size: 13px; color: var(--dim); font-weight: 600; }
+#source-gutter div.cur { background: #b38f00; color: #111; }
+.break-controls { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }

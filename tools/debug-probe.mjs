@@ -61,7 +61,7 @@ try {
  assert.match(await page.textContent('#debug-bp-list'),new RegExp(`${line}行`));
  await page.waitForFunction(()=>!document.getElementById('debug-break').hidden);
  const brk=await page.textContent('#debug-break');
- assert.match(brk,new RegExp(`${line}行目で停止`)); assert.match(brk,/speed/);
+ assert.match(brk,new RegExp(`${line}行目で一時停止中`)); // suspended mid-frame at the line assert.match(brk,/speed/);
  assert.equal(await page.evaluate(()=>document.getElementById('debug-play').textContent),'▶');
  const stopped=await page.evaluate(()=>window.__sim.frame);
  await page.waitForTimeout(300);

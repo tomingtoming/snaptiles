@@ -223,6 +223,13 @@ export class RustSimulation implements SimView {
 
   /** a page command (reset, ball, wind): recorded; one issued during a replay ends the replay there */
   private command(c: Command): number {
+    // a command lands between frames in the recording; mid-frame it would land inside one, which a replay cannot repeat
+    if (this.midFrame) {
+      const why = 'フレームの途中で止まっています。続行（またはこのフレームを最後まで）してから使ってください';
+      if (c.kind === 'script') this.lastScriptError = why;
+      if (c.kind === 'eval') this.lastEval = { ok: false, text: why };
+      return -1;
+    }
     if (this.replaying) this.player = null;
     return this.apply(c);
   }
@@ -301,9 +308,28 @@ export class RustSimulation implements SimView {
     this.m._core_set_axes(this.id, a[0], a[1], a[2], a[3], a[4], a[5]);
   }
 
-  /** One fixed step in the core: keys → vals → script → clamp → physics (inputs from `player` while replaying). */
+  /** true while the frame's script is suspended at a breakpoint or a line step (the next step resumes it) */
+  midFrame = false;
+
+  /** One fixed step in the core: keys → vals → script → clamp → physics (inputs from `player` while replaying). A
+   *  breakpoint suspends it mid-frame; the next step resumes the script there and completes the frame. */
   step(): void {
     if (!this.m || this.id < 0) return;
+    if (!this.midFrame) this.beginFrame();
+    this.m._core_step(this.id, 1);
+    this.afterCore();
+  }
+
+  /** run the script to its next line and stop there (a new frame starts if none is under way) */
+  stepLine(): void {
+    if (!this.m || this.id < 0) return;
+    if (!this.midFrame) this.beginFrame();
+    this.m._core_step_line(this.id);
+    this.afterCore();
+  }
+
+  /** a frame's inputs and commands, recorded once at its start */
+  private beginFrame(): void {
     let input: FrameInput;
     if (this.replaying) {
       for (const c of this.player!.commandsAt(this.frame)) this.apply(c);
@@ -311,10 +337,13 @@ export class RustSimulation implements SimView {
     } else input = this.liveInput();
     this.pushInput(input);
     this.recording.inputs.push(input);
-    this.m._core_step(this.id, 1);
-    this.frame++;
+  }
+
+  private afterCore(): void {
+    const m = this.m!;
     this.read();
-    const hit = this.m.UTF8ToString(this.m._core_break(this.id));
+    if (!this.midFrame) this.frame++;
+    const hit = m.UTF8ToString(m._core_break(this.id));
     this.breakHit = hit ? parseBreak(hit) : null;
   }
 
@@ -380,6 +409,7 @@ export class RustSimulation implements SimView {
     const wind = this.physics.wind;
     wind.x = at(HEADER.WIND_X); wind.y = at(HEADER.WIND_Y); wind.z = at(HEADER.WIND_Z);
     const outGen = at(HEADER.OUT_GENERATION), outRows = at(HEADER.OUT_ROWS), errorGen = at(HEADER.ERROR_GENERATION), hasError = at(HEADER.HAS_ERROR);
+    this.midFrame = at(HEADER.MID_FRAME) !== 0;
     if (outGen !== this.outGen) {
       this.outGen = outGen;
       const s = m.UTF8ToString(m._core_out(this.id));

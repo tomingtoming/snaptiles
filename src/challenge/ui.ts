@@ -83,7 +83,7 @@ export class ChallengeUI {
     const s = this.active;
     if (!s || sim.scenario !== s || this.cleared !== null || this.failed) return;
     const core = sim.physics.tiles[0];
-    if (s.mission && core) this.held = holds(s, { position: core.position, quaternion: core.quaternion }) ? this.held + 1 : 0;
+    if (s.mission && core) this.held = holds(s, { position: core.position, quaternion: core.quaternion }, sim.coreVelocity()) ? this.held + 1 : 0;
     if (s.mission ? this.held >= s.mission.hold.seconds * FRAME_RATE : inGoal(s, sim.corePosition())) {
       this.cleared = sim.frame;
       this.showResult(sim, true);

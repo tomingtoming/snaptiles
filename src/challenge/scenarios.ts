@@ -23,7 +23,12 @@ export interface Scenario {
   /** a mission (a Lua lesson): its starting model, and the state the model has to hold for `seconds` */
   mission?: {
     starter: string;
-    hold: { kind: 'upright'; maxTilt: number; seconds: number } | { kind: 'altitude'; min: number; max: number; seconds: number };
+    hold:
+      | { kind: 'upright'; maxTilt: number; seconds: number }
+      | { kind: 'altitude'; min: number; max: number; seconds: number }
+      | { kind: 'speed'; min: number; max: number; seconds: number }
+      /** the Core inside the goal box, nearly still */
+      | { kind: 'stop'; maxSpeed: number; seconds: number };
     hint: string;
   };
 }
@@ -130,6 +135,24 @@ end
 }
 `;
 
+const CAR_LESSON = (title: string, note: string, line: string) => `// ミッション：${title}
+// ${note}
+Val { ENGINE(default=0,min=-1000,max=1000) }
+Key { }
+Body { Core(){ N:Chip(){ W:Wheel(angle=90,power=-ENGINE){ } E:Wheel(angle=90,power=ENGINE){ } } S:Chip(){ W:Wheel(angle=90,power=-ENGINE){ } E:Wheel(angle=90,power=ENGINE){ } } } }
+Lua {
+lastZ = 0
+function OnFrame()
+  local speed = _VEL(0)          -- 速さ（m/s）
+  local z = _Z(0)                -- 前後の位置（前へ進むと減る。スタートは0）
+  local vz = (z - lastZ) * 30    -- 前後の速度（前のフレームとの差 × 30）
+  lastZ = z
+${line}
+  out(0, "速さ ", speed, "  位置 ", z)
+end
+}
+`;
+
 /** missions: Lua lessons on a bare field; the starting model is loaded into the editor */
 export const MISSIONS: Scenario[] = [
   {
@@ -150,15 +173,50 @@ export const MISSIONS: Scenario[] = [
     solids: [],
     mission: { starter: HOVER_LESSON, hold: { kind: 'altitude', min: 2.5, max: 3.5, seconds: 10 }, hint: '高さ（_H）と上下の速さ（_VY）から出力を決める' },
   },
+  {
+    id: 'cruise',
+    title: '速さを保つ',
+    description: '車を秒速9〜11mで10秒走らせ続ける（出しっぱなしでは速くなりすぎる）。',
+    budget: 999,
+    timeLimit: 60,
+    solids: [],
+    mission: {
+      starter: CAR_LESSON('速さを秒速10m前後に10秒保とう', '出力を一定にすると、どんどん速くなる。速さを見て出力を変えよう。', '  ENGINE = 300                   -- ここを書こう（ヒント：ENGINE = (10 − 速さ) × 数）'),
+      hold: { kind: 'speed', min: 9, max: 11, seconds: 10 },
+      hint: '目標との差（10 − 速さ）に比例して出力を決める（P制御）',
+    },
+  },
+  {
+    id: 'stop',
+    title: '決めた所で止まる',
+    description: '50m先の緑の範囲で止まり、3秒じっとしている。',
+    budget: 999,
+    timeLimit: 60,
+    solids: [],
+    goal: [-10, 10, -2, 6, -52, -48],
+    mission: {
+      starter: CAR_LESSON('50m先の緑の範囲でぴたりと止まろう', '残りの距離は z + 50（止まる所で0）。近づいたら弱め、行き過ぎたら戻る。速度 vz でブレーキをかけると行き過ぎない。', '  ENGINE = 300                   -- ここを書こう（ヒント：ENGINE = (z + 50) × 数 ＋ vz × 数）'),
+      hold: { kind: 'stop', maxSpeed: 0.3, seconds: 3 },
+      hint: '残りの距離（z + 50）と速度（vz）から出力を決める（PD制御）',
+    },
+  },
 ];
 
 export const scenarioById = (id: string | null | undefined): Scenario | null => [...SCENARIOS, ...MISSIONS].find((s) => s.id === id) ?? null;
 
-/** whether the model holds a mission's state this frame (the Core's tilt from upright, or its height) */
-export function holds(s: Scenario, core: { position: { y: number }; quaternion: { x: number; z: number } }): boolean {
+/** whether the model holds a mission's state this frame: the Core's tilt from upright, its height, its speed, or it
+ *  standing still in the goal box */
+export function holds(
+  s: Scenario,
+  core: { position: { x: number; y: number; z: number }; quaternion: { x: number; z: number } },
+  velocity: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 },
+): boolean {
   const h = s.mission?.hold;
   if (!h) return false;
   if (h.kind === 'altitude') return core.position.y >= h.min && core.position.y <= h.max;
+  const speed = Math.hypot(velocity.x, velocity.y, velocity.z);
+  if (h.kind === 'speed') return speed >= h.min && speed <= h.max;
+  if (h.kind === 'stop') return inGoal(s, core.position) && speed <= h.maxSpeed;
   const q = core.quaternion;
   return Math.acos(Math.max(-1, Math.min(1, 1 - 2 * (q.x * q.x + q.z * q.z)))) <= h.maxTilt;
 }

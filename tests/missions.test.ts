@@ -8,6 +8,8 @@ import { MISSIONS, holds } from '../src/challenge/scenarios';
 const SOLUTIONS: Record<string, [string, string]> = {
   balance: ['ENGINE = 0 ', 'ENGINE = 20000 * tilt - 2000 * spin '],
   hover: ['local power = 7300 ', 'local power = 7300 + (3 - h) * 6000 - vy * 4000 '],
+  cruise: ['ENGINE = 300 ', 'ENGINE = (10 - speed) * 300 '],
+  stop: ['ENGINE = 300 ', 'ENGINE = (z + 50) * 40 + vz * 150 '],
 };
 
 async function framesToClear(source: string, mission: (typeof MISSIONS)[number]): Promise<number> {
@@ -19,7 +21,7 @@ async function framesToClear(source: string, mission: (typeof MISSIONS)[number])
     for (let f = 0; f < mission.timeLimit * 30; f++) {
       sim.step();
       const core = sim.physics.tiles[0];
-      held = holds(mission, { position: core.position, quaternion: core.quaternion }) ? held + 1 : 0;
+      held = holds(mission, { position: core.position, quaternion: core.quaternion }, sim.coreVelocity()) ? held + 1 : 0;
       if (held >= need) return sim.frame;
       expect(sim.scriptError).toBeNull();
     }

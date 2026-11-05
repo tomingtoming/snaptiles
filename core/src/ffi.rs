@@ -413,3 +413,15 @@ pub unsafe extern "C" fn core_eval(id: u32, ptr: *const u8, len: usize) -> *cons
     });
     text_out(&msg)
 }
+
+/// Run the script to its next line and stop there (starting a frame if none is under way); the frame completes when no
+/// line is left. The page's "next line" while paused at a breakpoint.
+#[no_mangle]
+pub extern "C" fn core_step_line(id: u32) {
+    with_slot(id, (), |slot| {
+        if let Some(sim) = slot.sim.as_mut() {
+            sim.step_line();
+        }
+        refresh(slot);
+    });
+}

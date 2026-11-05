@@ -29,6 +29,7 @@ export interface SnapTilesCoreModule {
   _core_check(ptr: number, len: number): number;
   _core_reload_script(id: number, ptr: number, len: number): number;
   _core_eval(id: number, ptr: number, len: number): number;
+  _core_step_line(id: number): void;
 }
 declare const SnapTilesCore: (options?: Record<string, unknown>) => Promise<SnapTilesCoreModule>;
 export default SnapTilesCore;

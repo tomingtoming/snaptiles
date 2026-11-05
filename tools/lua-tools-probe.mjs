@@ -95,7 +95,19 @@ try{
  assert.match(await page.textContent('#debug-bp-list'),/count > 0・3回目〜/);
  await page.click('#debug-play');
  await page.waitForFunction(()=>!document.getElementById('debug-break').hidden);
- assert.match(await page.textContent('#debug-break'),new RegExp(`${outLine}行目で停止`));
+ assert.match(await page.textContent('#debug-break'),new RegExp(`${outLine}行目で一時停止中`));
+ // suspended mid-frame: the line marked in the gutter, the frame not counted until it completes
+ assert.equal(await page.evaluate(()=>window.__sim.midFrame),true);
+ await page.waitForFunction(l=>document.querySelector(`#source-gutter [data-line="${l}"]`).classList.contains('cur'),outLine);
+ const pausedFrame=await page.evaluate(()=>window.__sim.frame);
+ await page.click('#debug-break button:has-text("次の行")');
+ await page.waitForFunction(l=>document.querySelector(`#source-gutter [data-line="${l}"]`).classList.contains('cur'),outLine+1);
+ assert.equal(await page.evaluate(()=>window.__sim.frame),pausedFrame);
+ // mid-frame the console waits: it would land inside a frame, which a replay cannot repeat
+ await page.fill('#debug-console','count'); await page.press('#debug-console','Enter');
+ assert.match(await page.textContent('#debug-console-log .console-err:last-child'),/フレームの途中/);
+ await page.click('#debug-break button:has-text("このフレームを最後まで")');
+ await page.waitForFunction(f=>!window.__sim.midFrame&&window.__sim.frame===f+1,pausedFrame);
  assert.deepEqual(errors,[]);
- console.log('Lua tools: gutter breakpoints, colours, completion (API detail, Esc), live syntax mark, live Lua edit keeps the count, console, rewind repeats the console, breakpoint with condition and pass count pass');
+ console.log('Lua tools: gutter breakpoints, colours, completion (API detail, Esc), live syntax mark, live Lua edit keeps the count, console, rewind repeats the console, breakpoint with condition and pass count suspends mid-frame, next line, finish frame pass');
 }finally{await browser.close();}
