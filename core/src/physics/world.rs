@@ -386,6 +386,8 @@ pub struct World {
     pub wind: Vec3,
     /// Optional authored lake: xmin, xmax, zmin, zmax, surface elevation.
     pub water: Option<[f64; 5]>,
+    /// Positive on measured towing ranges. Zero keeps the original inlet replay physics.
+    pub water_horizontal_drag: f64,
     /// knockable crates (course props), reset with the model
     pub crates: Vec<RigidBodyHandle>,
     pub(crate) assembly: Option<Assembly>,
@@ -443,6 +445,7 @@ impl World {
             balls: Vec::new(),
             wind: Vec3::default(),
             water: None,
+            water_horizontal_drag: 0.0,
             crates,
             assembly: None,
             kerb_pairs: HashSet::new(),
@@ -1069,8 +1072,15 @@ impl World {
                     let displaced = t.spec.mass.min(25.2);
                     let fraction = ((level - p.y) / 0.7).min(1.0);
                     let v = self.velocity(i, &pose);
-                    let drag = (200.0 * drag * v.length()).min(t.mass / (2.0 * self.dt));
-                    let force = Vec3::new(0.0, 15.4 * displaced, 0.0).add_scaled(v, -drag).scale(fraction);
+                    let cap = t.mass / (2.0 * self.dt);
+                    let buoyancy = Vec3::new(0.0, 15.4 * displaced, 0.0);
+                    let force = if self.water_horizontal_drag > 0.0 {
+                        let horizontal = (self.water_horizontal_drag * drag * v.x.hypot(v.z)).min(cap);
+                        let vertical = (200.0 * drag * v.y.abs()).min(cap);
+                        buoyancy.add(Vec3::new(-horizontal * v.x, -vertical * v.y, -horizontal * v.z))
+                    } else {
+                        buoyancy.add_scaled(v, -(200.0 * drag * v.length()).min(cap))
+                    }.scale(fraction);
                     self.world.bodies.get_mut(body).unwrap().add_force_at_point(to_vector(force), to_vector(p), true);
                 }
             }

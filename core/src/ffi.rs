@@ -370,14 +370,16 @@ pub unsafe extern "C" fn core_add_surface(id: u32, ptr: *const f64, n: u32, grip
 
 /// Configure a rectangular authored lake. Rejected bounds leave the previous configuration intact.
 #[no_mangle]
-pub extern "C" fn core_set_water(id: u32, xmin: f64, xmax: f64, zmin: f64, zmax: f64, level: f64) -> i32 {
+pub extern "C" fn core_set_water(id: u32, xmin: f64, xmax: f64, zmin: f64, zmax: f64, level: f64, horizontal_drag: f64) -> i32 {
     let water = [xmin, xmax, zmin, zmax, level];
-    if !water.iter().all(|v| v.is_finite()) || xmin >= xmax || zmin >= zmax {
+    if !(0.0..=200.0).contains(&horizontal_drag) || !water.iter().all(|v| v.is_finite()) || xmin >= xmax || zmin >= zmax {
         return 1;
     }
     with_slot(id, 1, |slot| match slot.sim.as_ref() {
         Some(sim) => {
-            sim.state_mut().world.water = Some(water);
+            let mut state = sim.state_mut();
+            state.world.water = Some(water);
+            state.world.water_horizontal_drag = horizontal_drag;
             0
         }
         None => 1,

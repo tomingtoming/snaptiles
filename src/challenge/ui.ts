@@ -154,6 +154,10 @@ export class ChallengeUI {
         else if (y < level) title += '｜Core 水面下 ' + (level - y).toFixed(2) + 'm';
         else title += '｜Core 水面上 ' + (y - level).toFixed(2) + 'm';
       }
+      if (s.waterStations) {
+        const z = sim.corePosition().z;
+        title += '｜出発点から' + (z > 0 ? '南' : '北') + Math.abs(z).toFixed(1) + 'm';
+      }
       if (s.centerStripe) {
         const x = sim.corePosition().x;
         title += Math.abs(x) < 0.05 ? '｜中央線上' : `｜中央線から${x < 0 ? '西' : '東'}へ ${Math.abs(x).toFixed(1)}m`;

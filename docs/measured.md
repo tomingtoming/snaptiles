@@ -554,3 +554,18 @@ The earlier terrain comparison inferred a sea threshold near y=49 from a moving 
 Probe: `tools/orig-harness/water-probe.py`, quarantined B26 executable SHA-256 `872ee04f7b432afa169542718c4447172abf9cd28478bea8872d4305622ef199`. The probe uses disposable copies of the game and Wine prefix in an offline WSL namespace. Raw 180-frame CSVs: `quarantine/original/runs/water_core_20261105_s57` and `water_core_near_zero_20261105_s57` in the local model archive.
 
 Four symmetric arms were then attached to the same Core. At frame 20 above the -15 m floor, vertical speeds in m/s were +0.841 with four Chips, +1.428 with four Frames, -1.492 with four Weights and -3.027 with four option-3 Weights. These are instantaneous speeds before floor contact. Both Weight rigs reached the floor. Raw runs: quarantine/original/runs/water_{chips,frames,weights,heavy}_20261105_s58.
+
+## 2026-11-06: forward drag of a twin-jet raft in water
+
+The B26 water harness ran the SnapTiles raft geometry on a flat floor 3 m below the surface. Both jets received the same scripted thrust starting at frame 90. The probe omits colour and manual steering. A trial with the full sample controls produced a startup error. Only the controlled variant provided measurements.
+
+| Thrust per jet | Original speed at frame 180 (m/s) | SnapTiles straight basin (m/s) |
+|---:|---:|---:|
+| 0 | 0.006 | 0.003 |
+| 1200 | 3.239 | 2.836 |
+| 2400 | 6.046 | 5.716 |
+| 3600 | 8.386 | 8.068 |
+
+The 2400 run was held out when selecting horizontal drag. At that setting the original travelled 9.99 m between frames 89 and 180, versus 9.50 m in the basin. At frame 180 the original's pitch was within 0.002 rad of level, versus about 0.08 rad in SnapTiles. A follow-up ran full thrust through frame 540. The original held 10.97 m/s and a pitch within 0.001 rad of level. The basin reached 10.33 m/s with 0.083 rad of pitch. The initial drag coefficient of 1.0 was closer over three seconds but allowed the stock raft to capsize before the 150 m marker under sustained key input. At 1.27 the raft cleared 150 m with three different initial input delays. Sideways resistance and turns remain uncalibrated. The earlier inlet courses keep their force law for replay compatibility.
+
+Raw CSVs in the local quarantine: `runs/raft_isolated_controls_20261106_s67` (1200), `runs/raft_long_3600_20261106_s69` (540 frames), `runs/raft_controlled_{0,3600}_20261106_s67`, and `runs/raft_validation_2400_20261106_s68`. Frame 180 reports local forward velocity. The small original pitch makes it comparable to world forward speed on these runs.

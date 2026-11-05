@@ -1,4 +1,4 @@
-"""Measure an unpowered model on flat land on either side of the original sea.
+"""Measure buoyancy or a scripted twin-jet raft on generated flat land in the original.
 Run under the existing quarantined WSL installation. No original files are shipped.
 The optional output directory must be empty; CSV files record only observations.
 """
@@ -7,6 +7,7 @@ import csv
 import hashlib
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -17,19 +18,34 @@ EXPECTED = "872ee04f7b432afa169542718c4447172abf9cd28478bea8872d4305622ef199"
 PARTS = {"core": None, "chips": "Chip()", "frames": "Frame()", "weights": "Weight()", "heavy": "Weight(option=3)"}
 
 
-def model(name):
+def model(name, thrust):
+    if name == "raft":
+        source = (HERE.parents[1] / "src/samples/raft.ts").read_text(encoding="utf-8")
+        body = source.split("Body {", 1)[1].split(chr(96), 1)[0]
+        # Keep the sample's parts and angles. Both jets use the same scripted command.
+        body = re.sub(r"color=#[0-9a-fA-F]+", "", body)
+        body = body.replace("THRUST+TURN", "POWER").replace("THRUST-TURN", "POWER")
+        return "Val { POWER(default=0,min=-1200,max=3600) }\nKey {}\nBody {" + body + f"""
+Lua {{
+ticks=0
+function OnFrame()
+    ticks=ticks+1
+    if ticks>=90 then POWER={thrust} end
+end
+}}
+"""
     part = PARTS[name]
     arms = " ".join(f"{side}:{part}{{}}" for side in ("N", "S", "W", "E")) if part else ""
     return "Val {}\nKey {}\nBody { Core(){" + arms + "} }\n"
 
 LOGGER = """n=0
-buf="frame,y,vy,h\\n"
+buf="frame,y,vy,h,z,vz,pitch\\n"
 function OnInit() n=0 end
 function OnReset() end
 function OnFrame()
   n=n+1
-  buf=buf..n..",".._Y(0)..",".._VY(0)..",".._H(0).."\\n"
-  if n==180 then
+  buf=buf..n..",".._Y(0)..",".._VY(0)..",".._H(0)..",".._Z(0)..",".._VZ(0)..",".._EX(0).."\\n"
+  if n==LAST_FRAME then
     local f=_FOPEN("water.csv","w")
     if f>=0 then _FPUTS(f,buf) _FCLOSE(f) end
   end
@@ -64,6 +80,7 @@ for i in $(seq 1 100); do
   kill -0 "$pid" || exit 1
   sleep 0.5
 done
+xwininfo -root -tree >&2
 exit 1
 """
 
@@ -72,8 +89,12 @@ def main():
     args = argparse.ArgumentParser()
     args.add_argument("bases", nargs="+", type=int)
     args.add_argument("--out", type=Path)
-    args.add_argument("--model", choices=PARTS, default="core")
+    args.add_argument("--model", choices=[*PARTS, "raft"], default="core")
+    args.add_argument("--thrust", type=int, default=0, help="Raft jet power from frame 90")
+    args.add_argument("--frames", type=int, default=180, choices=range(90, 901), metavar="90..900")
     opts = args.parse_args()
+    if not -1200 <= opts.thrust <= 3600 or (opts.thrust and opts.model != "raft"):
+        args.error("Choose a valid raft thrust between -1200 and 3600")
     original = Path.home() / "rc/RC15B26"
     if hashlib.sha256((original / "RigidChips15B26.exe").read_bytes()).hexdigest() != EXPECTED:
         raise SystemExit("Unexpected executable hash")
@@ -87,8 +108,8 @@ def main():
         shutil.copytree(Path.home() / ".wine-rc", work / "prefix", symlinks=True)
         (work / "home").mkdir()
         resources = work / "game/Resources"
-        (resources / "Basic.txt").write_text(model(opts.model), encoding="ascii")
-        (resources / "System.rcs").write_text(LOGGER, encoding="ascii")
+        (resources / "Basic.txt").write_text(model(opts.model, opts.thrust), encoding="ascii")
+        (resources / "System.rcs").write_text(LOGGER.replace("LAST_FRAME", str(opts.frames)), encoding="ascii")
         template = b"".join((resources / "Land.x.orig").read_bytes().splitlines(keepends=True)[:127])
         for base in opts.bases:
             csv_path = resources / "water.csv"
@@ -105,12 +126,12 @@ def main():
                 detail = log.read_text(errors="replace")[-1500:] if log.exists() else ""
                 raise RuntimeError(f"No observation at land base {base}: {detail}")
             rows = list(csv.DictReader(csv_path.read_text().splitlines()))
-            if len(rows) != 180:
+            if len(rows) != opts.frames:
                 raise RuntimeError(f"Incomplete observation at {base}: {len(rows)} frames")
             if opts.out:
                 shutil.copyfile(csv_path, opts.out / f"{opts.model}_base{base}.csv")
             print(f"{opts.model} base {base}", [(r["frame"], round(float(r["y"]), 4), round(float(r["vy"]), 4),
-                                   round(float(r["h"]), 4)) for r in rows if int(r["frame"]) in (1, 10, 20, 60, 180)],
+                                   round(float(r["h"]), 4)) for r in rows if int(r["frame"]) in (1, 10, 20, 60, 180, opts.frames)],
                   flush=True)
 
 

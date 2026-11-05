@@ -60,7 +60,7 @@ includes a kilometre-wide plateau with four peaks, a mountain pass and a six-hum
 the left to 55 cm on the right. The brake track pairs a low-grip blue lane with
 ordinary pavement. Brake at the white line to compare stopping distances. Timed courses include a drive over the pass,
 a steering course, and a flyover with altitude gates. Cross the yellow
-checkpoint before the green finish. At **入り江の試走場** (#car&c=tidal-inlet), drive north from the beach to test whether your model floats. Chip and Frame rafts rise in deep water. Weight ballast can sink them. Select **水上から落とす** to release the current model offshore. In **入り江のブイ航路** (#raft&c=inlet-buoys), drive between the yellow buoys and turn right toward the green pair. **地形図** opens the map while driving.
+checkpoint before the green finish. At **入り江の試走場** (#car&c=tidal-inlet), drive north from the beach to test whether your model floats. Chip and Frame rafts rise in deep water. Weight ballast can sink them. Select **水上から落とす** to release the current model offshore. In **入り江のブイ航路** (#raft&c=inlet-buoys), drive between the yellow buoys and turn right toward the green pair. **水上の直線試験場** (#raft&c=tow-basin) has a 200 m water lane with distance markers every 25 m and forward drag fitted to measured raft trials. **地形図** opens the map while driving.
 
 ## Build visually
 

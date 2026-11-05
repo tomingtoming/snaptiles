@@ -584,15 +584,21 @@ export class SceneView {
     }
     for (const surface of s.surfaces ?? []) addMesh(hull(box(...surface.bounds)), surface.color, false);
     for (const o of s.solids) addMesh(hull(o), 0x9aa3ab, true);
+    const buoy = (x: number, z: number, level: number, color: number) => {
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.45, 12, 8), new THREE.MeshStandardMaterial({ color }));
+      mesh.position.set(x, level + 0.13, z);
+      this.scenarioGroup.add(mesh);
+    };
+    if (s.water && s.waterStations) {
+      for (const distance of s.waterStations.distances) {
+        const color = distance % 50 === 0 ? 0xf0a032 : 0xf7f3db;
+        for (const x of [s.waterStations.left, s.waterStations.right]) buoy(x, -distance, s.water[4], color);
+      }
+    }
     // the goal (green) and a mission's waypoint (yellow): translucent zones with their outlines
     const zone = ([x0, x1, y0, y1, z0, z1]: number[], fill: number, line: number) => {
       if (s.water) {
-        for (const x of [x0, x1]) {
-          const buoy = new THREE.Mesh(new THREE.SphereGeometry(0.45, 12, 8),
-            new THREE.MeshStandardMaterial({ color: fill }));
-          buoy.position.set(x, s.water[4] + 0.13, z1);
-          this.scenarioGroup.add(buoy);
-        }
+        for (const x of [x0, x1]) buoy(x, z1, s.water[4], fill);
       }
       const geo = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
       const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: fill, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide }));

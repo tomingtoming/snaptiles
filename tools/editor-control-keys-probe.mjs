@@ -27,7 +27,7 @@ try{
  for(const k of ['ArrowUp','ArrowRight','a','z'])await page.keyboard.up(k);
  await page.waitForFunction(names=>names.every(n=>window.__sim.env(n)===0),names);
  await page.setViewportSize({width:320,height:568});assert.deepEqual(await page.locator('#keys .cap').allTextContents(),['↑','↓','←','→','Z','X','A','D']);
- const thrust=page.locator('#keys .cap').filter({hasText:/^Z$/});const r=await thrust.boundingBox();await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();
+ const thrust=page.locator('#keys .cap').filter({hasText:/^Z$/});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await thrust.hover();await page.mouse.down();
  await page.waitForFunction(()=>window.__sim.env('ST_POWER_1')===3000);assert.equal((await values())[1],0);await page.mouse.up();await page.waitForFunction(()=>window.__sim.env('ST_POWER_1')===0);
  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
  await page.screenshot({path:fileURLToPath(new URL('../.shots/editor-flight-controls.png',import.meta.url))});

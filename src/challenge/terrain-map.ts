@@ -150,6 +150,15 @@ export class TerrainMap {
       lake.setAttribute('height', String(zmax - zmin));
       lake.setAttribute('fill', '#3994b2');
       fragment.append(lake);
+      if (s.waterStations) for (const distance of s.waterStations.distances) {
+        for (const x of [s.waterStations.left, s.waterStations.right]) {
+          const marker = document.createElementNS(NS, 'circle');
+          marker.setAttribute('cx', String(x)); marker.setAttribute('cy', String(-distance));
+          marker.setAttribute('r', '1.6');
+          marker.setAttribute('fill', distance % 50 === 0 ? '#f0a032' : '#f7f3db');
+          fragment.append(marker);
+        }
+      }
     }
     this.legend.hidden = !s.contourInterval;
     if (s.contourInterval) {

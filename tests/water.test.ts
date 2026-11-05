@@ -51,3 +51,31 @@ it.each([[0, -1], [1, 1], [2, -1], [3, 1]])('keeps the raft upright with control
     expect((control >= 2 ? p.x : p.z) * direction).toBeGreaterThan(2);
   } finally { await sim.dispose(); }
 });
+
+it.each([[0, 0.006], [1200, 3.239], [2400, 6.046], [3600, 8.386]])(
+  'reproduces the measured towing speed at frame 180, thrust %i', async (power, original) => {
+    const control = '\nLua {\nticks=0\nfunction OnFrame()\nticks=ticks+1\nif ticks>=90 then THRUST=' + power + ' end\nend\n}';
+    const sim = new RustSimulation(RAFT + control, new KeyState(new EventTarget()), { scenario: scenarioById('tow-basin') });
+    try {
+      await sim.start();
+      for (let frame = 0; frame < 180; frame++) sim.step();
+      expect(Math.abs(-sim.coreVelocity().z - original)).toBeLessThan(power === 0 ? 0.02 : 0.45);
+    } finally { await sim.dispose(); }
+  },
+);
+
+it.each([0, 45, 90])('keeps the raft upright for 150 m when thrust begins at frame %i', async delay => {
+  const keys = new KeyState(new EventTarget());
+  const sim = new RustSimulation(RAFT, keys, { scenario: scenarioById('tow-basin') });
+  try {
+    await sim.start();
+    while (sim.frame < 660 && sim.corePosition().z > -150) {
+      if (sim.frame === delay) keys.press(0);
+      sim.step();
+      const q = sim.physics.tiles[0].quaternion;
+      expect(1 - 2 * (q.x * q.x + q.z * q.z)).toBeGreaterThan(0.95);
+    }
+    expect(sim.corePosition().z).toBeLessThanOrEqual(-150);
+    expect(Math.abs(-sim.coreVelocity().z - 10.969)).toBeLessThan(0.7);
+  } finally { await sim.dispose(); }
+});

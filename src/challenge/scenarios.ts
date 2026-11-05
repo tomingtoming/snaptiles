@@ -26,6 +26,8 @@ export interface Scenario {
   brakingTest?: { entryKmh: number; stopKmh: number };
   brakeLine?: number; // z of the common braking reference, measured toward north
   water?: [number, number, number, number, number]; // xmin, xmax, zmin, zmax, surface elevation
+  waterStations?: { left: number; right: number; distances: number[] }; // north from z=0
+  waterHorizontalDrag?: number; // measured flat-water range; legacy inlets use isotropic drag
   runway?: { width: number; north: number; south: number };
   contourInterval?: number; // vertical spacing of elevation lines on the map, in metres
   terrainColorRange?: [number, number]; // elevations of the low and high ground colours
@@ -174,6 +176,21 @@ function inlet(offshore = false): Scenario {
   };
 }
 
+/** A level 200 m water lane with 3 m of depth through the measuring reach. */
+function towBasin(): Scenario {
+  const xs = [-42, -30, -18, 0, 18, 30, 42];
+  const zs = [40, 30, 18, 0, -150, -162, -170, -180];
+  const heights = zs.map(z => xs.map(x =>
+    3 + Math.max(-3, Math.min(1, -Math.min(30 - Math.abs(x), 30 - z, z + 170) / 4))));
+  return {
+    ...heightfield(xs, zs, heights), id: 'tow-basin', title: '水上の直線試験場',
+    description: '水深3mの直線水路。北へ加速し、25mおきの標識で距離と速さを比べられます。',
+    water: [-30, 30, -170, 30, 3], waterHorizontalDrag: 1.27,
+    waterStations: { left: -10, right: 10, distances: [25, 50, 75, 100, 125, 150] }, terrainColorRange: [0, 4],
+    freeDrive: true, budget: Infinity, timeLimit: Infinity, solids: [],
+  };
+}
+
 const pass = mountainPass();
 
 /** Three alternating side slopes. Longitudinal transitions are long enough
@@ -280,6 +297,7 @@ const normalBrakeTrack = brakeTrack(true);
 const offshoreInlet = inlet(true);
 export const FREE_DRIVES: Scenario[] = [
   inlet(),
+  towBasin(),
   slickBrakeTrack,
   {
     ...sideSlopes,
