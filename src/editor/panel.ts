@@ -250,7 +250,7 @@ export class BuildPanel {
     document.getElementById('script-error-goto')!.onclick = () => {
       const hit = diagnosticLine(this.source.value, this.status.textContent ?? '');
       if (!hit) return;
-      this.source.focus(); this.source.setSelectionRange(hit.start, hit.end); this.revealSource(hit.start);
+      this.focusSourceRange(hit.start, hit.end);
     };
   }
   private luaBlockOffset(): number | null {
@@ -258,6 +258,11 @@ export class BuildPanel {
       const block = findBlocks(this.document.text).find(b => /^lua$/i.test(b.name));
       return block ? block.offset : null;
     } catch { return null; }
+  }
+  focusSourceRange(start: number, end: number): void {
+    this.source.focus();
+    this.source.setSelectionRange(start, end);
+    this.revealSource(start);
   }
   /** scroll the source so the line holding this offset is in view */
   private revealSource(offset: number): void {

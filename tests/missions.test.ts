@@ -8,6 +8,7 @@ import { MISSIONS, MissionProgress } from '../src/challenge/scenarios';
 const SOLUTIONS: Record<string, [string, string]> = {
   balance: ['ENGINE = 0 ', 'ENGINE = 20000 * tilt - 2000 * spin '],
   hover: ['local power = 7300 ', 'local power = 7300 + (3 - h) * 6000 - vy * 4000 '],
+  'terrain-hover': ['local h = _Y(0)', 'local h = _H(0)'],
   cruise: ['ENGINE = 300 ', 'ENGINE = (10 - speed) * 300 '],
   stop: ['ENGINE = 300 ', 'ENGINE = (z + 50) * 40 + vz * 150 '],
   shuttle: ['ENGINE = (z + 30) * 40 + vz * 150 ', 'if z < -29 then back = true end  ENGINE = (z - (back and 0 or -30)) * 40 + vz * 150 '],
@@ -22,7 +23,8 @@ async function framesToClear(source: string, mission: (typeof MISSIONS)[number])
     for (let f = 0; f < mission.timeLimit * 30; f++) {
       sim.step();
       const core = sim.physics.tiles[0];
-      if (progress.step(sim.frame, { position: core.position, quaternion: core.quaternion }, sim.coreVelocity())) return sim.frame;
+      const clearance = mission.mission?.hold.kind === 'clearance' ? Number(sim.apiValue('_H', 0)) : undefined;
+      if (progress.step(sim.frame, { position: core.position, quaternion: core.quaternion }, sim.coreVelocity(), clearance)) return sim.frame;
       expect(sim.scriptError).toBeNull();
     }
     return -1;

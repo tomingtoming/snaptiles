@@ -1,0 +1,67 @@
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+
+const browser = await chromium.launch();
+try {
+  const page = await browser.newPage({ permissions: ['clipboard-read', 'clipboard-write'] });
+  await page.goto(process.argv[2] + '#hover');
+  await page.waitForFunction(() => window.__sim);
+  await page.click('#challenge-open');
+  await page.click('[data-course-section="course-lessons"]');
+  await page.getByRole('button', { name: /斜面に沿って飛ぶ/ }).click();
+  await page.waitForFunction(() => window.__sim?.scenario?.id === 'terrain-hover');
+  await page.waitForFunction(() => location.hash === '#lesson=terrain-hover');
+  await page.reload();
+  await page.waitForFunction(() => window.__sim?.scenario?.id === 'terrain-hover');
+  const starter = await page.inputValue('#source');
+  assert.match(starter, /local h = _Y\(0\)/);
+  await page.click('#build');
+  await page.click('#share-model');
+  await page.waitForFunction(() => document.getElementById('share-url').value.endsWith('#lesson=terrain-hover'));
+  await page.click('#share-dialog form button');
+  await page.click('#run');
+  await page.waitForFunction(() => document.getElementById('builder').hidden);
+  await page.click('#mission-edit');
+  const selected = () => page.$eval('#source', el => el.value.slice(el.selectionStart, el.selectionEnd));
+  assert.equal(await selected(), '_Y(0)');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'source');
+  const pausedFrame = await page.evaluate(() => window.__sim.frame);
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  assert.equal(await page.evaluate(() => window.__sim.frame), pausedFrame);
+  const runLesson = () => page.evaluate(() => {
+    const step = document.getElementById('debug-forward');
+    const result = document.getElementById('challenge-result');
+    // Frame stepping uses the game's normal physics and mission judge.
+    for (let i = 0; i <= 45 * 30 && !result.open; i++) step.click();
+    return document.getElementById('challenge-result-title').textContent;
+  });
+  assert.match(await runLesson(), /時間切れ/);
+  await page.click('#challenge-result form button');
+  const corrected = starter.replace('local h = _Y(0)', 'local h = _H(0)');
+  await page.click('#mission-edit');
+  assert.equal(await selected(), '_Y(0)');
+  await page.keyboard.insertText('_H(0)');
+  assert.equal(await page.inputValue('#source'), corrected);
+  await page.keyboard.press('Control+Enter');
+  await page.waitForFunction(() => window.__sim?.source.includes('local h = _H(0)'));
+  await page.waitForFunction(() => location.hash.startsWith('#m=') && location.hash.endsWith('&c=terrain-hover'));
+  await page.reload();
+  await page.waitForFunction(() => window.__sim?.scenario?.id === 'terrain-hover');
+  assert.equal(await page.inputValue('#source'), corrected);
+  assert.match(await runLesson(), /クリア！ 斜面に沿って飛ぶ/);
+  const time = await page.locator('#challenge-result-body dd').first().textContent();
+  await page.click('#challenge-copy');
+  await page.waitForFunction(async () => (await navigator.clipboard.readText()).includes('&r='));
+  const replay = await page.evaluate(() => navigator.clipboard.readText());
+  assert.match(new URL(replay).hash, /^#m=[^&]+&c=terrain-hover&r=.+$/);
+  const receiver = await browser.newPage();
+  await receiver.goto(replay);
+  await receiver.waitForFunction(() => document.getElementById('challenge-result').open);
+  assert.equal(await receiver.locator('#challenge-result-body dd').first().textContent(), time);
+  const body = await receiver.textContent('#challenge-result-body');
+  assert.match(body, /再計算して確認済み/);
+  assert.doesNotMatch(body, /自己ベスト/);
+  console.log('Terrain following: world altitude timed out; downward range cleared the same course:', body);
+} finally {
+  await browser.close();
+}

@@ -13,6 +13,7 @@ export interface ChallengeHost {
   reload(source?: string): void;
   /** a link to the current model, challenge and run */
   recordLink(): Promise<string>;
+  editLesson(): void;
 }
 
 interface Best { time: number; cost: number }
@@ -47,6 +48,7 @@ export class ChallengeUI {
     $('challenge-open').addEventListener('click', () => this.openDialog());
     $('course-restart').addEventListener('click', () => { this.dialog.close(); this.host.reload(); });
     $('challenge-leave').addEventListener('click', () => { this.dialog.close(); this.select(null); });
+    $('mission-edit').addEventListener('click', () => this.host.editLesson());
     $('brake-compare').addEventListener('click', () => {
       const road = scenarioById(this.active?.compareRoad?.id);
       if (road) this.select(road);
@@ -103,6 +105,7 @@ export class ChallengeUI {
 
   /** a new simulation: a fresh start, or the same run re-run to a frame (a clear after that frame is undone) */
   attach(sim: RustSimulation, rewound: boolean): void {
+    $('mission-edit').hidden = !sim.scenario?.mission;
     const compare = $('brake-compare');
     compare.hidden = !sim.scenario?.compareRoad;
     compare.textContent = sim.scenario?.compareRoad?.label ?? '';
@@ -117,8 +120,9 @@ export class ChallengeUI {
     const s = this.active;
     if (!s || s.freeDrive || sim.scenario !== s || this.cleared !== null || this.failed) return;
     const core = sim.physics.tiles[0];
+    const clearance = s.mission?.hold.kind === 'clearance' ? Number(sim.apiValue('_H', 0)) : undefined;
     const done = s.mission
-      ? !!core && this.progressFor(s).step(sim.frame, { position: core.position, quaternion: core.quaternion }, sim.coreVelocity())
+      ? !!core && this.progressFor(s).step(sim.frame, { position: core.position, quaternion: core.quaternion }, sim.coreVelocity(), clearance)
       : (!s.checkpoint || sim.checkpointPassed) && inGoal(s, sim.corePosition());
     if (done) {
       this.cleared = sim.frame;
@@ -182,7 +186,8 @@ export class ChallengeUI {
     const cost = modelCost(sim.assembly!);
     const time = sim.frame / FRAME_RATE;
     const within = cost <= s.budget;
-    const verified = !!sim.player && sim.replaying;
+    // Results judge the completed frame, including the final one in the recording.
+    const verified = !!sim.player && sim.frame > 0 && sim.frame <= sim.player.frames;
     const lua = !!sim.model.script;
     let note = '';
     if (cleared && within && !verified) {

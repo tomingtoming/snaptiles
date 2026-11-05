@@ -11,7 +11,7 @@ import { SourceView } from './editor/source-view';
 import { Completion } from './editor/completion';
 import { diagnosticLine } from './editor/script';
 import { ChallengeUI } from './challenge/ui';
-import { scenarioById } from './challenge/scenarios';
+import { scenarioById, type Scenario } from './challenge/scenarios';
 import { Sfx } from './audio/sfx';
 import { SAMPLES } from './samples';
 
@@ -126,6 +126,19 @@ const challenge = new ChallengeUI({
   reload: (source) => {
     if (source !== undefined) { builder.loadSource(source); refreshSampleButtons(); }
     void loadAndShare(source ?? sourceEl.value);
+  },
+  editLesson: () => {
+    paused = true;
+    // Each starter marks its editable assignment with a Japanese Lua comment.
+    // If the learner removed the marker, stay at their current selection.
+    const match = /^([^\n]*?)--[^\n]*ここを[^\n]*$/m.exec(sourceEl.value);
+    if (!match) {
+      builder.focusSourceRange(sourceEl.selectionStart, sourceEl.selectionEnd);
+      return;
+    }
+    const code = match[1].trimEnd();
+    const rhs = code.slice(code.indexOf('=') + 1).trimStart();
+    builder.focusSourceRange(match.index + code.length - rhs.length, match.index + code.length);
   },
   recordLink: async () => {
     const s = sim!;
@@ -651,6 +664,9 @@ let shareGeneration = 0;
 shareDialog.addEventListener('close', () => { ++shareGeneration; });
 const shareRun = $<HTMLInputElement>('share-run');
 const shareRunRow = $('share-run-row');
+function lessonFragment(text: string, course: Scenario | null | undefined): string | null {
+  return course?.mission?.starter === text ? `lesson=${course.id}` : null;
+}
 async function makeShareLink(): Promise<void> {
   const text = sourceEl.value;
   const request = ++shareGeneration;
@@ -662,11 +678,14 @@ async function makeShareLink(): Promise<void> {
   if (run) $('share-run-length').textContent = (run.frames / 30).toFixed(1);
   try {
     if (!parseRc(text).body) throw new Error('Body がありません');
-    const hash = await encodeHash(text);
-    const recording = run && shareRun.checked ? await encodeRecording(run) : null;
+    const course = sim?.scenario;
+    const includeRun = run && shareRun.checked;
+    const lesson = includeRun ? null : lessonFragment(text, course);
+    const fragment = lesson ?? `m=${await encodeHash(text)}${course ? `&c=${course.id}` : ''}`;
+    const recording = includeRun ? await encodeRecording(run) : null;
     if (request !== shareGeneration || !shareDialog.open) return;
-    const course = sim?.scenario ? `&c=${sim.scenario.id}` : '';
-    const url = new URL(location.href); url.hash = `m=${hash}${course}${recording ? `&r=${recording}` : ''}`;
+    const url = new URL(location.href);
+    url.hash = fragment + (recording ? `&r=${recording}` : '');
     shareUrl.value = url.href; copyLink.disabled = false;
     shareStatus.textContent = ''; shareUrl.focus(); shareUrl.select();
   } catch (error) {
@@ -692,7 +711,8 @@ const encodeHash = encodeText;
 const decodeHash = decodeText;
 async function publishHash(text: string, request: number): Promise<void> {
   const sample = SAMPLES.find((s) => s.source === text);
-  const h = (sample ? `#${sample.name}` : `#m=${await encodeHash(text)}`) + (challenge.active ? `&c=${challenge.active.id}` : '');
+  const lesson = lessonFragment(text, challenge.active);
+  const h = lesson ? `#${lesson}` : (sample ? `#${sample.name}` : `#m=${await encodeHash(text)}`) + (challenge.active ? `&c=${challenge.active.id}` : '');
   if (request === loadGeneration && location.hash !== h) history.replaceState(null, '', h);
 }
 
@@ -711,6 +731,14 @@ async function boot(): Promise<void> {
   if (runCode) {
     try { player = await decodeRecording(runCode); } catch { player = null; }
     if (request !== loadGeneration) return;
+  }
+  const lesson = h.startsWith('lesson=') ? scenarioById(h.slice(7)) : null;
+  if (lesson?.mission) {
+    challenge.active = lesson;
+    builder.loadSource(lesson.mission.starter);
+    refreshSampleButtons();
+    await load(lesson.mission.starter, request, player);
+    return;
   }
   if (h.startsWith('m=')) {
     try {

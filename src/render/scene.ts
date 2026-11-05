@@ -649,7 +649,7 @@ export class SceneView {
     this.camTarget.copy(center);
     const horiz = this.leashDist * Math.cos(this.leashPitch);
     const bearing = new THREE.Vector3(0.930, 0, -0.367);
-    if (scenario?.freeDrive) bearing.set(0, 0, 1);
+    if (scenario?.freeDrive || (scenario?.mission && scenario.terrainBounds)) bearing.set(0, 0, 1);
     if (scenario?.goal && !scenario.mission) {
       const [x0, x1, , , z0, z1] = scenario.goal;
       const away = new THREE.Vector3(center.x - (x0 + x1) / 2, 0, center.z - (z0 + z1) / 2);

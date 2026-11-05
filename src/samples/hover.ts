@@ -1,4 +1,5 @@
-export const HOVER = `// hover platform: four jets with a Lua altitude/attitude hold. ↑↓ forward/back, ←→ sideways, A/D turn
+export function hoverModel(title: string, targetHeight: number, sensor: string): string {
+  return `// ${title}
 Val
 {
   FWD(default=0, min=-1, max=1, step=0.1)
@@ -39,10 +40,10 @@ Body
 Lua
 {
   function clamp(v, lo, hi) if v < lo then return lo elseif v > hi then return hi end return v end
-  TARGET = 3
+  TARGET = ${targetHeight}
   lastPitch, lastRoll = 0, 0
   function OnFrame()
-    local h = _H(0)
+    ${sensor}
     if h < 0 then h = TARGET end
     local vy = _VY(0)
     local pitch = -math.deg(_AX(0))  -- _AX is nose-up positive (measured); the controller wants nose-down positive
@@ -63,3 +64,6 @@ Lua
   end
 }
 `;
+}
+
+export const HOVER = hoverModel("hover platform: four jets with a Lua altitude/attitude hold. ↑↓ forward/back, ←→ sideways, A/D turn", 3, 'local h = _H(0)');

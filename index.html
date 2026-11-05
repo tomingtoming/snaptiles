@@ -58,7 +58,7 @@
       <pre id="vals"></pre>
       <pre id="out"></pre>
       <div id="keys"></div>
-      <div id="challenge-banner" hidden role="status"><span id="challenge-banner-text"></span><button id="brake-compare" type="button" hidden></button><button id="challenge-quit" type="button">平地に戻る</button></div>
+      <div id="challenge-banner" hidden role="status"><span id="challenge-banner-text"></span><button id="mission-edit" type="button" title="一時停止して課題の行へ。Ctrl+Enterで試す" hidden>Luaを編集</button><button id="brake-compare" type="button" hidden></button><button id="challenge-quit" type="button">平地に戻る</button></div>
       <details id="terrain-map" hidden>
         <summary>地形図</summary>
         <svg role="img" aria-label="上が北。白い点が現在地、黄色が中間地点、緑がゴール"></svg>
@@ -108,7 +108,7 @@
     </dialog>
     <dialog id="share-dialog" aria-labelledby="share-title">
       <h2 id="share-title">共有リンク</h2>
-      <p>リンクを作った時点の編集内容を開けます。</p>
+      <p>編集したモデルは、リンクを作った時点の内容で開きます。ミッションの初期状態を共有すると、教材を直接開くリンクになります。</p>
       <label for="share-url">モデルのURL</label>
       <input id="share-url" type="text" readonly />
       <label id="share-run-row" class="share-run" hidden><input id="share-run" type="checkbox" /> いまの走り（<span id="share-run-length"></span> 秒）も含める</label>
@@ -186,7 +186,7 @@
       <p><strong>地形・お題</strong>で走る場所を選べます。自由走行の「峠」は登坂や旋回、「波状路」は車輪や足回りの試走向けです。「地形図」を開くと、白い点で現在地を確認できます。</p>
       <p>お題は予算内で機体を組み、Coreを緑のゴールへ運びます。黄色の中間地点があるコースでは先にそこを通ってください。「峠の空路」は指定高度を飛びます。完走すると、このブラウザに自己ベストが残ります。記録リンクを開くと同じ走りを再計算します。</p>
       <p><strong>アクセス解析：</strong>このサイトは訪問数を知るために Cloudflare Web Analytics を使っています。Cookieは使わず、個人を特定する情報は集めません。モデル・走り・自己ベストを集める仕組みはありません（自己ベストはこのブラウザにだけ保存されます）。</p>
-      <p><strong>ミッション：</strong>「地形・お題」のミッションは、Luaで制御を作る練習です。選ぶと練習用の機体に替わります（「組む」の取り消しで元の機体に戻せます）。易しい順に、車の速さを保つ、決めた所で止まる、行って帰る（変数で状態を覚える）、ホバーで高さを保つ、線に乗り換える（ハンドル）、セグウェイを立たせる、の6つがあります。</p>
+      <p><strong>ミッション：</strong>「地形・お題」のミッションは、Luaで制御を作る練習です。選ぶと練習用の機体に替わります（「組む」の取り消しで元の機体に戻せます）。「Luaを編集」で試走を止め、課題の行を書き換えられます。易しい順に、車の速さを保つ、決めた所で止まる、行って帰る（変数で状態を覚える）、ホバーで高さを保つ、斜面に沿って飛ぶ、線に乗り換える（ハンドル）、セグウェイを立たせる、の7つがあります。</p>
       <p><strong>走りの共有：</strong>共有リンクで「いまの走りも含める」を選ぶと、操作の記録がリンクに入ります。開いた人の画面で同じ走りが再生され、キーを押すとそこから操作を引き継げます。</p>
       <p><strong>部品を探す：</strong>部品一覧の「探す…」から、名前・種類を部分一致で検索できます。結果を選んで「選択へ」を押すと部品を選択し、画面もその部品へ移動します。検索はモデルやUndo履歴を変更しません。</p>
       <p><strong>部品名：</strong>「名前・接続先」の「部品名…」で設定・解除できます。名前は大文字で保存され、一覧とスクリプトで使えます。変更・解除してもソース内の参照は書き換えません。コピー・反転した枝には、重複しない別名を付けます。</p>

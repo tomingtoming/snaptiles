@@ -2,6 +2,7 @@
 // any model within the budget and bring its Core into the goal; the run's time and the model's cost are the scores.
 // Courses lie toward −Z, where the samples drive under ↑. A run is recorded from its first step, so a record link
 // (model + run + challenge) is re-run and checked in the receiver's browser.
+import { hoverModel } from '../samples/hover';
 import type { Assembly } from '../model/assemble';
 import { FRAME_RATE } from '../sim/sim-view';
 
@@ -38,6 +39,7 @@ export interface Scenario {
     hold:
       | { kind: 'upright'; maxTilt: number; seconds: number }
       | { kind: 'altitude'; min: number; max: number; seconds: number }
+      | { kind: 'clearance'; min: number; max: number; minSpeed: number; seconds: number }
       | { kind: 'speed'; min: number; max: number; seconds: number }
       /** the Core inside the goal box, nearly still */
       | { kind: 'stop'; maxSpeed: number; seconds: number }
@@ -428,7 +430,7 @@ end
 }
 `;
 
-/** missions: Lua lessons on a bare field, easiest first; the starting model is loaded into the editor */
+/** missions: Lua lessons, easiest first; the starting model is loaded into the editor */
 export const MISSIONS: Scenario[] = [
   {
     id: 'cruise',
@@ -482,6 +484,22 @@ export const MISSIONS: Scenario[] = [
     mission: { starter: HOVER_LESSON, hold: { kind: 'altitude', min: 2.5, max: 3.5, seconds: 10 }, hint: '高さ（_H）と上下の速さ（_VY）から出力を決める' },
   },
   {
+    ...pass,
+    id: 'terrain-hover',
+    title: '斜面に沿って飛ぶ',
+    description: '自動で前進するホバー機で、緑の区間を飛びながら地面から2.5〜4.5mの高さを4秒保とう。',
+    budget: 999,
+    timeLimit: 45,
+    solids: [],
+    goal: [-20, 20, -4, 25, -82, -30],
+    mission: {
+      starter: hoverModel('ミッション：斜面からの高さを保とう。Luaで高さの測り方を選ぶ。', 4,
+        'FWD = clamp((5 + _VZ(0)) * 0.6, -1, 1)  -- 前進速度を保つ\n    local h = _Y(0)  -- ここを変更：斜面の真下までの距離を測ろう'),
+      hold: { kind: 'clearance', min: 2.5, max: 4.5, minSpeed: 2, seconds: 4 },
+      hint: '_Y(0)は標高、_H(0)は真下の地面までの距離',
+    },
+  },
+  {
     id: 'lane',
     title: '線に乗り換える',
     description: '走りながら横へ5m（_X が5の所）移って緑の帯に入り、帯の中を10秒走り続ける。',
@@ -514,9 +532,14 @@ export function holds(
   s: Scenario,
   core: { position: { x: number; y: number; z: number }; quaternion: { x: number; z: number } },
   velocity: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 },
+  clearance?: number,
 ): boolean {
   const h = s.mission?.hold;
   if (!h) return false;
+  if (h.kind === 'clearance') {
+    return clearance !== undefined && clearance >= h.min && clearance <= h.max
+      && inGoal(s, core.position) && Math.hypot(velocity.x, velocity.z) >= h.minSpeed;
+  }
   if (h.kind === 'altitude') return core.position.y >= h.min && core.position.y <= h.max;
   const speed = Math.hypot(velocity.x, velocity.y, velocity.z);
   if (h.kind === 'speed') return speed >= h.min && speed <= h.max;
@@ -542,11 +565,11 @@ export class MissionProgress {
   visitedAt: number | null = null;
   constructor(readonly scenario: Scenario) {}
   /** this frame's state; true once the hold has lasted long enough */
-  step(frame: number, core: { position: { x: number; y: number; z: number }; quaternion: { x: number; z: number } }, velocity: { x: number; y: number; z: number }): boolean {
+  step(frame: number, core: { position: { x: number; y: number; z: number }; quaternion: { x: number; z: number } }, velocity: { x: number; y: number; z: number }, clearance?: number): boolean {
     const m = this.scenario.mission!;
     if (m.via && this.visitedAt === null && inBox(m.via, core.position)) this.visitedAt = frame;
     const ready = !m.via || this.visitedAt !== null;
-    this.held = ready && holds(this.scenario, core, velocity) ? this.held + 1 : 0;
+    this.held = ready && holds(this.scenario, core, velocity, clearance) ? this.held + 1 : 0;
     return this.held >= m.hold.seconds * FRAME_RATE;
   }
   /** a re-run to `frame`: the hold starts over, a pass through `via` after that frame is undone */
