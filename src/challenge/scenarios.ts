@@ -154,6 +154,18 @@ function heightfield(xs: number[], zs: number[], heights: number[][]): Pick<Scen
 }
 
 const pass = mountainPass();
+
+/** Three alternating side slopes. Longitudinal transitions are long enough
+ * to drive them with stock wheels; the flat ends provide a repeatable start. */
+function crossSlopes(): Pick<Scenario, 'ground' | 'terrainFaces' | 'terrainBounds'> {
+  const xs = [-24, -12, 0, 12, 24];
+  const zs = [20, 0, -12, -30, -45, -65, -80, -100, -115, -135, -155];
+  const rolls = [0, 0, 0, 7, 7, -10, -10, 12, 12, 0, 0];
+  const heights = rolls.map(roll => xs.map(x => (roll === 0 ? 0 : 3.2)
+    + Math.max(-12, Math.min(12, x)) * Math.tan(roll * Math.PI / 180)));
+  return heightfield(xs, zs, heights);
+}
+const sideSlopes = crossSlopes();
 /** Six transverse humps. The left side barely ripples; the right side reaches
  * axle height. A long flat entry and runout allow a repeatable approach. */
 function washboard(): Pick<Scenario, 'ground' | 'terrainFaces' | 'terrainBounds'> {
@@ -231,6 +243,17 @@ const slickBrakeTrack = brakeTrack(false);
 const normalBrakeTrack = brakeTrack(true);
 export const FREE_DRIVES: Scenario[] = [
   slickBrakeTrack,
+  {
+    ...sideSlopes,
+    id: 'cross-slopes',
+    title: '片勾配の試走路',
+    description: '前方の路面が右上がり7°、左上がり10°、右上がり12°と変わります。横流れと姿勢の戻りを試せます。',
+    freeDrive: true,
+    budget: Infinity,
+    timeLimit: Infinity,
+    terrainColorRange: [0, 6],
+    solids: [],
+  },
   {
     ...plateau,
     id: 'highlands',
