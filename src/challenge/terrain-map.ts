@@ -141,6 +141,16 @@ export class TerrainMap {
       face.setAttribute('fill', `hsl(${99 - 66 * level} 28% ${34 + 14 * level}%)`);
       fragment.append(face);
     }
+    if (s.water) {
+      const [xmin, xmax, zmin, zmax] = s.water;
+      const lake = document.createElementNS(NS, 'rect');
+      lake.setAttribute('x', String(xmin));
+      lake.setAttribute('y', String(zmin));
+      lake.setAttribute('width', String(xmax - xmin));
+      lake.setAttribute('height', String(zmax - zmin));
+      lake.setAttribute('fill', '#3994b2');
+      fragment.append(lake);
+    }
     this.legend.hidden = !s.contourInterval;
     if (s.contourInterval) {
       this.legend.textContent = `等高線 ${s.contourInterval}m間隔`;

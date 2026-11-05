@@ -25,6 +25,7 @@ export interface Scenario {
   compareRoad?: { id: string; label: string };
   brakingTest?: { entryKmh: number; stopKmh: number };
   brakeLine?: number; // z of the common braking reference, measured toward north
+  water?: [number, number, number, number, number]; // xmin, xmax, zmin, zmax, surface elevation
   runway?: { width: number; north: number; south: number };
   contourInterval?: number; // vertical spacing of elevation lines on the map, in metres
   terrainColorRange?: [number, number]; // elevations of the low and high ground colours
@@ -154,6 +155,22 @@ function heightfield(xs: number[], zs: number[], heights: number[][]): Pick<Scen
   return { ground, terrainFaces, terrainBounds: [xs[0], xs[xs.length - 1], zs[zs.length - 1], zs[0]] };
 }
 
+function inlet(): Scenario {
+  const xs = [-65, -36, -26, 0, 26, 36, 65];
+  const zs = [30, 0, -18, -29, -70, -83, -99, -120];
+  const heights = zs.map(z => xs.map(x => {
+    const inland = Math.min(36 - Math.abs(x), -18 - z, z + 99);
+    return Math.max(-3, Math.min(1, -inland / 5));
+  }));
+  return {
+    ...heightfield(xs, zs, heights),
+    id: 'tidal-inlet', title: '入り江の試走場',
+    description: '北の砂浜から水に入れます。Chipを組んだ機体とWeightを積んだ機体で浮き方を比べられます。',
+    water: [-36, 36, -99, -18, 0], terrainColorRange: [-2, 1],
+    freeDrive: true, budget: Infinity, timeLimit: Infinity, solids: [],
+  };
+}
+
 const pass = mountainPass();
 
 /** Three alternating side slopes. Longitudinal transitions are long enough
@@ -258,6 +275,7 @@ function brakeTrack(normal: boolean): Scenario {
 const slickBrakeTrack = brakeTrack(false);
 const normalBrakeTrack = brakeTrack(true);
 export const FREE_DRIVES: Scenario[] = [
+  inlet(),
   slickBrakeTrack,
   {
     ...sideSlopes,

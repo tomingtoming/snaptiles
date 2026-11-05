@@ -530,6 +530,17 @@ export class SceneView {
     } else {
       for (const g of s.ground ?? []) addMesh(hull(g), 0xb9c4b0, false);
     }
+    if (s.water) {
+      const [xmin, xmax, zmin, zmax, level] = s.water;
+      const geometry = new THREE.PlaneGeometry(xmax - xmin, zmax - zmin);
+      geometry.rotateX(-Math.PI / 2);
+      const surface = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+        color: 0x368baf, roughness: 0.28, transparent: true, opacity: 0.64,
+        depthWrite: false, side: THREE.DoubleSide,
+      }));
+      surface.position.set((xmin + xmax) / 2, level, (zmin + zmax) / 2);
+      this.scenarioGroup.add(surface);
+    }
     if (s.runway || s.brakeLine !== undefined) {
       // Paint on level ground. The ground itself carries the collision surface.
       const positions: number[] = [], colors: number[] = [];

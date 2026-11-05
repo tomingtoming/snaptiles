@@ -384,6 +384,8 @@ pub struct World {
     /// specific gravity 0.3 at x = 2, 6 m up; they survive a reset) and the wind the same scenario cycles with J
     pub balls: Vec<Ball>,
     pub wind: Vec3,
+    /// Optional authored lake: xmin, xmax, zmin, zmax, surface elevation.
+    pub water: Option<[f64; 5]>,
     /// knockable crates (course props), reset with the model
     pub crates: Vec<RigidBodyHandle>,
     pub(crate) assembly: Option<Assembly>,
@@ -440,6 +442,7 @@ impl World {
             regulations: REGULATION_DEFAULTS.iter().map(|(k, v)| (k.to_string(), *v)).collect(),
             balls: Vec::new(),
             wind: Vec3::default(),
+            water: None,
             crates,
             assembly: None,
             kerb_pairs: HashSet::new(),
@@ -1056,6 +1059,21 @@ impl World {
                 self.update_arm(i, &pose, env);
             }
             let body = self.tiles[i].body;
+
+            if let Some([xmin, xmax, zmin, zmax, level]) = self.water {
+                let p = pose.position;
+                if p.x >= xmin && p.x <= xmax && p.z >= zmin && p.z <= zmax && p.y < level {
+                    let t = self.tile(self.tiles[i].tile);
+                    // Original deep-water release: Core/Chip +5.6 m/s² initially, +0.841 m/s terminal.
+                    // A Frame displaces half as much as a Chip; ballast increases mass without displacement.
+                    let displaced = t.spec.mass.min(25.2);
+                    let fraction = ((level - p.y) / 0.7).min(1.0);
+                    let v = self.velocity(i, &pose);
+                    let drag = (200.0 * drag * v.length()).min(t.mass / (2.0 * self.dt));
+                    let force = Vec3::new(0.0, 15.4 * displaced, 0.0).add_scaled(v, -drag).scale(fraction);
+                    self.world.bodies.get_mut(body).unwrap().add_force_at_point(to_vector(force), to_vector(p), true);
+                }
+            }
 
             if is_jet {
                 let t = self.tile(self.tiles[i].tile);

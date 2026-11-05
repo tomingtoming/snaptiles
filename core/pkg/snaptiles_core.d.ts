@@ -28,6 +28,7 @@ export interface SnapTilesCoreModule {
   _core_break(id: number): number;
   _core_add_solid(id: number, ptr: number, n: number): number;
   _core_add_surface(id: number, ptr: number, n: number, grip: number): number;
+  _core_set_water(id: number, xmin: number, xmax: number, zmin: number, zmax: number, level: number): number;
   _core_check(ptr: number, len: number): number;
   _core_reload_script(id: number, ptr: number, len: number): number;
   _core_eval(id: number, ptr: number, len: number): number;

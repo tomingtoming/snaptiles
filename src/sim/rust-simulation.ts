@@ -206,6 +206,10 @@ export class RustSimulation implements SimView {
     const code = m._core_load(this.id, ptr, bytes.length, (this.bare || sc ? 1 : 0) | (sc?.ground ? 2 : 0));
     m._free(ptr);
     if (code !== 0) throw new Error(m.UTF8ToString(m._core_error(this.id)) || 'model failed to load');
+    if (sc?.water && m._core_set_water(this.id, ...sc.water)) {
+      this.freeCore();
+      throw new Error(sc.title + 'の水域の範囲が正しくありません');
+    }
     const solids = [...(sc?.ground ?? []), ...(sc?.solids ?? [])];
     const addSolid = (solid: Solid, index: number, grip = 1) => {
       const at = m._malloc(solid.length * 24);
