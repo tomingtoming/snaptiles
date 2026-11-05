@@ -24,7 +24,7 @@ export const CONTROL_KEYS = {
 export type ControlKeys = keyof typeof CONTROL_KEYS;
 export type ControlPair = ControlKeys | readonly [number, number];
 
-export interface CopiedBranch { text: string; variables: string[]; partNames: string[]; count: number }
+export interface CopiedBranch { text: string; variables: string[]; partNames: string[]; count: number; types: string[] }
 
 /** Edits use parser offsets: scripts, comments and unrelated attributes remain byte-for-byte. */
 export class ModelDocument {
@@ -282,7 +282,7 @@ export class ModelDocument {
     }
     const variables = [...new Set(parseRc(this.text).vals.map(v=>v.name.toUpperCase()).filter(name=>reads.has(name)))];
     const partNames = [...new Set(this.nodes().map(n=>n.attrs.name?.replace(/\s/g,'').toUpperCase()).filter((name): name is string => !!name && reads.has(name) && !variables.includes(name)))];
-    return {text, count:nodes.length, variables, partNames};
+    return {text, count:nodes.length, variables, partNames, types: nodes.map(n => n.type.toLowerCase())};
   }
   /** Reflect a branch across its parent's local plane to the opposite attachment edge. */
   mirrorBranch(index: number): number {

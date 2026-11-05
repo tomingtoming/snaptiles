@@ -6,6 +6,10 @@ import { parseRc, findBlocks } from '../rc/parser';
 import { assemble, type Assembly } from '../model/assemble';
 import { LUA_REF, LUA_SNIPPETS, insertScript, diagnosticLine } from './script';
 import type { SceneView } from '../render/scene';
+import { COSTS, typesCost } from '../challenge/scenarios';
+
+/** a part list entry with its cost (the challenges' budget unit) */
+const withCost = (type: string) => `${type}　コスト${COSTS[type.toLowerCase()] ?? 1}`;
 
 const TYPES = ['Chip', 'Frame', 'Wheel', 'Rudder', 'RudderF', 'Trim', 'TrimF', 'Jet', 'Weight', 'Cowl', 'Arm', 'RLW'];
 export class BuildPanel {
@@ -65,8 +69,8 @@ export class BuildPanel {
   }
   constructor(private source: HTMLTextAreaElement, private scene: SceneView, private status: HTMLElement, private enter: () => void) {
     this.document = new ModelDocument(source.value);
-    this.type.add(new Option('Core', 'Core'));
-    for (const type of TYPES) { this.type.add(new Option(type, type)); this.addType.add(new Option(type, type)); }
+    this.type.add(new Option(withCost('Core'), 'Core'));
+    for (const type of TYPES) { this.type.add(new Option(withCost(type), type)); this.addType.add(new Option(withCost(type), type)); }
     this.restoreButton.onclick = () => { const draft = this.recoveryDraft; if (draft) this.edit(() => { this.document.restore(draft.text, draft.filename); this.selected = 0; }, true); };
     window.addEventListener('storage', event => {
       if (this.active && (event.key === null || event.key === 'snaptiles.editor.draft.v1')) this.paintDraft();
@@ -123,7 +127,7 @@ export class BuildPanel {
       try {
         this.clipboard = this.document.copyBranch(this.selected);
         this.addType.querySelector('option[value="clipboard"]')?.remove();
-        this.addType.add(new Option(`コピーした枝（${this.clipboard.count}部品）`, 'clipboard'));
+        this.addType.add(new Option(`コピーした枝（${this.clipboard.count}部品・コスト${typesCost(this.clipboard.types)}）`, 'clipboard'));
         this.addType.value = 'clipboard'; this.status.textContent = parseRc(this.document.text).warnings.join('\n');
       } catch (e) { this.status.textContent = e instanceof Error ? e.message : String(e); }
     };

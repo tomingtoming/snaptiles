@@ -3,6 +3,7 @@
 // Courses lie toward −Z, where the samples drive under ↑. A run is recorded from its first step, so a record link
 // (model + run + challenge) is re-run and checked in the receiver's browser.
 import type { Assembly } from '../model/assemble';
+import { FRAME_RATE } from '../sim/sim-view';
 
 /** a static solid: the convex hull of its points (x, y, z) */
 export type Solid = [number, number, number][];
@@ -28,7 +29,11 @@ export interface Scenario {
       | { kind: 'altitude'; min: number; max: number; seconds: number }
       | { kind: 'speed'; min: number; max: number; seconds: number }
       /** the Core inside the goal box, nearly still */
-      | { kind: 'stop'; maxSpeed: number; seconds: number };
+      | { kind: 'stop'; maxSpeed: number; seconds: number }
+      /** the Core inside the goal box (a strip), moving */
+      | { kind: 'lane'; minSpeed: number; seconds: number };
+    /** a box the Core has to pass through before the hold counts */
+    via?: [number, number, number, number, number, number];
     hint: string;
   };
 }
@@ -48,8 +53,30 @@ export const COSTS: Record<string, number> = {
 };
 
 export function modelCost(a: Assembly): number {
-  return a.tiles.reduce((sum, t) => sum + (COSTS[t.type] ?? 1), 0);
+  return typesCost(a.tiles.map(t => t.type));
 }
+
+/** the cost of parts of these types (lower case, as the assembly names them) */
+export function typesCost(types: string[]): number {
+  return types.reduce((sum, t) => sum + (COSTS[t] ?? 1), 0);
+}
+
+/** the cost per part type, largest first: "Wheel 4×5=20 · Chip 2×1=2" (the Core and Cowls cost nothing and are left out) */
+export function costBreakdown(a: Assembly): string {
+  const count = new Map<string, number>();
+  for (const t of a.tiles) count.set(t.type, (count.get(t.type) ?? 0) + 1);
+  const label = (type: string) => TYPE_LABELS[type] ?? type;
+  return [...count].map(([type, n]) => ({ type, n, total: n * (COSTS[type] ?? 1) }))
+    .filter(r => r.total > 0)
+    .sort((a, b) => b.total - a.total || a.type.localeCompare(b.type))
+    .map(r => `${label(r.type)} ${r.n}×${COSTS[r.type] ?? 1}=${r.total}`)
+    .join(' · ');
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  chip: 'Chip', frame: 'Frame', rudder: 'Rudder', rudderf: 'RudderF', trim: 'Trim', trimf: 'TrimF', weight: 'Weight', wheel: 'Wheel',
+  rlw: 'RLW', jet: 'Jet', arm: 'Arm', cowl: 'Cowl', core: 'Core',
+};
 
 export const SCENARIOS: Scenario[] = [
   {
@@ -153,26 +180,42 @@ end
 }
 `;
 
-/** missions: Lua lessons on a bare field; the starting model is loaded into the editor */
+const LANE_LESSON = `// ミッション：走りながら横へ5m移り、緑の帯（_X が5の所）の中を10秒走ろう
+// _X(0) は左右の位置（スタートは0）。ハンドルを切ると曲がり、横の速さ vx が付く。行き過ぎないよう vx でも戻す。
+Val { ENGINE(default=0,min=-1000,max=1000) HANDLE(default=0,min=-30,max=30) }
+Key { }
+Body
+{
+  Core(){
+    N:Chip(){
+      N:Chip(){
+        W:Chip(){ W:Rudder(angle=HANDLE){ W:Frame(angle=90){ W:Wheel(power=-ENGINE) } } }
+        E:Chip(){ E:Rudder(angle=HANDLE){ E:Frame(angle=90){ E:Wheel(power=ENGINE) } } }
+      }
+    }
+    S:Chip(){
+      S:Chip(){
+        W:Chip(){ W:Frame(angle=90){ W:Wheel(power=-ENGINE) } }
+        E:Chip(){ E:Frame(angle=90){ E:Wheel(power=ENGINE) } }
+      }
+    }
+  }
+}
+Lua {
+lastX = 0
+function OnFrame()
+  local x = _X(0)                -- 左右の位置
+  local vx = (x - lastX) * 30    -- 横の速さ（前のフレームとの差 × 30）
+  lastX = x
+  ENGINE = 300
+  HANDLE = 0                     -- ここを書こう（ヒント：HANDLE = (x − 5) × 数 ＋ vx × 数）
+  out(0, "左右の位置 ", x)
+end
+}
+`;
+
+/** missions: Lua lessons on a bare field, easiest first; the starting model is loaded into the editor */
 export const MISSIONS: Scenario[] = [
-  {
-    id: 'balance',
-    title: 'セグウェイを立たせる',
-    description: '傾きを見て車輪を回し、倒れずに10秒立ち続ける。',
-    budget: 999,
-    timeLimit: 60,
-    solids: [],
-    mission: { starter: SEGWAY, hold: { kind: 'upright', maxTilt: 0.35, seconds: 10 }, hint: '傾き（_EX）と傾く速さ（_WX）から ENGINE を決める（PD制御）' },
-  },
-  {
-    id: 'hover',
-    title: 'ホバーで高さを保つ',
-    description: '4つのジェットの出力を決めて、高さ2.5〜3.5mに10秒とどまる。',
-    budget: 999,
-    timeLimit: 60,
-    solids: [],
-    mission: { starter: HOVER_LESSON, hold: { kind: 'altitude', min: 2.5, max: 3.5, seconds: 10 }, hint: '高さ（_H）と上下の速さ（_VY）から出力を決める' },
-  },
   {
     id: 'cruise',
     title: '速さを保つ',
@@ -200,6 +243,53 @@ export const MISSIONS: Scenario[] = [
       hint: '残りの距離（z + 50）と速度（vz）から出力を決める（PD制御）',
     },
   },
+  {
+    id: 'shuttle',
+    title: '行って帰る',
+    description: '30m先の黄色い範囲まで行き、スタートの緑の範囲へ戻って3秒止まる。',
+    budget: 999,
+    timeLimit: 60,
+    solids: [],
+    goal: [-10, 10, -2, 6, -2, 2],
+    mission: {
+      starter: CAR_LESSON('30m先まで行って、スタートへ戻って止まろう', '今の式は30m先で止まるだけ。着いたことを変数に覚えておき、帰りは目標を0にしよう。変数は次のフレームにも残る。', '  ENGINE = (z + 30) * 40 + vz * 150   -- ここを書き足そう（ヒント：if z < -29 then back = true end、目標を back で切り替える）'),
+      via: [-10, 10, -2, 6, -32, -28],
+      hold: { kind: 'stop', maxSpeed: 0.3, seconds: 3 },
+      hint: '着いたかどうかを変数に覚えて、目標を切り替える（状態を持つプログラム）',
+    },
+  },
+  {
+    id: 'hover',
+    title: 'ホバーで高さを保つ',
+    description: '4つのジェットの出力を決めて、高さ2.5〜3.5mに10秒とどまる。',
+    budget: 999,
+    timeLimit: 60,
+    solids: [],
+    mission: { starter: HOVER_LESSON, hold: { kind: 'altitude', min: 2.5, max: 3.5, seconds: 10 }, hint: '高さ（_H）と上下の速さ（_VY）から出力を決める' },
+  },
+  {
+    id: 'lane',
+    title: '線に乗り換える',
+    description: '走りながら横へ5m（_X が5の所）移って緑の帯に入り、帯の中を10秒走り続ける。',
+    budget: 999,
+    timeLimit: 40,
+    solids: [],
+    goal: [-6, -4, -2, 6, -2000, 50],
+    mission: {
+      starter: LANE_LESSON,
+      hold: { kind: 'lane', minSpeed: 4, seconds: 10 },
+      hint: '目標の線との差（x − 5）と横の速さ（vx）からハンドルを決める（符号も試そう）',
+    },
+  },
+  {
+    id: 'balance',
+    title: 'セグウェイを立たせる',
+    description: '傾きを見て車輪を回し、倒れずに10秒立ち続ける。',
+    budget: 999,
+    timeLimit: 60,
+    solids: [],
+    mission: { starter: SEGWAY, hold: { kind: 'upright', maxTilt: 0.35, seconds: 10 }, hint: '傾き（_EX）と傾く速さ（_WX）から ENGINE を決める（PD制御）' },
+  },
 ];
 
 export const scenarioById = (id: string | null | undefined): Scenario | null => [...SCENARIOS, ...MISSIONS].find((s) => s.id === id) ?? null;
@@ -217,12 +307,37 @@ export function holds(
   const speed = Math.hypot(velocity.x, velocity.y, velocity.z);
   if (h.kind === 'speed') return speed >= h.min && speed <= h.max;
   if (h.kind === 'stop') return inGoal(s, core.position) && speed <= h.maxSpeed;
+  if (h.kind === 'lane') return inGoal(s, core.position) && speed >= h.minSpeed;
   const q = core.quaternion;
   return Math.acos(Math.max(-1, Math.min(1, 1 - 2 * (q.x * q.x + q.z * q.z)))) <= h.maxTilt;
 }
 
 export function inGoal(s: Scenario, p: { x: number; y: number; z: number }): boolean {
-  if (!s.goal) return false;
-  const [x0, x1, y0, y1, z0, z1] = s.goal;
+  return !!s.goal && inBox(s.goal, p);
+}
+
+export function inBox([x0, x1, y0, y1, z0, z1]: number[], p: { x: number; y: number; z: number }): boolean {
   return p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1 && p.z >= z0 && p.z <= z1;
+}
+
+/** a mission's progress, one call per frame: whether the Core has passed `via` (when the mission has one), and how many
+ *  frames in a row it has held the state since */
+export class MissionProgress {
+  held = 0;
+  /** the frame the Core first entered `via`, or null */
+  visitedAt: number | null = null;
+  constructor(readonly scenario: Scenario) {}
+  /** this frame's state; true once the hold has lasted long enough */
+  step(frame: number, core: { position: { x: number; y: number; z: number }; quaternion: { x: number; z: number } }, velocity: { x: number; y: number; z: number }): boolean {
+    const m = this.scenario.mission!;
+    if (m.via && this.visitedAt === null && inBox(m.via, core.position)) this.visitedAt = frame;
+    const ready = !m.via || this.visitedAt !== null;
+    this.held = ready && holds(this.scenario, core, velocity) ? this.held + 1 : 0;
+    return this.held >= m.hold.seconds * FRAME_RATE;
+  }
+  /** a re-run to `frame`: the hold starts over, a pass through `via` after that frame is undone */
+  rewind(frame: number): void {
+    this.held = 0;
+    if (this.visitedAt !== null && this.visitedAt >= frame) this.visitedAt = null;
+  }
 }

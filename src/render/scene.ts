@@ -498,15 +498,17 @@ export class SceneView {
     };
     for (const g of s.ground ?? []) solid(g, 0xb9c4b0, false);
     for (const o of s.solids) solid(o, 0x9aa3ab, true);
-    // the goal: a translucent zone with its outline (missions have none)
-    if (!s.goal) return;
-    const [x0, x1, y0, y1, z0, z1] = s.goal;
-    const geo = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
-    const zone = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x43a047, transparent: true, opacity: 0.18, depthWrite: false }));
-    zone.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
-    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x2e7d32 }));
-    edges.position.copy(zone.position);
-    this.scenarioGroup.add(zone, edges);
+    // the goal (green) and a mission's waypoint (yellow): translucent zones with their outlines
+    const zone = ([x0, x1, y0, y1, z0, z1]: number[], fill: number, line: number) => {
+      const geo = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
+      const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: fill, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide }));
+      mesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: line }));
+      edges.position.copy(mesh.position);
+      this.scenarioGroup.add(mesh, edges);
+    };
+    if (s.goal) zone(s.goal, 0x43a047, 0x2e7d32);
+    if (s.mission?.via) zone(s.mission.via, 0xfdd835, 0xf9a825);
   }
   private ballMeshes: THREE.Mesh[] = [];
   sync(world: PhysicsView): void {

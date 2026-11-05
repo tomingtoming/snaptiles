@@ -14,7 +14,7 @@ try {
  const page=await context.newPage();
  await page.goto(base+'#car'); await page.waitForFunction(()=>window.__sim);
  await page.click('#challenge-open');
- assert.equal(await page.locator('#challenge-list button').count(),7); // 3 challenges, 4 missions
+ assert.equal(await page.locator('#challenge-list button').count(),9); // 3 challenges, 6 missions
  await page.click('#challenge-list button:has-text("100m走")');
  await page.waitForFunction(()=>window.__sim?.scenario?.id==='sprint');
  assert.match(await page.evaluate(()=>location.hash),/&c=sprint/);
@@ -54,6 +54,10 @@ try {
  await page.click('#build');
  await page.waitForFunction(()=>!document.getElementById('build-cost').hidden);
  assert.match(await page.textContent('#build-cost'),/100m走.*コスト 22 \/ 30（残り 8）/);
+ assert.match(await page.textContent('#build-cost'),/｜Wheel 4×5=20 · Chip 2×1=2$/);
+ // the part lists carry each type's cost
+ assert.equal(await page.$eval('#add-type option[value="Wheel"]',o=>o.text),'Wheel　コスト5');
+ assert.equal(await page.$eval('#part-type option[value="Core"]',o=>o.text),'Core　コスト0');
  await page.click('#new-model');
  await page.waitForFunction(()=>document.getElementById('build-cost').textContent.includes('コスト 0 / 30'));
  await page.click('[data-edge="N"]');
@@ -67,11 +71,16 @@ try {
  await page.waitForFunction(()=>window.__sim?.scenario?.id==='balance');
  assert.match(await page.inputValue('#source'),/ミッション：セグウェイ/);
  await page.waitForFunction(()=>/ミッション：セグウェイを立たせる｜保持/.test(document.getElementById('challenge-banner').textContent));
+ // a mission with a waypoint says whether the Core has passed it
+ await page.click('#challenge-open');
+ await page.click('#challenge-list button:has-text("行って帰る")');
+ await page.waitForFunction(()=>window.__sim?.scenario?.id==='shuttle');
+ await page.waitForFunction(()=>/ミッション：行って帰る｜折り返しはまだ｜保持/.test(document.getElementById('challenge-banner').textContent));
  // leaving the challenge
  await page.click('#challenge-quit');
  await page.waitForFunction(()=>window.__sim&&!window.__sim.scenario);
  assert.equal(await page.isVisible('#challenge-banner'),false);
  await page.waitForFunction(()=>!location.hash.includes('&c='));
  assert.ok(await page.evaluate(()=>window.__sim.physics.crates.length)>0);
- console.log(`Challenge: list, banner and over-budget mark, 100m cleared in ${time} s at cost 22, best kept, build-mode cost, mission model and hold banner, record link replays and confirms the clear, leaving restores the course pass`);
+ console.log(`Challenge: list, banner and over-budget mark, 100m cleared in ${time} s at cost 22, best kept, build-mode cost, mission model and hold banner, waypoint banner, record link replays and confirms the clear, leaving restores the course pass`);
 }finally{await browser.close();}

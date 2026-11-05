@@ -4,7 +4,7 @@
 import type { RustSimulation } from '../sim/rust-simulation';
 import type { Assembly } from '../model/assemble';
 import { FRAME_RATE } from '../sim/sim-view';
-import { MISSIONS, SCENARIOS, holds, inGoal, modelCost, type Scenario } from './scenarios';
+import { MISSIONS, SCENARIOS, MissionProgress, costBreakdown, inGoal, modelCost, type Scenario } from './scenarios';
 
 export interface ChallengeHost {
   sim(): RustSimulation | null;
@@ -22,8 +22,12 @@ export class ChallengeUI {
   active: Scenario | null = null;
   private cleared: number | null = null;
   private failed = false;
-  /** a mission's consecutive frames in the required state */
-  private held = 0;
+  /** a mission's progress (frames held, the pass through its waypoint) */
+  private progress: MissionProgress | null = null;
+  private progressFor(s: Scenario): MissionProgress {
+    if (this.progress?.scenario !== s) this.progress = new MissionProgress(s);
+    return this.progress;
+  }
   private dialog = $<HTMLDialogElement>('challenge-dialog');
   private result = $<HTMLDialogElement>('challenge-result');
   private banner = $('challenge-banner');
@@ -74,7 +78,8 @@ export class ChallengeUI {
   /** a new simulation: a fresh start, or the same run re-run to a frame (a clear after that frame is undone) */
   attach(sim: RustSimulation, rewound: boolean): void {
     if (!rewound || this.cleared === null || sim.frame < this.cleared) { this.cleared = null; this.failed = false; }
-    this.held = 0;
+    if (!rewound) this.progress = null;
+    else this.progress?.rewind(sim.frame);
     this.update(sim);
   }
 
@@ -83,8 +88,10 @@ export class ChallengeUI {
     const s = this.active;
     if (!s || sim.scenario !== s || this.cleared !== null || this.failed) return;
     const core = sim.physics.tiles[0];
-    if (s.mission && core) this.held = holds(s, { position: core.position, quaternion: core.quaternion }, sim.coreVelocity()) ? this.held + 1 : 0;
-    if (s.mission ? this.held >= s.mission.hold.seconds * FRAME_RATE : inGoal(s, sim.corePosition())) {
+    const done = s.mission
+      ? !!core && this.progressFor(s).step(sim.frame, { position: core.position, quaternion: core.quaternion }, sim.coreVelocity())
+      : inGoal(s, sim.corePosition());
+    if (done) {
       this.cleared = sim.frame;
       this.showResult(sim, true);
     } else if (sim.frame >= s.timeLimit * FRAME_RATE) {
@@ -104,7 +111,7 @@ export class ChallengeUI {
     this.banner.classList.toggle('over', over);
     const state = this.cleared !== null ? '・クリア！' : this.failed ? '・時間切れ' : '';
     const text = s.mission
-      ? `ミッション：${s.title}｜保持 ${(this.held / FRAME_RATE).toFixed(1)} / ${s.mission.hold.seconds} 秒｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}｜${s.mission.hint}`
+      ? `ミッション：${s.title}｜${s.mission.via ? (this.progress?.visitedAt != null ? '折り返し済み｜' : '折り返しはまだ｜') : ''}保持 ${((this.progress?.scenario === s ? this.progress.held : 0) / FRAME_RATE).toFixed(1)} / ${s.mission.hold.seconds} 秒｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}｜${s.mission.hint}`
       : `お題：${s.title}｜コスト ${cost} / ${s.budget}${over ? '（予算オーバー・記録なし）' : ''}｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}`;
     if (this.bannerText.textContent !== text) this.bannerText.textContent = text;
   }
@@ -117,7 +124,8 @@ export class ChallengeUI {
     if (!s || !building) return;
     const cost = assembly ? modelCost(assembly) : 0;
     const over = cost > s.budget;
-    const text = `お題：${s.title}｜コスト ${cost} / ${s.budget}${over ? `（${cost - s.budget} オーバー）` : `（残り ${s.budget - cost}）`}`;
+    const parts = assembly ? costBreakdown(assembly) : '';
+    const text = `お題：${s.title}｜コスト ${cost} / ${s.budget}${over ? `（${cost - s.budget} オーバー）` : `（残り ${s.budget - cost}）`}${parts ? `｜${parts}` : ''}`;
     if (el.textContent !== text) el.textContent = text;
     el.classList.toggle('over', over);
   }
