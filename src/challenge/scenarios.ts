@@ -28,6 +28,7 @@ export interface Scenario {
   runway?: { width: number; north: number; south: number };
   contourInterval?: number; // vertical spacing of elevation lines on the map, in metres
   terrainColorRange?: [number, number]; // elevations of the low and high ground colours
+  centerStripe?: Solid; // painted triangles along the north-south test line at x=0
   terrainFaces?: Solid; // exposed triangles of a continuous terrain, in draw order
   /** Rectangular road surfaces. Bounds use the same x/y/z pairs as box(). */
   surfaces?: { bounds: [number, number, number, number, number, number]; grip: number; color: number }[];
@@ -157,13 +158,28 @@ const pass = mountainPass();
 
 /** Three alternating side slopes. Longitudinal transitions are long enough
  * to drive them with stock wheels; the flat ends provide a repeatable start. */
-function crossSlopes(): Pick<Scenario, 'ground' | 'terrainFaces' | 'terrainBounds'> {
+function crossSlopes(): Pick<Scenario, 'ground' | 'terrainFaces' | 'terrainBounds' | 'centerStripe'> {
   const xs = [-24, -12, 0, 12, 24];
   const zs = [20, 0, -12, -30, -45, -65, -80, -100, -115, -135, -155];
   const rolls = [0, 0, 0, 7, 7, -10, -10, 12, 12, 0, 0];
   const heights = rolls.map(roll => xs.map(x => (roll === 0 ? 0 : 3.2)
     + Math.max(-12, Math.min(12, x)) * Math.tan(roll * Math.PI / 180)));
-  return heightfield(xs, zs, heights);
+  const centerStripe: Solid = [];
+  for (let i = 1; i < zs.length; i++) {
+    const south = zs[i - 1], north = zs[i];
+    const at = (x: number, z: number): Solid[number] => {
+      const t = (z - south) / (north - south);
+      const edge = (row: number) => heights[row][2] + x * (heights[row][3] - heights[row][2]) / 12;
+      return [x, edge(i - 1) * (1 - t) + edge(i) * t + 0.04, z];
+    };
+    for (let mark = Math.floor(north / 6) * 6; mark < south; mark += 6) {
+      const start = Math.max(north, mark), end = Math.min(south, mark + 3);
+      if (start >= end) continue;
+      const a = at(-0.12, end), b = at(0.12, end), c = at(-0.12, start), d = at(0.12, start);
+      centerStripe.push(a, b, c, b, d, c);
+    }
+  }
+  return { ...heightfield(xs, zs, heights), centerStripe };
 }
 const sideSlopes = crossSlopes();
 /** Six transverse humps. The left side barely ripples; the right side reaches

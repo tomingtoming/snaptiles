@@ -565,6 +565,12 @@ export class SceneView {
       surface.computeVertexNormals();
       addMesh(surface, 0xffffff, false);
     }
+    if (s.centerStripe) {
+      const marks = new THREE.BufferGeometry();
+      marks.setAttribute('position', new THREE.Float32BufferAttribute(s.centerStripe.flat(), 3));
+      marks.computeVertexNormals();
+      addMesh(marks, 0xfff3ce, false);
+    }
     for (const surface of s.surfaces ?? []) addMesh(hull(box(...surface.bounds)), surface.color, false);
     for (const o of s.solids) addMesh(hull(o), 0x9aa3ab, true);
     // the goal (green) and a mission's waypoint (yellow): translucent zones with their outlines

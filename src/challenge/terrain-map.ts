@@ -165,6 +165,15 @@ export class TerrainMap {
       return rect;
     };
     for (const surface of s.surfaces ?? []) zone(surface.bounds, '#' + surface.color.toString(16).padStart(6, '0'));
+    if (s.centerStripe) {
+      const line = document.createElementNS(NS, 'line');
+      line.setAttribute('x1', '0'); line.setAttribute('x2', '0');
+      line.setAttribute('y1', String(north)); line.setAttribute('y2', String(south));
+      line.setAttribute('stroke', '#fff3ce');
+      line.setAttribute('stroke-dasharray', '3 3');
+      line.setAttribute('vector-effect', 'non-scaling-stroke');
+      fragment.append(line);
+    }
     if (s.runway) {
       const { width, north, south } = s.runway;
       zone([-width / 2, width / 2, 0, 0, north, south], '#e9e1c1');

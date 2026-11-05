@@ -146,6 +146,10 @@ export class ChallengeUI {
     if (s.freeDrive) {
       this.banner.classList.remove('over');
       let title = s.title;
+      if (s.centerStripe) {
+        const x = sim.corePosition().x;
+        title += Math.abs(x) < 0.05 ? '｜中央線上' : `｜中央線から${x < 0 ? '西' : '東'}へ ${Math.abs(x).toFixed(1)}m`;
+      }
       if (s.brakeLine !== undefined) {
         const distance = sim.corePosition().z - s.brakeLine;
         title += distance > 0 ? '｜基準線まで ' + distance.toFixed(1) + 'm' : '｜基準線から ' + (-distance).toFixed(1) + 'm';
