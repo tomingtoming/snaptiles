@@ -66,7 +66,9 @@ impl World {
             let ray = Ray::new(to_vector(o), to_vector(d));
             let filter = QueryFilter::new().groups(groups(MODEL_GROUP)).exclude_rigid_body(body);
             let hit = self.world.cast_ray_and_get_normal(&ray, (r + TYRE_CONTACT_MARGIN) as f32, true, filter);
-            if let Some((_, hit)) = hit {
+            if let Some((handle, hit)) = hit {
+                let surface = &self.world.colliders[handle];
+                let grip = if surface.user_data == SURFACE_GRIP_TAG { surface.friction() as f64 } else { 1.0 };
                 contact = true;
                 let toi = hit.time_of_impact as f64;
                 let p_contact = o.add_scaled(d, toi);
@@ -106,7 +108,7 @@ impl World {
                     let ramp = js_min(1.0, vf.abs() / 0.5); // no chatter at rest
                     tau -= js_sign(vf) * frac * load * ramp * r;
                 }
-                let mu = WHEEL_FRICTION;
+                let mu = WHEEL_FRICTION * grip;
                 let limit = mu * load;
                 let mut ff = tau / r;
                 // set while the tyre slides: kinetic friction direction (f, l)
@@ -160,7 +162,7 @@ impl World {
                 // friction circle, drive first (measured on the original, steered car at steer 10/20 deg: the lateral
                 // acceleration tops out near 1.1 g with little drive, 0.9-1.0 g with rear drive at 0.7 of the cap, and
                 // the rear axle slides freely once its drive saturates - the car then drifts along the front wheels)
-                let mu_l = TYRE_LATERAL_MU;
+                let mu_l = TYRE_LATERAL_MU * grip;
                 if let Some((sf, sl)) = slide_dir {
                     ff = limit * sf;
                     fl = limit * sl;

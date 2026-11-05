@@ -16,7 +16,7 @@ import {
   TILE, TILE_STRIDE, type ApiName,
 } from './core-layout';
 import { Recording, type Command, type FrameInput } from './replay';
-import { inBox, type Scenario } from '../challenge/scenarios';
+import { box, inBox, type Scenario, type Solid } from '../challenge/scenarios';
 
 let corePromise: Promise<SnapTilesCoreModule> | null = null;
 /** load (once) and instantiate the Emscripten module */
@@ -201,16 +201,18 @@ export class RustSimulation implements SimView {
     m._free(ptr);
     if (code !== 0) throw new Error(m.UTF8ToString(m._core_error(this.id)) || 'model failed to load');
     const solids = [...(sc?.ground ?? []), ...(sc?.solids ?? [])];
-    for (const [index, solid] of solids.entries()) {
+    const addSolid = (solid: Solid, index: number, grip = 1) => {
       const at = m._malloc(solid.length * 24);
       m.HEAPF64.set(solid.flat(), at / 8);
-      const rejected = m._core_add_solid(this.id, at, solid.length);
+      const rejected = grip === 1 ? m._core_add_solid(this.id, at, solid.length) : m._core_add_surface(this.id, at, solid.length, grip);
       m._free(at);
       if (rejected) {
         this.freeCore();
         throw new Error(`${sc!.title}の地形を読み込めませんでした（衝突形状 ${index + 1}）`);
       }
-    }
+    };
+    solids.forEach((points, i) => addSolid(points, i));
+    sc?.surfaces?.forEach((surface, i) => addSolid(box(...surface.bounds), solids.length + i, surface.grip));
     const names = m.UTF8ToString(m._core_val_names(this.id));
     this.valOrder = (names ? names.split(TEXT_SEP) : []).map((n) => this.vals.get(n));
     this.buildTiles();

@@ -340,13 +340,21 @@ pub extern "C" fn core_break(id: u32) -> *const u8 {
 /// `ptr` must point to `3·n` readable f64.
 #[no_mangle]
 pub unsafe extern "C" fn core_add_solid(id: u32, ptr: *const f64, n: u32) -> i32 {
+    core_add_surface(id, ptr, n, 1.0)
+}
+
+/// An authored terrain solid with an explicit grip multiplier (0.01 to 4.0).
+/// # Safety
+/// `ptr` must point to `3·n` readable f64 values.
+#[no_mangle]
+pub unsafe extern "C" fn core_add_surface(id: u32, ptr: *const f64, n: u32, grip: f32) -> i32 {
     if ptr.is_null() || n < 4 {
         return 1;
     }
     let flat = std::slice::from_raw_parts(ptr, 3 * n as usize);
     let points: Vec<[f64; 3]> = flat.chunks(3).map(|c| [c[0], c[1], c[2]]).collect();
     with_slot(id, 1, |slot| {
-        let added = slot.sim.as_mut().is_some_and(|sim| sim.add_solid(&points));
+        let added = slot.sim.as_mut().is_some_and(|sim| sim.add_surface(&points, grip));
         if added {
             refresh(slot);
         }

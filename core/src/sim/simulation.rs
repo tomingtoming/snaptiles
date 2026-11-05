@@ -575,10 +575,24 @@ impl Simulation {
 
     /// a static ground-like convex solid (a challenge course's box or ramp): false when the points span no volume
     pub fn add_solid(&mut self, points: &[[f64; 3]]) -> bool {
+        self.add_surface(points, 1.0)
+    }
+
+    /// Authored grip scales both tyre limits. Ordinary solids keep the stock contact material.
+    pub fn add_surface(&mut self, points: &[[f64; 3]], grip: f32) -> bool {
+        if !(0.01..=4.0).contains(&grip) {
+            return false;
+        }
         let pts: Vec<rapier3d::math::Vector> = points.iter().map(|p| rapier3d::math::Vector::new(p[0] as f32, p[1] as f32, p[2] as f32)).collect();
         match rapier3d::geometry::ColliderBuilder::convex_hull(&pts) {
             Some(cd) => {
-                self.add_ground_collider(cd);
+                if grip == 1.0 {
+                    self.add_ground_collider(cd);
+                } else {
+                    let cd = cd.friction(grip).user_data(crate::physics::SURFACE_GRIP_TAG)
+                        .collision_groups(crate::physics::groups(crate::physics::GROUND_GROUP));
+                    self.state.borrow_mut().world.world.insert_collider(cd, None);
+                }
                 true
             }
             None => false,

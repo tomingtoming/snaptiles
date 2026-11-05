@@ -20,9 +20,13 @@ export interface Scenario {
   /** its own ground (else the endless flat ground), plus obstacles */
   ground?: Solid[];
   terrainBounds?: [number, number, number, number]; // x min/max, z min/max of the driving area
+  compareRoad?: { id: string; label: string };
+  brakeLine?: number; // z of the common braking reference, measured toward north
   runway?: { width: number; north: number; south: number };
   terrainColorRange?: [number, number]; // elevations of the low and high ground colours
   terrainFaces?: Solid; // exposed triangles of a continuous terrain, in draw order
+  /** Rectangular road surfaces. Bounds use the same x/y/z pairs as box(). */
+  surfaces?: { bounds: [number, number, number, number, number, number]; grip: number; color: number }[];
   solids: Solid[];
   /** the Core has to enter this box: [x0, x1, y0, y1, z0, z1] (challenges) */
   goal?: [number, number, number, number, number, number];
@@ -192,7 +196,33 @@ function highlands(): Pick<Scenario, 'ground' | 'terrainFaces' | 'terrainBounds'
 
 const GRASS_RUNWAY = { width: 12, north: -112, south: 8 };
 
+function brakeTrack(normal: boolean): Scenario {
+  const dry = { grip: 1, color: 0x81888a }, slick = { grip: 0.18, color: 0x90c4d1 };
+  return {
+    id: normal ? 'brake-track-normal' : 'brake-track',
+    compareRoad: normal ? { id: 'brake-track', label: '低グリップで試す' } : { id: 'brake-track-normal', label: '通常路で試す' },
+    brakeLine: -36,
+    title: normal ? '制動試験路・通常路' : '制動試験路',
+    description: '青い帯は低グリップ路、両脇は通常路。白い横線でブレーキをかけ、5m刻みの目盛りで停止位置を比べられます。',
+    freeDrive: true,
+    budget: Infinity,
+    timeLimit: Infinity,
+    ground: [box(-1000, 1000, -81, -1, -1000, 1000)],
+    terrainBounds: [-32, 32, -150, 20],
+    surfaces: [
+      { bounds: [-32, 32, -1, 0, -30, 20], grip: 1, color: 0x81888a },
+      { bounds: [-32, -7, -1, 0, -120, -30], ...(normal ? slick : dry) },
+      { bounds: [-7, 7, -1, 0, -120, -30], ...(normal ? dry : slick) },
+      { bounds: [7, 32, -1, 0, -120, -30], grip: 1, color: 0x81888a },
+      { bounds: [-32, 32, -1, 0, -150, -120], grip: 1, color: 0x81888a },
+    ],
+    solids: [],
+  };
+}
+
+const normalBrakeTrack = brakeTrack(true);
 export const FREE_DRIVES: Scenario[] = [
+  brakeTrack(false),
   {
     ...highlands(),
     id: 'highlands',
@@ -476,7 +506,7 @@ export const MISSIONS: Scenario[] = [
   },
 ];
 
-export const scenarioById = (id: string | null | undefined): Scenario | null => [...FREE_DRIVES, ...SCENARIOS, ...MISSIONS].find((s) => s.id === id) ?? null;
+export const scenarioById = (id: string | null | undefined): Scenario | null => [normalBrakeTrack, ...FREE_DRIVES, ...SCENARIOS, ...MISSIONS].find((s) => s.id === id) ?? null;
 
 /** whether the model holds a mission's state this frame: the Core's tilt from upright, its height, its speed, or it
  *  standing still in the goal box */

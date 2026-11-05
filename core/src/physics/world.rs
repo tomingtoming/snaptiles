@@ -171,6 +171,9 @@ pub const SPRING_ZETA_LOAD: f64 = 0.3;
 /// damping ratio of a spring joint at damper 0 and at damper ≥ 0.5 (0.5 and 1 run identically in the original)
 pub const SPRING_ZETA: [f64; 2] = [0.1, 0.4]; // lower than the fit: rapier's implicit motor adds damping
 
+/// Static terrain whose collider friction also scales the custom tyre force.
+pub(crate) const SURFACE_GRIP_TAG: u128 = 0x5354_4752;
+
 /// Tiles of a model never collide with each other (only with the ground / objects). rapier3d-compat packs a group
 /// pair as `memberships << 16 | filter`; these are the same pairs.
 pub const MODEL_GROUP: u32 = 0x0001_0002; // membership 1, filter 2

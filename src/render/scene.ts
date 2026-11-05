@@ -5,7 +5,7 @@ import { wheelRadius } from '../model/assemble';
 import type { PhysicsView } from '../sim/sim-view';
 import { COURSE, CRATES } from '../model/course';
 import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js';
-import type { Scenario } from '../challenge/scenarios';
+import { box, type Scenario } from '../challenge/scenarios';
 const SPIN_AXIS = new THREE.Vector3(0, 1, 0);
 const UP_AXIS = new THREE.Vector3(0, 1, 0);
 /** the original's built-in views: F8–F12 select A–E, Ctrl+F8–F12 select F–J */
@@ -519,27 +519,42 @@ export class SceneView {
     } else {
       for (const g of s.ground ?? []) addMesh(hull(g), 0xb9c4b0, false);
     }
-    if (s.runway) {
-      // Paint the level grass strip. Its collision surface is the terrain itself.
-      const { north, south, width } = s.runway;
+    if (s.runway || s.brakeLine !== undefined) {
+      // Paint on level ground. The ground itself carries the collision surface.
       const positions: number[] = [], colors: number[] = [];
       const turf = new THREE.Color(0x6c8450), chalk = new THREE.Color(0xece4c4);
       const paint = (x0: number, x1: number, z0: number, z1: number, y: number, color: THREE.Color) => {
         positions.push(x0, y, z0, x0, y, z1, x1, y, z0, x1, y, z0, x0, y, z1, x1, y, z1);
         for (let i = 0; i < 6; i++) colors.push(color.r, color.g, color.b);
       };
-      const half = width / 2;
-      paint(-half, half, north, south, 0.012, turf);
-      for (let z = north + 8; z < south - 7; z += 12) {
-        paint(-0.18, 0.18, z, z + 5, 0.025, chalk);
+      if (s.runway) {
+        const { north, south, width } = s.runway;
+        const half = width / 2;
+        paint(-half, half, north, south, 0.012, turf);
+        for (let z = north + 8; z < south - 7; z += 12) {
+          paint(-0.18, 0.18, z, z + 5, 0.025, chalk);
+        }
+        for (const z of [north + 1, south - 1.5]) paint(-half + 0.5, half - 0.5, z, z + 0.5, 0.025, chalk);
       }
-      for (const z of [north + 1, south - 1.5]) paint(-half + 0.5, half - 0.5, z, z + 0.5, 0.025, chalk);
+      if (s.brakeLine !== undefined && s.terrainBounds) {
+        const [left, right] = s.terrainBounds;
+        paint(left, right, s.brakeLine - 0.18, s.brakeLine + 0.18, 0.025, chalk);
+        for (const { bounds: [x0, x1, , , north, south] } of s.surfaces ?? []) {
+          if (north >= s.brakeLine || south < s.brakeLine) continue;
+          for (let d = 5; s.brakeLine - d > north; d += 5) {
+            const z = s.brakeLine - d, length = d % 10 === 0 ? 1.4 : 0.7;
+            paint(x0 + 0.2, x0 + 0.2 + length, z - 0.12, z + 0.12, 0.025, chalk);
+            paint(x1 - 0.2 - length, x1 - 0.2, z - 0.12, z + 0.12, 0.025, chalk);
+          }
+        }
+      }
       const surface = new THREE.BufferGeometry();
       surface.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
       surface.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
       surface.computeVertexNormals();
       addMesh(surface, 0xffffff, false);
     }
+    for (const surface of s.surfaces ?? []) addMesh(hull(box(...surface.bounds)), surface.color, false);
     for (const o of s.solids) addMesh(hull(o), 0x9aa3ab, true);
     // the goal (green) and a mission's waypoint (yellow): translucent zones with their outlines
     const zone = ([x0, x1, y0, y1, z0, z1]: number[], fill: number, line: number) => {

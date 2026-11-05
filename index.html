@@ -58,7 +58,7 @@
       <pre id="vals"></pre>
       <pre id="out"></pre>
       <div id="keys"></div>
-      <div id="challenge-banner" hidden role="status"><span id="challenge-banner-text"></span><button id="challenge-quit" type="button">平地に戻る</button></div>
+      <div id="challenge-banner" hidden role="status"><span id="challenge-banner-text"></span><button id="brake-compare" type="button" hidden></button><button id="challenge-quit" type="button">平地に戻る</button></div>
       <details id="terrain-map" hidden>
         <summary>地形図</summary>
         <svg role="img" aria-label="上が北。白い点が現在地、黄色が中間地点、緑がゴール"></svg>
@@ -88,6 +88,11 @@
     </main>
     <dialog id="challenge-dialog" aria-labelledby="challenge-title">
       <h2 id="challenge-title">地形・お題</h2>
+      <nav class="course-jumps" aria-label="種類へ移動">
+        <button type="button" data-course-section="course-free">自由走行</button>
+        <button type="button" data-course-section="course-trials">お題</button>
+        <button type="button" data-course-section="course-lessons">ミッション</button>
+      </nav>
       <div class="course-options">
         <p>お題は予算内で機体を組み、Coreを緑のゴールに入れればクリア。かかった時間と使ったコストが記録になります。今の機体のまま挑戦し、組み直すときは「組む」へ。</p>
         <div id="challenge-list"></div>

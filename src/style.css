@@ -210,11 +210,15 @@ button:disabled { opacity: .4; cursor: default !important; }
 #challenge-dialog, #challenge-result { width: min(520px, calc(100vw - 32px)); padding: 20px; border: 1px solid #59636e; border-radius: 8px; background: var(--panel); color: var(--ink); }
 #terrain-map { position: absolute; right: 10px; bottom: 76px; z-index: 2; color: white; background: #20272eef; border-radius: 6px; }
 #terrain-map[hidden], .building #terrain-map, .debugging #terrain-map { display: none; }
+#terrain-map[open] { width: min(200px, 49vw); }
 #terrain-map summary { padding: 8px 12px; cursor: pointer; font-size: 13px; }
 #terrain-map svg { display: block; margin-inline: auto; width: min(180px, 38vw); height: min(155px, 25dvh); }
 #terrain-map small { display: block; padding: 3px 8px 7px; font-size: 11px; }
 @media (max-width: 520px) { #challenge-banner { top: 88px; } }
 #challenge-dialog[open] { display: flex; flex-direction: column; gap: 12px; max-height: calc(100dvh - 32px); }
+#challenge-dialog .course-jumps { display: flex; gap: 6px; }
+#challenge-dialog .course-jumps button { flex: 1; min-height: 36px; background: #303840; color: var(--ink); border: 1px solid #59636e; border-radius: 4px; cursor: pointer; }
+@media (pointer: coarse) { #challenge-dialog .course-jumps button { min-height: 44px; } }
 #challenge-dialog h2 { margin: 0; }
 #challenge-dialog .course-options { overflow-y: auto; overscroll-behavior: contain; }
 #challenge-dialog .course-options > p:first-child { margin-top: 0; }

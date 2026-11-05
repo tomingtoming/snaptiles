@@ -57,7 +57,8 @@ ramp, kerbs, a gate, a wall and crates to knock over.
 
 Choose **地形・お題** beside the samples for original SnapTiles terrain. Free drive
 includes a kilometre-wide plateau with four peaks, a mountain pass and a six-hump washboard. The humps rise from 12 cm on
-the left to 55 cm on the right. Timed courses include a drive over the pass,
+the left to 55 cm on the right. The brake track pairs a low-grip blue lane with
+ordinary pavement. Brake at the white line to compare stopping distances. Timed courses include a drive over the pass,
 a steering course, and a flyover with altitude gates. Cross the yellow
 checkpoint before the green finish. **地形図** opens the map while driving.
 

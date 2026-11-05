@@ -42,6 +42,19 @@ export class TerrainMap {
       const distance = Math.round(Math.hypot(dx, dz));
       text += '　' + (headingForCheckpoint ? '黄：中間' : '緑：ゴール') + 'まで' + distance + 'm';
     }
+    if (!next && s.runway) {
+      const { width, north, south } = s.runway;
+      const dx = Math.max(-width / 2, Math.min(width / 2, position.x)) - position.x;
+      const dz = Math.max(north, Math.min(south, position.z)) - position.z;
+      const metres = Math.round(Math.hypot(dx, dz));
+      if (metres === 0) {
+        text += '　滑走路の範囲内';
+      } else {
+        const octant = (Math.round(Math.atan2(dx, -dz) / (Math.PI / 4)) + 8) % 8;
+        const direction = ['北', '北東', '東', '南東', '南', '南西', '西', '北西'][octant];
+        text += '　滑走路は' + direction + ' ' + metres + 'm';
+      }
+    }
     if (this.caption.textContent !== text) this.caption.textContent = text;
   }
 
@@ -71,6 +84,7 @@ export class TerrainMap {
       fragment.append(rect);
       return rect;
     };
+    for (const surface of s.surfaces ?? []) zone(surface.bounds, '#' + surface.color.toString(16).padStart(6, '0'));
     if (s.runway) {
       const { width, north, south } = s.runway;
       zone([-width / 2, width / 2, 0, 0, north, south], '#e9e1c1');

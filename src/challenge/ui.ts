@@ -5,7 +5,7 @@ import type { RustSimulation } from '../sim/rust-simulation';
 import { TerrainMap } from './terrain-map';
 import type { Assembly } from '../model/assemble';
 import { FRAME_RATE } from '../sim/sim-view';
-import { FREE_DRIVES, MISSIONS, SCENARIOS, MissionProgress, costBreakdown, inGoal, modelCost, type Scenario } from './scenarios';
+import { FREE_DRIVES, MISSIONS, SCENARIOS, MissionProgress, scenarioById, costBreakdown, inGoal, modelCost, type Scenario } from './scenarios';
 
 export interface ChallengeHost {
   sim(): RustSimulation | null;
@@ -37,9 +37,20 @@ export class ChallengeUI {
   private status = $('challenge-result-status');
 
   constructor(private host: ChallengeHost) {
+    this.dialog.querySelectorAll<HTMLButtonElement>('[data-course-section]').forEach(button => {
+      button.addEventListener('click', () => {
+        const heading = $(button.dataset.courseSection!);
+        heading.scrollIntoView({ block: 'start' });
+        heading.focus({ preventScroll: true });
+      });
+    });
     $('challenge-open').addEventListener('click', () => this.openDialog());
     $('course-restart').addEventListener('click', () => { this.dialog.close(); this.host.reload(); });
     $('challenge-leave').addEventListener('click', () => { this.dialog.close(); this.select(null); });
+    $('brake-compare').addEventListener('click', () => {
+      const road = scenarioById(this.active?.compareRoad?.id);
+      if (road) this.select(road);
+    });
     $('challenge-quit').addEventListener('click', () => this.select(null));
     $('challenge-retry').addEventListener('click', () => { this.result.close(); this.host.reload(); });
     $('challenge-copy').addEventListener('click', async () => {
@@ -67,8 +78,19 @@ export class ChallengeUI {
       b.addEventListener('click', () => { this.dialog.close(); this.select(s); });
       return b;
     };
-    const heading = (text: string) => { const h = document.createElement('h3'); h.textContent = text; return h; };
-    $('challenge-list').replaceChildren(heading('自由走行'), ...FREE_DRIVES.map(button), heading('お題（予算内で組んでゴールへ）'), ...SCENARIOS.map(button), heading('ミッション（Luaで制御の練習。機体はミッションのものに替わります）'), ...MISSIONS.map(button));
+    const heading = (id: string, text: string) => {
+      const h = document.createElement('h3');
+      h.id = id;
+      h.tabIndex = -1;
+      h.textContent = text;
+      return h;
+    };
+    $('challenge-list').replaceChildren(
+      heading('course-free', '自由走行'),
+      ...FREE_DRIVES.map(s => button(this.active?.compareRoad?.id === s.id ? this.active : s)),
+      heading('course-trials', 'お題（予算内で組んでゴールへ）'), ...SCENARIOS.map(button),
+      heading('course-lessons', 'ミッション（Luaで制御の練習。機体はミッションのものに替わります）'), ...MISSIONS.map(button),
+    );
     $('course-restart').hidden = !this.active;
     $('challenge-leave').hidden = !this.active;
     this.dialog.showModal();
@@ -81,6 +103,9 @@ export class ChallengeUI {
 
   /** a new simulation: a fresh start, or the same run re-run to a frame (a clear after that frame is undone) */
   attach(sim: RustSimulation, rewound: boolean): void {
+    const compare = $('brake-compare');
+    compare.hidden = !sim.scenario?.compareRoad;
+    compare.textContent = sim.scenario?.compareRoad?.label ?? '';
     if (!rewound || this.cleared === null || sim.frame < this.cleared) { this.cleared = null; this.failed = false; }
     if (!rewound) this.progress = null;
     else this.progress?.rewind(sim.frame);
@@ -112,7 +137,12 @@ export class ChallengeUI {
     if (!s || !sim?.assembly) return;
     if (s.freeDrive) {
       this.banner.classList.remove('over');
-      if (this.bannerText.textContent !== s.title) this.bannerText.textContent = s.title;
+      let title = s.title;
+      if (s.brakeLine !== undefined) {
+        const distance = sim.corePosition().z - s.brakeLine;
+        title += distance > 0 ? '｜基準線まで ' + distance.toFixed(1) + 'm' : '｜基準線から ' + (-distance).toFixed(1) + 'm';
+      }
+      if (this.bannerText.textContent !== title) this.bannerText.textContent = title;
       return;
     }
     const cost = modelCost(sim.assembly);
