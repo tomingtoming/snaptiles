@@ -22,7 +22,7 @@ export interface Scenario {
   /** its own ground (else the endless flat ground), plus obstacles */
   ground?: Solid[];
   terrainBounds?: [number, number, number, number]; // x min/max, z min/max of the driving area
-  compareRoad?: { id: string; label: string };
+  compareTerrain?: { id: string; label: string };
   brakingTest?: { entryKmh: number; stopKmh: number };
   brakeLine?: number; // z of the common braking reference, measured toward north
   water?: [number, number, number, number, number]; // xmin, xmax, zmin, zmax, surface elevation
@@ -155,7 +155,8 @@ function heightfield(xs: number[], zs: number[], heights: number[][]): Pick<Scen
   return { ground, terrainFaces, terrainBounds: [xs[0], xs[xs.length - 1], zs[zs.length - 1], zs[0]] };
 }
 
-function inlet(): Scenario {
+function inlet(offshore = false): Scenario {
+  const offset = offshore ? 55 : 0;
   const xs = [-65, -36, -26, 0, 26, 36, 65];
   const zs = [30, 0, -18, -29, -70, -83, -99, -120];
   const heights = zs.map(z => xs.map(x => {
@@ -163,10 +164,12 @@ function inlet(): Scenario {
     return Math.max(-3, Math.min(1, -inland / 5));
   }));
   return {
-    ...heightfield(xs, zs, heights),
-    id: 'tidal-inlet', title: '入り江の試走場',
-    description: '北の砂浜から水に入れます。Chipを組んだ機体とWeightを積んだ機体で浮き方を比べられます。',
-    water: [-36, 36, -99, -18, 0], terrainColorRange: [-2, 1],
+    ...heightfield(xs, zs.map(z => z + offset), heights),
+    id: offshore ? 'inlet-float' : 'tidal-inlet',
+    title: offshore ? '入り江の浮力試験' : '入り江の試走場',
+    compareTerrain: offshore ? { id: 'tidal-inlet', label: '岸から走る' } : { id: 'inlet-float', label: '水上から落とす' },
+    description: offshore ? '同じ機体を入り江の中央から落とし、水面からの高さを測れます。' : '北の砂浜から水に入れます。Chipを組んだ機体とWeightを積んだ機体で浮き方を比べられます。',
+    water: [-36, 36, -99 + offset, -18 + offset, 0], terrainColorRange: [-2, 1],
     freeDrive: true, budget: Infinity, timeLimit: Infinity, solids: [],
   };
 }
@@ -252,7 +255,7 @@ function brakeTrack(normal: boolean): Scenario {
   const dry = { grip: 1, color: 0x81888a }, slick = { grip: 0.18, color: 0x90c4d1 };
   return {
     id: normal ? 'brake-track-normal' : 'brake-track',
-    compareRoad: normal ? { id: 'brake-track', label: '低グリップで試す' } : { id: 'brake-track-normal', label: '通常路で試す' },
+    compareTerrain: normal ? { id: 'brake-track', label: '低グリップで試す' } : { id: 'brake-track-normal', label: '通常路で試す' },
     brakeLine: -36,
     title: normal ? '制動試験路・通常路' : '制動試験路',
     description: '青い帯は低グリップ路、両脇は通常路。白い横線でブレーキをかけ、5m刻みの目盛りで停止位置を比べられます。',
@@ -274,6 +277,7 @@ function brakeTrack(normal: boolean): Scenario {
 
 const slickBrakeTrack = brakeTrack(false);
 const normalBrakeTrack = brakeTrack(true);
+const offshoreInlet = inlet(true);
 export const FREE_DRIVES: Scenario[] = [
   inlet(),
   slickBrakeTrack,
@@ -325,7 +329,7 @@ export const SCENARIOS: Scenario[] = [
   {
     ...slickBrakeTrack,
     freeDrive: false,
-    compareRoad: undefined,
+    compareTerrain: undefined,
     id: 'braking-box',
     title: '低グリップ路で止まる',
     description: '黄色に36km/h以上で進入し、青い路面の緑枠内で1km/h以下まで減速。標準のcarは↑で加速し、白い横線で↑を離してZでブレーキ。',
@@ -640,7 +644,7 @@ export const MISSIONS: Scenario[] = [
   },
 ];
 
-export const scenarioById = (id: string | null | undefined): Scenario | null => [normalBrakeTrack, ...FREE_DRIVES, ...SCENARIOS, ...MISSIONS].find((s) => s.id === id) ?? null;
+export const scenarioById = (id: string | null | undefined): Scenario | null => [normalBrakeTrack, offshoreInlet, ...FREE_DRIVES, ...SCENARIOS, ...MISSIONS].find((s) => s.id === id) ?? null;
 
 /** whether the model holds a mission's state this frame: the Core's tilt from upright, its height, its speed, or it
  *  standing still in the goal box */

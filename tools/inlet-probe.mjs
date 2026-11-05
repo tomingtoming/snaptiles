@@ -9,11 +9,24 @@ try {
   await page.click('#challenge-open');
   await page.getByRole('button', { name: /入り江の試走場/ }).click();
   await page.waitForFunction(() => window.__sim?.scenario?.id === 'tidal-inlet');
+  const car = await page.inputValue('#source');
+  await page.getByRole('button', { name: '水上から落とす' }).click();
+  await page.waitForFunction(() => window.__sim?.scenario?.id === 'inlet-float');
+  await page.reload();
+  await page.waitForFunction(() => window.__sim?.scenario?.id === 'inlet-float');
+  await page.waitForFunction(() => document.getElementById('challenge-banner-text').textContent.includes('Core 水面下'));
+  assert.equal(await page.inputValue('#source'), car);
+  await page.getByRole('button', { name: '岸から走る' }).click();
+  await page.waitForFunction(() => window.__sim?.scenario?.id === 'tidal-inlet');
   await page.click('#terrain-map summary');
   const lake = page.locator('#terrain-map rect[fill="#3994b2"]');
   assert.equal(await lake.getAttribute('width'), '72');
+  assert.match(await page.textContent('#challenge-banner-text'), /岸まで [\d.]+m/);
   await page.focus('#view');
   await page.keyboard.down('ArrowUp');
+  await page.waitForFunction(() => document.getElementById('challenge-banner-text').textContent.includes('Core 水面下'));
+  const depthLabel = await page.textContent('#challenge-banner-text');
+  assert.match(depthLabel, /水面下 [0-9]+\.[0-9]{2}m/);
   const path = await page.evaluate(() => {
     const sim = window.__sim;
     const points = [];
@@ -24,7 +37,6 @@ try {
     return points;
   });
   await page.keyboard.up('ArrowUp');
-  assert(path.some(([, y, z]) => z > -18 && y > 0));
   assert(path.some(([, y, z]) => z < -25 && y < 0));
   assert(path.every(p => p.every(Number.isFinite)));
   console.log('Stock car enters the inlet from dry ground. Lowest Core:', Math.min(...path.map(p => p[1])).toFixed(2), 'm');

@@ -45,8 +45,8 @@ export class ChallengeUI {
     $('challenge-leave').addEventListener('click', () => { this.dialog.close(); this.select(null); });
     $('mission-edit').addEventListener('click', () => this.host.editLesson());
     $('brake-compare').addEventListener('click', () => {
-      const road = scenarioById(this.active?.compareRoad?.id);
-      if (road) this.select(road);
+      const terrain = scenarioById(this.active?.compareTerrain?.id);
+      if (terrain) this.select(terrain);
     });
     $('challenge-quit').addEventListener('click', () => this.select(null));
     $('challenge-retry').addEventListener('click', () => { this.result.close(); this.host.reload(); });
@@ -85,7 +85,7 @@ export class ChallengeUI {
     };
     $('challenge-list').replaceChildren(
       heading('course-free', '自由走行'),
-      ...FREE_DRIVES.map(s => button(this.active?.compareRoad?.id === s.id ? this.active : s)),
+      ...FREE_DRIVES.map(s => button(this.active?.compareTerrain?.id === s.id ? this.active : s)),
       heading('course-trials', 'お題（予算内で組んでゴールへ）'), ...SCENARIOS.map(button),
       heading('course-lessons', 'ミッション（Luaで制御の練習。機体はミッションのものに替わります）'), ...MISSIONS.map(button),
     );
@@ -108,8 +108,8 @@ export class ChallengeUI {
     $('mission-edit').hidden = !sim.scenario?.mission;
     $('brake-retry').hidden = true;
     const compare = $('brake-compare');
-    compare.hidden = !sim.scenario?.compareRoad;
-    compare.textContent = sim.scenario?.compareRoad?.label ?? '';
+    compare.hidden = !sim.scenario?.compareTerrain;
+    compare.textContent = sim.scenario?.compareTerrain?.label ?? '';
     if (rewound && sim.missionProgress) {
       this.cleared = sim.missionProgress.clearedAt;
       this.failed = this.cleared === null && sim.frame >= sim.missionProgress.scenario.timeLimit * FRAME_RATE;
@@ -146,6 +146,14 @@ export class ChallengeUI {
     if (s.freeDrive) {
       this.banner.classList.remove('over');
       let title = s.title;
+      if (s.water) {
+        const [xmin, xmax, zmin, zmax, level] = s.water;
+        const { x, y, z } = sim.corePosition();
+        const shore = Math.hypot(Math.max(xmin - x, 0, x - xmax), Math.max(zmin - z, 0, z - zmax));
+        if (shore > 0) title += '｜岸まで ' + shore.toFixed(1) + 'm';
+        else if (y < level) title += '｜Core 水面下 ' + (level - y).toFixed(2) + 'm';
+        else title += '｜Core 水面上 ' + (y - level).toFixed(2) + 'm';
+      }
       if (s.centerStripe) {
         const x = sim.corePosition().x;
         title += Math.abs(x) < 0.05 ? '｜中央線上' : `｜中央線から${x < 0 ? '西' : '東'}へ ${Math.abs(x).toFixed(1)}m`;
