@@ -16,7 +16,7 @@ import {
   TILE, TILE_STRIDE, type ApiName,
 } from './core-layout';
 import { Recording, type Command, type FrameInput } from './replay';
-import { box, inBox, MissionProgress, type Scenario, type Solid } from '../challenge/scenarios';
+import { box, entersBrakingGate, inBox, MissionProgress, type Scenario, type Solid } from '../challenge/scenarios';
 
 let corePromise: Promise<SnapTilesCoreModule> | null = null;
 /** load (once) and instantiate the Emscripten module */
@@ -352,6 +352,8 @@ export class RustSimulation implements SimView {
 
   private afterCore(): void {
     const m = this.m!;
+    const test = this.scenario?.brakingTest;
+    const before = test && !this.checkpointPassed ? this.physics.tiles[0]?.position.clone() : undefined;
     this.read();
     if (!this.midFrame) {
       this.frame++;
@@ -362,7 +364,9 @@ export class RustSimulation implements SimView {
         progress.step(this.frame, core, this.coreVelocity(), this.groundRange);
       }
       if (!this.checkpointPassed && this.scenario?.checkpoint) {
-        this.checkpointPassed = inBox(this.scenario.checkpoint, this.corePosition());
+        this.checkpointPassed = test
+          ? !!before && entersBrakingGate(this.scenario.checkpoint, before, core.position, -core.vel.z * 3.6, test.entryKmh)
+          : inBox(this.scenario.checkpoint, this.corePosition());
       }
     }
     const hit = m.UTF8ToString(m._core_break(this.id));

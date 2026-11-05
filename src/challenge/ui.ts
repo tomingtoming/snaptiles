@@ -123,7 +123,8 @@ export class ChallengeUI {
     if (!s || s.freeDrive || sim.scenario !== s || this.cleared !== null || this.failed) return;
     const done = s.mission
       ? sim.missionProgress?.clearedAt != null
-      : (!s.checkpoint || sim.checkpointPassed) && inGoal(s, sim.corePosition());
+      : (!s.checkpoint || sim.checkpointPassed) && inGoal(s, sim.corePosition())
+        && (!s.brakingTest || sim.coreVelocity().length() * 3.6 <= s.brakingTest.stopKmh);
     if (done) {
       this.cleared = sim.frame;
       this.showResult(sim, true);
@@ -155,6 +156,9 @@ export class ChallengeUI {
     this.banner.classList.toggle('over', over);
     const state = this.cleared !== null ? '・クリア！' : this.failed ? '・時間切れ' : '';
     const checkpoint = s.checkpoint ? (!sim.checkpointPassed ? '｜黄色の中間地点へ' : '｜中間地点通過・緑のゴールへ') : '';
+    const driving = s.brakingTest
+      ? (sim.checkpointPassed ? `｜緑枠内で${s.brakingTest.stopKmh}km/h以下` : `｜黄色に${s.brakingTest.entryKmh}km/h以上で進入`)
+      : checkpoint;
     const zone = !sim.checkpointPassed && s.checkpoint ? s.checkpoint : s.goal;
     const altitude = s.showGateAltitude && zone ? `（高度${zone[2]}〜${zone[3]}m）` : '';
     let hint = s.mission?.hint;
@@ -165,7 +169,7 @@ export class ChallengeUI {
     }
     const text = s.mission
       ? `ミッション：${s.title}｜${s.mission.via ? (sim.missionProgress?.visitedAt != null ? '折り返し済み｜' : '折り返しはまだ｜') : ''}保持 ${((sim.missionProgress?.held ?? 0) / FRAME_RATE).toFixed(1)} / ${s.mission.hold.seconds} 秒｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}｜${hint}`
-      : `お題：${s.title}｜コスト ${cost} / ${s.budget}${over ? '（予算オーバー・記録なし）' : ''}｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}${checkpoint}${altitude}`;
+      : `お題：${s.title}｜コスト ${cost} / ${s.budget}${over ? '（予算オーバー・記録なし）' : ''}｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}${driving}${altitude}`;
     if (this.bannerText.textContent !== text) this.bannerText.textContent = text;
   }
 

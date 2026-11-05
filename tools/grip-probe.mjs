@@ -59,6 +59,43 @@ try {
     assert.ok(turn ? slick.distance < dry.distance * 0.5 : slick.distance > dry.distance * 1.5);
     console.log(turn ? 'Lateral travel at 0.8 s' : 'Braking distance', { dry, slick });
   }
+
+  for (const brake of [false, true]) {
+    await page.goto(process.argv[2] + '#car&c=braking-box');
+    await page.reload();
+    await page.waitForFunction(() => window.__sim?.scenario?.id === 'braking-box');
+    await page.focus('#view');
+    await page.evaluate(() => {
+      const step = document.getElementById('debug-forward');
+      do { step.click(); } while (window.__sim.frame < 45);
+    });
+    await page.keyboard.down('ArrowUp');
+    await page.evaluate(() => {
+      const step = document.getElementById('debug-forward');
+      for (let i = 0; i < 400 && window.__sim.corePosition().z > -36; i++) step.click();
+    });
+    assert.equal(await page.evaluate(() => window.__sim.checkpointPassed), true);
+    if (brake) {
+      await page.keyboard.up('ArrowUp');
+      await page.keyboard.down('z');
+    }
+    const outcome = await page.evaluate(() => {
+      const sim = window.__sim;
+      const step = document.getElementById('debug-forward');
+      let enteredAtSpeed = false;
+      for (let i = 0; i < 500 && !document.getElementById('challenge-result').open; i++) {
+        step.click();
+        const p = sim.corePosition();
+        if (p.z < -70 && p.z > -85 && Math.abs(p.x) <= 6.5 && sim.coreVelocity().length() > 1) enteredAtSpeed = true;
+      }
+      return { enteredAtSpeed, clear: document.getElementById('challenge-result').open, speedKmh: sim.coreVelocity().length() * 3.6 };
+    });
+    await page.keyboard.up(brake ? 'z' : 'ArrowUp');
+    assert.ok(outcome.enteredAtSpeed);
+    assert.equal(outcome.clear, brake);
+    if (brake) assert.ok(outcome.speedKmh <= 1);
+    console.log(brake ? 'Stopped inside the box:' : 'Driving through did not clear:', outcome);
+  }
 } finally {
   await browser.close();
 }

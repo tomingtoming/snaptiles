@@ -22,6 +22,7 @@ export interface Scenario {
   ground?: Solid[];
   terrainBounds?: [number, number, number, number]; // x min/max, z min/max of the driving area
   compareRoad?: { id: string; label: string };
+  brakingTest?: { entryKmh: number; stopKmh: number };
   brakeLine?: number; // z of the common braking reference, measured toward north
   runway?: { width: number; north: number; south: number };
   contourInterval?: number; // vertical spacing of elevation lines on the map, in metres
@@ -224,9 +225,10 @@ function brakeTrack(normal: boolean): Scenario {
   };
 }
 
+const slickBrakeTrack = brakeTrack(false);
 const normalBrakeTrack = brakeTrack(true);
 export const FREE_DRIVES: Scenario[] = [
-  brakeTrack(false),
+  slickBrakeTrack,
   {
     ...plateau,
     id: 'highlands',
@@ -261,6 +263,19 @@ export const FREE_DRIVES: Scenario[] = [
 ];
 
 export const SCENARIOS: Scenario[] = [
+  {
+    ...slickBrakeTrack,
+    freeDrive: false,
+    compareRoad: undefined,
+    id: 'braking-box',
+    title: '低グリップ路で止まる',
+    description: '黄色に36km/h以上で進入し、青い路面の緑枠内で1km/h以下まで減速。標準のcarは↑で加速し、白い横線で↑を離してZでブレーキ。',
+    budget: 45,
+    timeLimit: 50,
+    brakingTest: { entryKmh: 36, stopKmh: 1 },
+    checkpoint: [-6.5, 6.5, 0, 2.5, -34, -28],
+    goal: [-6.5, 6.5, 0, 2.5, -85, -70],
+  },
   {
     id: 'sprint',
     title: '100m走',
@@ -559,6 +574,23 @@ export function holds(
   if (h.kind === 'lane') return inGoal(s, core.position) && speed >= h.minSpeed;
   const q = core.quaternion;
   return Math.acos(Math.max(-1, Math.min(1, 1 - 2 * (q.x * q.x + q.z * q.z)))) <= h.maxTilt;
+}
+
+/** Cross the southern face of the braking gate heading down the marked lane.
+ * Interpolate the entry point even when a fast vehicle clears the whole box in one frame. */
+export function entersBrakingGate(
+  gate: NonNullable<Scenario['checkpoint']>,
+  before: { x: number; y: number; z: number },
+  after: { x: number; y: number; z: number },
+  forwardKmh: number,
+  minimumKmh: number,
+): boolean {
+  const [left, right, low, high, , entry] = gate;
+  if (forwardKmh < minimumKmh || before.z <= entry || after.z > entry) return false;
+  const t = (entry - before.z) / (after.z - before.z);
+  const x = before.x + t * (after.x - before.x);
+  const y = before.y + t * (after.y - before.y);
+  return x >= left && x <= right && y >= low && y <= high;
 }
 
 export function inGoal(s: Scenario, p: { x: number; y: number; z: number }): boolean {
