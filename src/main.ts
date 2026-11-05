@@ -596,6 +596,12 @@ function drawHud(buf: number[], s: SimView): void {
     // a dark plate behind the readout: white text alone vanished over the bright ground and sky (UI audit 2026-11-01)
     const width = Math.max(...rows.map((r) => hudCtx.measureText(r).width)) + 16;
     const height = (rows.length - 1) * step + size + 12;
+    // Keep map and touch controls clear of the canvas plate. Reserve three
+    // speed digits so accelerating across 100 km/h does not move a held key.
+    const reservedWidth = Math.ceil(Math.max(width, hudCtx.measureText('888 km/h').width + 16)) + 'px';
+    const reservedHeight = height + 'px';
+    if (keysEl.style.getPropertyValue('--dial-width') !== reservedWidth) keysEl.style.setProperty('--dial-width', reservedWidth);
+    if (keysEl.style.getPropertyValue('--dial-height') !== reservedHeight) keysEl.style.setProperty('--dial-height', reservedHeight);
     hudCtx.fillStyle = 'rgba(16,20,24,0.62)';
     hudCtx.beginPath();
     const bottom = h - 12 - (debug.open ? debug.panel.offsetHeight : 0); // above the debug panel when it is open

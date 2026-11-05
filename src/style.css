@@ -36,7 +36,7 @@ body { display: grid; grid-template-columns: 380px 1fr; }
 #out { grid-area: 1 / 2; justify-self: end; white-space: pre-wrap; }
 #vals, #out { min-height: 0; max-height: 100%; max-width: 100%; overflow: hidden; }
 #vals:empty, #out:empty { display: none; }
-#keys { display: flex; gap: 6px; flex-wrap: wrap; }
+#keys { display: flex; align-content: end; align-items: end; gap: 6px; flex-wrap: wrap; min-height: var(--dial-height, 0px); padding-right: calc(var(--dial-width, 0px) + 6px); }
 #keys .cap { pointer-events: auto; display: grid; place-items: center; min-width: 44px; height: 44px; padding: 0 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.6); color: #1d2328; font: 600 15px/1 var(--mono); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25); transition: transform 60ms, background 60ms; cursor: pointer; user-select: none; touch-action: none; }
 #keys .cap[data-down='true'] { background: var(--accent); transform: translateY(2px); box-shadow: none; }
 #keys .cap small { font-size: 9px; font-weight: 500; color: #4a535c; letter-spacing: 0.02em; }
@@ -194,7 +194,7 @@ button:disabled { opacity: .4; cursor: default !important; }
 #debug-break[hidden] { display: none; }
 .break-head { color: #ffb4ab; margin-bottom: 4px; }
 .break-locals { font: 12px var(--mono); }
-.debugging #keys { bottom: calc(min(42%, 340px) + 12px); }
+.debugging #flight-overlay { bottom: max(200px, min(42%, 340px)); }
 .building #debug { display: none; }
 @media (max-width: 800px) { .debug-cols { grid-template-columns: 1fr 1fr; } .debug-cols .debug-col:nth-child(2) { display: none; } #debug-replay { display: none; } }
 .building #debug-toggle { display: none; } /* the editor needs the bar's height on phones; the panel serves the running model */
