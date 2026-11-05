@@ -33,6 +33,7 @@ export interface Scenario {
   runway?: { width: number; north: number; south: number };
   contourInterval?: number; // vertical spacing of elevation lines on the map, in metres
   terrainColorRange?: [number, number]; // elevations of the low and high ground colours
+  bumpSection?: { startZ: number; endZ: number; halfWidth: number };
   centerStripe?: Solid; // painted triangles along the north-south test line at x=0
   roadPaint?: Solid; // markings on the banked pavement
   asphaltStart?: number; // first paved vertex in the terrain triangle list
@@ -364,6 +365,7 @@ export const FREE_DRIVES: Scenario[] = [
     ...washboard(),
     terrainColorRange: [0, 0.5],
     id: 'washboard',
+    bumpSection: { startZ: -12, endZ: -48, halfWidth: 22 },
     title: '波状路',
     description: '前方に6本の起伏。左は12cm、中央は32cm、右は55cm。車輪や足回りを試せます。',
     freeDrive: true,

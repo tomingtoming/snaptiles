@@ -24,6 +24,7 @@ export class ChallengeUI {
   active: Scenario | null = null;
   private cleared: number | null = null;
   private failed = false;
+  private bumpReference?: { peakVertical: number; entryKmh: number };
   private terrainMap = new TerrainMap();
   private dialog = $<HTMLDialogElement>('challenge-dialog');
   private result = $<HTMLDialogElement>('challenge-result');
@@ -56,6 +57,10 @@ export class ChallengeUI {
       if (!sim?.scenario?.waterStations) return;
       this.renderWaterLog(sim);
       ($('water-log-dialog') as HTMLDialogElement).showModal();
+    });
+    $('bump-pin').addEventListener('click', () => {
+      const run = this.host.sim()?.bumpRun;
+      if (run?.complete) this.bumpReference = { ...run };
     });
     $('brake-retry').addEventListener('click', () => this.host.reload());
     $('challenge-open').addEventListener('click', () => this.openDialog());
@@ -160,6 +165,7 @@ export class ChallengeUI {
     $('mission-edit').hidden = !sim.scenario?.mission;
     this.renderedWaterCount = -1;
     if (!sim.scenario?.waterStations) ($('water-log-dialog') as HTMLDialogElement).close();
+    $('bump-pin').hidden = true;
     $('water-log').hidden = !sim.scenario?.waterStations;
     $('brake-retry').hidden = true;
     const compare = $('brake-compare');
@@ -208,6 +214,15 @@ export class ChallengeUI {
         if (shore > 0) title += '｜岸まで ' + shore.toFixed(1) + 'm';
         else if (y < level) title += '｜Core 水面下 ' + (level - y).toFixed(2) + 'm';
         else title += '｜Core 水面上 ' + (y - level).toFixed(2) + 'm';
+      }
+      if (s.bumpSection) {
+        const run = sim.bumpRun;
+        $('bump-pin').hidden = !run?.complete;
+        if (run) title += '｜' + (run.complete ? '通過' : '計測中') + '・進入 ' + run.entryKmh.toFixed(1)
+          + ' km/h・上下速度の最大 ' + run.peakVertical.toFixed(2) + ' m/s';
+        else title += '｜6本の起伏を北向きに走行';
+        if (this.bumpReference) title += '｜基準 ' + this.bumpReference.peakVertical.toFixed(2)
+          + ' m/s（進入 ' + this.bumpReference.entryKmh.toFixed(1) + ' km/h）';
       }
       if (s.waterStations) {
         if (($('water-log-dialog') as HTMLDialogElement).open && this.renderedWaterCount !== sim.waterPasses.size) this.renderWaterLog(sim);

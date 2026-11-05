@@ -135,6 +135,7 @@ export class RustSimulation implements SimView {
   lapStartFrame = 0;
   readonly waterPasses = new Map<number, { seconds: number; speedKmh: number }>();
   private waterStartFrame = 0;
+  bumpRun?: { entryKmh: number; peakVertical: number; complete: boolean };
   brakingEntryKmh?: number;
   groundRange?: number;
   readonly missionProgress: MissionProgress | null;
@@ -297,6 +298,7 @@ export class RustSimulation implements SimView {
       this.sectorFrames.length = 0;
       this.lapStartFrame = this.frame;
     }
+    this.bumpRun = undefined;
     this.waterPasses.clear();
     this.waterStartFrame = this.frame;
     this.m._core_reset(this.id);
@@ -374,7 +376,8 @@ export class RustSimulation implements SimView {
     const rings = this.scenario?.rings;
     const stations = this.scenario?.waterStations;
     const trackWater = stations && this.waterPasses.size < stations.distances.length;
-    const trackMotion = trackWater || (test && !this.checkpointPassed) || (rings && this.ringsPassed < rings.length);
+    const bumps = this.scenario?.bumpSection;
+    const trackMotion = bumps || trackWater || (test && !this.checkpointPassed) || (rings && this.ringsPassed < rings.length);
     const before = trackMotion ? this.physics.tiles[0]?.position.clone() : undefined;
     this.read();
     if (!this.midFrame) {
@@ -384,6 +387,19 @@ export class RustSimulation implements SimView {
       if (progress?.scenario.mission?.hold.kind === 'clearance' || this.scenario?.shoalDepth) this.groundRange = m._core_ground_range(this.id, 0);
       if (progress && progress.clearedAt === null && core && this.frame <= progress.scenario.timeLimit * FRAME_RATE) {
         progress.step(this.frame, core, this.coreVelocity(), this.groundRange);
+      }
+      if (bumps && before && core) {
+        const after = core.position;
+        if (before.z >= bumps.startZ && after.z < bumps.startZ && Math.abs(before.x) <= bumps.halfWidth) {
+          this.bumpRun = { entryKmh: Math.hypot(core.vel.x, core.vel.z) * 3.6, peakVertical: 0, complete: false };
+        }
+        if (this.bumpRun && !this.bumpRun.complete) {
+          if (Math.abs(after.x) > bumps.halfWidth || after.z > before.z) this.bumpRun = undefined;
+          else {
+            this.bumpRun.peakVertical = Math.max(this.bumpRun.peakVertical, Math.abs(core.vel.y));
+            this.bumpRun.complete = after.z <= bumps.endZ;
+          }
+        }
       }
       if (trackWater && before && core && this.scenario?.water && before.z > core.position.z) {
         const after = core.position;
