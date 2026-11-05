@@ -11,6 +11,7 @@ export type Solid = [number, number, number][];
 export interface Scenario {
   id: string;
   title: string;
+  freeDrive?: boolean;
   description: string;
   /** cost limit (COSTS per part) */
   budget: number;
@@ -18,9 +19,12 @@ export interface Scenario {
   timeLimit: number;
   /** its own ground (else the endless flat ground), plus obstacles */
   ground?: Solid[];
+  terrainColorRange?: [number, number]; // elevations of the low and high ground colours
+  terrainFaces?: Solid; // exposed triangles of a continuous terrain, in draw order
   solids: Solid[];
   /** the Core has to enter this box: [x0, x1, y0, y1, z0, z1] (challenges) */
   goal?: [number, number, number, number, number, number];
+  checkpoint?: Scenario['goal'];
   /** a mission (a Lua lesson): its starting model, and the state the model has to hold for `seconds` */
   mission?: {
     starter: string;
@@ -78,6 +82,106 @@ const TYPE_LABELS: Record<string, string> = {
   rlw: 'RLW', jet: 'Jet', arm: 'Arm', cowl: 'Cowl', core: 'Core',
 };
 
+/** An original pass between two ridges. Each triangle has its own convex collider so
+ * a hull across an entire valley cannot bridge the hollow. Coordinates are in metres. */
+function mountainPass(): Pick<Scenario, 'ground' | 'terrainFaces'> {
+  const xs = [-70, -32, -12, 0, 12, 32, 70];
+  const zs = [35, 0, -12, -32, -55, -74, -100, -130];
+  const heights = [
+    [0, 0, 0, 0, 0, 0, 0],
+    [1, 1, 0, 0, 0, 1, 1],
+    [3, 2, 0, 0, 0, 4, 3],
+    [7, 10, 4, 2, 4, 12, 8],
+    [9, 17, 8, 6, 8, 20, 10],
+    [6, 12, 5, 3, 4, 14, 8],
+    [2, 4, 0, 0, 0, 5, 3],
+    [0, 0, 0, 0, 0, 0, 0],
+  ];
+  return heightfield(xs, zs, heights);
+}
+
+/** xs increase and zs decrease so the top triangles face upwards. Render faces
+ * and convex ground prisms share the same samples and diagonal in every cell. */
+function heightfield(xs: number[], zs: number[], heights: number[][]): Pick<Scenario, 'ground' | 'terrainFaces'> {
+  // A very thin convex hull at this width gives an unreliable running surface.
+  const ground = [box(-3000, 3000, -104, -4, -3000, 3000)];
+  const vertex = (row: number, col: number): Solid[number] => [xs[col], heights[row][col], zs[row]];
+  // Only the exposed faces are drawn; internal prism walls meet exactly at the riding surface.
+  const terrainFaces: Solid = [
+    [-3000, -4, 3000], [3000, -4, 3000], [-3000, -4, -3000],
+    [3000, -4, 3000], [3000, -4, -3000], [-3000, -4, -3000],
+  ];
+  // Widen the perimeter on its outward axes. Neighbouring slopes share their outer
+  // vertices, including at corners, and meet the surrounding plain at y = -4.
+  function foot([x, , z]: Solid[number]): Solid[number] {
+    const outerX = x === xs[0] ? x - 65 : x === xs[xs.length - 1] ? x + 65 : x;
+    const outerZ = z === zs[0] ? z + 45 : z === zs[zs.length - 1] ? z - 45 : z;
+    return [outerX, -4, outerZ];
+  }
+  function shoulder(a: Solid[number], b: Solid[number]): void {
+    const lowA = foot(a), lowB = foot(b);
+    ground.push(triangle(a, lowA, b), triangle(b, lowA, lowB));
+  }
+  function triangle(...top: Solid): Solid {
+    terrainFaces.push(...top);
+    return [...top, ...top.map(([x, , z]): Solid[number] => [x, -4, z])];
+  }
+  for (let row = 1; row < zs.length; row++) {
+    for (let col = 1; col < xs.length; col++) {
+      const a = vertex(row - 1, col - 1), b = vertex(row - 1, col);
+      const c = vertex(row, col - 1), d = vertex(row, col);
+      ground.push(triangle(a, b, c), triangle(b, d, c));
+      if (row === 1) shoulder(a, b);
+      if (row === zs.length - 1) shoulder(d, c);
+      if (col === 1) shoulder(c, a);
+      if (col === xs.length - 1) shoulder(b, d);
+    }
+  }
+  return { ground, terrainFaces };
+}
+
+const pass = mountainPass();
+/** Six transverse humps. The left side barely ripples; the right side reaches
+ * axle height. A long flat entry and runout allow a repeatable approach. */
+function washboard(): Pick<Scenario, 'ground' | 'terrainFaces'> {
+  const xs = [-22, -8, 0, 8, 22];
+  const zs = [18, 0, -12];
+  const flat = xs.map(() => 0);
+  const crest = [0.12, 0.12, 0.32, 0.55, 0.55];
+  const heights = [flat, flat, flat];
+  for (let hump = 0; hump < 6; hump++) {
+    zs.push(-15 - hump * 6, -18 - hump * 6);
+    heights.push(crest, flat);
+  }
+  zs.push(-80);
+  heights.push(flat);
+  return heightfield(xs, zs, heights);
+}
+
+export const FREE_DRIVES: Scenario[] = [
+  {
+    ...pass,
+    id: 'mountain-drive',
+    title: '峠の自由走行',
+    description: '今の機体で尾根や谷を自由に走れます。',
+    freeDrive: true,
+    budget: Infinity,
+    timeLimit: Infinity,
+    solids: [],
+  },
+  {
+    ...washboard(),
+    terrainColorRange: [0, 0.5],
+    id: 'washboard',
+    title: '波状路',
+    description: '前方に6本の起伏。左は12cm、中央は32cm、右は55cm。車輪や足回りを試せます。',
+    freeDrive: true,
+    budget: Infinity,
+    timeLimit: Infinity,
+    solids: [],
+  },
+];
+
 export const SCENARIOS: Scenario[] = [
   {
     id: 'sprint',
@@ -109,6 +213,27 @@ export const SCENARIOS: Scenario[] = [
       box(-3000, 3000, -61, -60, -3000, 3000)],
     solids: [],
     goal: [-20, 20, -2, 30, -72, -60],
+  },
+  {
+    id: 'mountain-pass',
+    title: '峠越え',
+    description: '二つの尾根の間を登り、峠を下った先の緑のゴールへ。',
+    budget: 45,
+    timeLimit: 90,
+    ...pass,
+    solids: [],
+    goal: [-10, 10, 0, 6, -116, -103],
+  },
+  {
+    ...pass,
+    id: 'ridge-turn',
+    title: '峠の切り返し',
+    description: '左手の黄色い中間地点を通り、峠を越えて右手の緑のゴールへ。',
+    budget: 45,
+    timeLimit: 100,
+    solids: [],
+    checkpoint: [-16, -3, 0, 12, -42, -26],
+    goal: [4, 20, 0, 8, -114, -91],
   },
 ];
 
@@ -292,7 +417,7 @@ export const MISSIONS: Scenario[] = [
   },
 ];
 
-export const scenarioById = (id: string | null | undefined): Scenario | null => [...SCENARIOS, ...MISSIONS].find((s) => s.id === id) ?? null;
+export const scenarioById = (id: string | null | undefined): Scenario | null => [...FREE_DRIVES, ...SCENARIOS, ...MISSIONS].find((s) => s.id === id) ?? null;
 
 /** whether the model holds a mission's state this frame: the Core's tilt from upright, its height, its speed, or it
  *  standing still in the goal box */

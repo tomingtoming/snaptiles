@@ -13,7 +13,7 @@
       <header id="bar">
         <nav id="samples"></nav>
         <button id="viewmode" type="button" aria-label="視点を切り替える">◎</button>
-        <button id="challenge-open" type="button" title="お題に挑戦：予算内で組んでゴールへ">お題</button>
+        <button id="challenge-open" type="button" title="地形を選んで走る・お題に挑戦する">地形・お題</button>
         <button id="debug-toggle" type="button" aria-pressed="false" aria-label="デバッグ" title="デバッグ：Luaの変数・グラフ・巻き戻し・ブレークポイント">🐞</button>
         <button id="mute" type="button" aria-label="消音">🔊</button>
         <button id="open-model" type="button">開く</button>
@@ -58,7 +58,7 @@
       <pre id="vals"></pre>
       <pre id="out"></pre>
       <div id="keys"></div>
-      <div id="challenge-banner" hidden role="status"><span id="challenge-banner-text"></span><button id="challenge-quit" type="button">お題をやめる</button></div>
+      <div id="challenge-banner" hidden role="status"><span id="challenge-banner-text"></span><button id="challenge-quit" type="button">平地に戻る</button></div>
       <section id="debug" hidden aria-label="デバッグ">
         <div class="debug-bar">
           <button id="debug-start" type="button" aria-label="最初へ" title="最初へ">⏮</button>
@@ -82,11 +82,13 @@
       </section>
     </main>
     <dialog id="challenge-dialog" aria-labelledby="challenge-title">
-      <h2 id="challenge-title">お題</h2>
-      <p>予算内で機体を組み、Coreを緑のゴールに入れればクリア。かかった時間と使ったコストが記録になります。今の機体のまま挑戦し、組み直すときは「組む」へ。</p>
-      <div id="challenge-list"></div>
-      <p class="challenge-costs">コスト：Chip・Frame 1、Rudder・Trim 2、Weight 3、Wheel・RLW 5、Jet・Arm 8、Core・Cowl 0。Luaも使えます（記録に「Lua使用」と出ます）。</p>
-      <div class="share-actions"><button id="challenge-leave" type="button">お題をやめる</button><form method="dialog"><button>閉じる</button></form></div>
+      <h2 id="challenge-title">地形・お題</h2>
+      <div class="course-options">
+        <p>お題は予算内で機体を組み、Coreを緑のゴールに入れればクリア。かかった時間と使ったコストが記録になります。今の機体のまま挑戦し、組み直すときは「組む」へ。</p>
+        <div id="challenge-list"></div>
+        <p class="challenge-costs">コスト：Chip・Frame 1、Rudder・Trim 2、Weight 3、Wheel・RLW 5、Jet・Arm 8、Core・Cowl 0。Luaも使えます（記録に「Lua使用」と出ます）。</p>
+      </div>
+      <div class="share-actions"><button id="challenge-leave" type="button">平地に戻る</button><form method="dialog"><button>閉じる</button></form></div>
     </dialog>
     <dialog id="challenge-result" aria-labelledby="challenge-result-title">
       <h2 id="challenge-result-title"></h2>

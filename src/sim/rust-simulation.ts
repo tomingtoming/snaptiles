@@ -16,7 +16,7 @@ import {
   TILE, TILE_STRIDE, type ApiName,
 } from './core-layout';
 import { Recording, type Command, type FrameInput } from './replay';
-import type { Scenario } from '../challenge/scenarios';
+import { inBox, type Scenario } from '../challenge/scenarios';
 
 let corePromise: Promise<SnapTilesCoreModule> | null = null;
 /** load (once) and instantiate the Emscripten module */
@@ -128,6 +128,7 @@ export class RustSimulation implements SimView {
   out: string[] = [];
   scriptError: string | null = null;
   ticks = 0;
+  checkpointPassed = false;
   lines3d: number[] = [];
   lines2d: number[] = [];
   zoomFov = 17.19;
@@ -199,11 +200,16 @@ export class RustSimulation implements SimView {
     const code = m._core_load(this.id, ptr, bytes.length, (this.bare || sc ? 1 : 0) | (sc?.ground ? 2 : 0));
     m._free(ptr);
     if (code !== 0) throw new Error(m.UTF8ToString(m._core_error(this.id)) || 'model failed to load');
-    for (const solid of [...(sc?.ground ?? []), ...(sc?.solids ?? [])]) {
+    const solids = [...(sc?.ground ?? []), ...(sc?.solids ?? [])];
+    for (const [index, solid] of solids.entries()) {
       const at = m._malloc(solid.length * 24);
       m.HEAPF64.set(solid.flat(), at / 8);
-      m._core_add_solid(this.id, at, solid.length);
+      const rejected = m._core_add_solid(this.id, at, solid.length);
       m._free(at);
+      if (rejected) {
+        this.freeCore();
+        throw new Error(`${sc!.title}の地形を読み込めませんでした（衝突形状 ${index + 1}）`);
+      }
     }
     const names = m.UTF8ToString(m._core_val_names(this.id));
     this.valOrder = (names ? names.split(TEXT_SEP) : []).map((n) => this.vals.get(n));
@@ -342,7 +348,12 @@ export class RustSimulation implements SimView {
   private afterCore(): void {
     const m = this.m!;
     this.read();
-    if (!this.midFrame) this.frame++;
+    if (!this.midFrame) {
+      this.frame++;
+      if (!this.checkpointPassed && this.scenario?.checkpoint) {
+        this.checkpointPassed = inBox(this.scenario.checkpoint, this.corePosition());
+      }
+    }
     const hit = m.UTF8ToString(m._core_break(this.id));
     this.breakHit = hit ? parseBreak(hit) : null;
   }

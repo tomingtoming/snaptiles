@@ -207,6 +207,11 @@ button:disabled { opacity: .4; cursor: default !important; }
 #challenge-banner button { min-height: 28px; background: #303840; color: var(--ink); border: 1px solid #59636e; border-radius: 4px; cursor: pointer; }
 .building #challenge-banner { display: none; }
 #challenge-dialog, #challenge-result { width: min(520px, calc(100vw - 32px)); padding: 20px; border: 1px solid #59636e; border-radius: 8px; background: var(--panel); color: var(--ink); }
+#challenge-dialog[open] { display: flex; flex-direction: column; gap: 12px; max-height: calc(100dvh - 32px); }
+#challenge-dialog h2 { margin: 0; }
+#challenge-dialog .course-options { overflow-y: auto; overscroll-behavior: contain; }
+#challenge-dialog .course-options > p:first-child { margin-top: 0; }
+#challenge-dialog .share-actions form { margin-left: auto; }
 #challenge-list { display: grid; gap: 8px; margin: 12px 0; }
 #challenge-list button { text-align: left; padding: 10px 12px; min-height: 44px; background: #303840; color: var(--ink); border: 1px solid #59636e; border-radius: 6px; cursor: pointer; }
 #challenge-list button[aria-current='true'] { border-color: var(--accent); }

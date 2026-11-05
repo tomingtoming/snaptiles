@@ -4,7 +4,7 @@
 import type { RustSimulation } from '../sim/rust-simulation';
 import type { Assembly } from '../model/assemble';
 import { FRAME_RATE } from '../sim/sim-view';
-import { MISSIONS, SCENARIOS, MissionProgress, costBreakdown, inGoal, modelCost, type Scenario } from './scenarios';
+import { FREE_DRIVES, MISSIONS, SCENARIOS, MissionProgress, costBreakdown, inGoal, modelCost, type Scenario } from './scenarios';
 
 export interface ChallengeHost {
   sim(): RustSimulation | null;
@@ -54,18 +54,18 @@ export class ChallengeUI {
       const b = document.createElement('button');
       b.type = 'button';
       b.setAttribute('aria-current', String(this.active?.id === s.id));
-      const best = this.best(s);
+      const best = s.freeDrive ? null : this.best(s);
       b.append(s.title);
       const small = document.createElement('small');
       const limits = s.mission ? `制限 ${s.timeLimit} 秒` : `予算 ${s.budget}・制限 ${s.timeLimit} 秒`;
       const record = best ? (s.mission ? `・自己ベスト ${best.time.toFixed(2)} 秒` : `・自己ベスト ${best.time.toFixed(2)} 秒 / コスト ${best.cost}`) : '';
-      small.textContent = `${s.description} ${limits}${record}`;
+      small.textContent = s.freeDrive ? s.description : `${s.description} ${limits}${record}`;
       b.append(small);
       b.addEventListener('click', () => { this.dialog.close(); this.select(s); });
       return b;
     };
     const heading = (text: string) => { const h = document.createElement('h3'); h.textContent = text; return h; };
-    $('challenge-list').replaceChildren(heading('お題（予算内で組んでゴールへ）'), ...SCENARIOS.map(button), heading('ミッション（Luaで制御の練習。機体はミッションのものに替わります）'), ...MISSIONS.map(button));
+    $('challenge-list').replaceChildren(heading('自由走行'), ...FREE_DRIVES.map(button), heading('お題（予算内で組んでゴールへ）'), ...SCENARIOS.map(button), heading('ミッション（Luaで制御の練習。機体はミッションのものに替わります）'), ...MISSIONS.map(button));
     $('challenge-leave').hidden = !this.active;
     this.dialog.showModal();
   }
@@ -86,11 +86,11 @@ export class ChallengeUI {
   /** after every step: the goal and the time limit */
   afterStep(sim: RustSimulation): void {
     const s = this.active;
-    if (!s || sim.scenario !== s || this.cleared !== null || this.failed) return;
+    if (!s || s.freeDrive || sim.scenario !== s || this.cleared !== null || this.failed) return;
     const core = sim.physics.tiles[0];
     const done = s.mission
       ? !!core && this.progressFor(s).step(sim.frame, { position: core.position, quaternion: core.quaternion }, sim.coreVelocity())
-      : inGoal(s, sim.corePosition());
+      : (!s.checkpoint || sim.checkpointPassed) && inGoal(s, sim.corePosition());
     if (done) {
       this.cleared = sim.frame;
       this.showResult(sim, true);
@@ -105,21 +105,27 @@ export class ChallengeUI {
     const s = this.active;
     this.banner.hidden = !s || !sim;
     if (!s || !sim?.assembly) return;
+    if (s.freeDrive) {
+      this.banner.classList.remove('over');
+      if (this.bannerText.textContent !== s.title) this.bannerText.textContent = s.title;
+      return;
+    }
     const cost = modelCost(sim.assembly);
     const time = (this.cleared ?? sim.frame) / FRAME_RATE;
     const over = !s.mission && cost > s.budget;
     this.banner.classList.toggle('over', over);
     const state = this.cleared !== null ? '・クリア！' : this.failed ? '・時間切れ' : '';
+    const checkpoint = s.checkpoint ? (!sim.checkpointPassed ? '｜黄色の中間地点へ' : '｜中間地点通過・緑のゴールへ') : '';
     const text = s.mission
       ? `ミッション：${s.title}｜${s.mission.via ? (this.progress?.visitedAt != null ? '折り返し済み｜' : '折り返しはまだ｜') : ''}保持 ${((this.progress?.scenario === s ? this.progress.held : 0) / FRAME_RATE).toFixed(1)} / ${s.mission.hold.seconds} 秒｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}｜${s.mission.hint}`
-      : `お題：${s.title}｜コスト ${cost} / ${s.budget}${over ? '（予算オーバー・記録なし）' : ''}｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}`;
+      : `お題：${s.title}｜コスト ${cost} / ${s.budget}${over ? '（予算オーバー・記録なし）' : ''}｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}${checkpoint}`;
     if (this.bannerText.textContent !== text) this.bannerText.textContent = text;
   }
 
   /** while building: the cost of the model being edited against the challenge's budget */
   updateBuild(assembly: Assembly | null, building: boolean): void {
     const el = $('build-cost');
-    const s = this.active?.mission ? null : this.active;
+    const s = this.active?.mission || this.active?.freeDrive ? null : this.active;
     el.hidden = !s || !building;
     if (!s || !building) return;
     const cost = assembly ? modelCost(assembly) : 0;

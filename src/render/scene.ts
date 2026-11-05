@@ -490,14 +490,31 @@ export class SceneView {
       c.traverse((o) => { if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); } });
     }
     if (!s) return;
-    const solid = (points: [number, number, number][], color: number, shadow: boolean) => {
-      const m = new THREE.Mesh(new ConvexGeometry(points.map((p) => new THREE.Vector3(...p))), new THREE.MeshStandardMaterial({ color, roughness: 0.95 }));
-      m.receiveShadow = true;
-      m.castShadow = shadow;
-      this.scenarioGroup.add(m);
+    const addMesh = (geometry: THREE.BufferGeometry, color: number, shadow: boolean) => {
+      const material = new THREE.MeshStandardMaterial({ color, roughness: 0.95, vertexColors: geometry.hasAttribute('color') });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.receiveShadow = true;
+      mesh.castShadow = shadow;
+      this.scenarioGroup.add(mesh);
     };
-    for (const g of s.ground ?? []) solid(g, 0xb9c4b0, false);
-    for (const o of s.solids) solid(o, 0x9aa3ab, true);
+    const hull = (points: [number, number, number][]) => new ConvexGeometry(points.map(p => new THREE.Vector3(...p)));
+    if (s.terrainFaces) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(s.terrainFaces.flat(), 3));
+      geometry.computeVertexNormals();
+      const colors = new Float32Array(s.terrainFaces.length * 3);
+      const [low, high] = s.terrainColorRange ?? [2, 14];
+      const valley = new THREE.Color(0x88aa69), ridge = new THREE.Color(0xa77e55);
+      const tint = new THREE.Color();
+      s.terrainFaces.forEach(([, y], i) => {
+        tint.lerpColors(valley, ridge, THREE.MathUtils.smoothstep(y, low, high)).toArray(colors, i * 3);
+      });
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      addMesh(geometry, 0xffffff, false);
+    } else {
+      for (const g of s.ground ?? []) addMesh(hull(g), 0xb9c4b0, false);
+    }
+    for (const o of s.solids) addMesh(hull(o), 0x9aa3ab, true);
     // the goal (green) and a mission's waypoint (yellow): translucent zones with their outlines
     const zone = ([x0, x1, y0, y1, z0, z1]: number[], fill: number, line: number) => {
       const geo = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
@@ -508,6 +525,7 @@ export class SceneView {
       this.scenarioGroup.add(mesh, edges);
     };
     if (s.goal) zone(s.goal, 0x43a047, 0x2e7d32);
+    if (s.checkpoint) zone(s.checkpoint, 0xfdd835, 0xf9a825);
     if (s.mission?.via) zone(s.mission.via, 0xfdd835, 0xf9a825);
   }
   private ballMeshes: THREE.Mesh[] = [];
@@ -586,10 +604,18 @@ export class SceneView {
 
   /** place view A's leash where the original starts it (after load / reset): 7.75 m out at world bearing
    *  −111.5° in the original's frame (x mirrored here), 2.0 m up */
-  snapModel(center: THREE.Vector3): void {
+  snapModel(center: THREE.Vector3, scenario?: Scenario | null): void {
     this.camTarget.copy(center);
     const horiz = this.leashDist * Math.cos(this.leashPitch);
-    this.leashEye.copy(center).add(new THREE.Vector3(0.930 * horiz, this.leashDist * Math.sin(this.leashPitch), -0.367 * horiz));
+    const bearing = new THREE.Vector3(0.930, 0, -0.367);
+    if (scenario?.freeDrive) bearing.set(0, 0, 1);
+    if (scenario?.goal && !scenario.mission) {
+      const [x0, x1, , , z0, z1] = scenario.goal;
+      const away = new THREE.Vector3(center.x - (x0 + x1) / 2, 0, center.z - (z0 + z1) / 2);
+      if (away.lengthSq() > 0.01) bearing.copy(away.normalize());
+    }
+    this.leashEye.copy(center).addScaledVector(bearing, horiz);
+    this.leashEye.y += this.leashDist * Math.sin(this.leashPitch);
     this.spectatorEye.copy(this.leashEye); this.spectatorTime = 0;
     if (this.viewMode === 'A' || this.viewMode === 'F') { this.camera.position.copy(this.leashEye); this.camera.lookAt(center); }
   }

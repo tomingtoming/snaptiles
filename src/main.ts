@@ -192,7 +192,7 @@ async function load(source: string, request: number, player: Recording | null = 
     scene.camYaw = 0.7;
     scene.sync(next.physics);
     scene.frameSimulation(next.corePosition());
-    scene.snapModel(next.modelCenter());
+    scene.snapModel(next.modelCenter(), next.scenario);
     acc = 0; last = performance.now(); lastCoreVel = null; lastShells = 0; crateVel.length = 0;
     buildKeyCaps(next);
     if (document.activeElement === focusBeforeLoad) canvas.focus({preventScroll: true});
@@ -380,7 +380,7 @@ window.addEventListener('keydown', (e) => {
   const fkey = /^F(8|9|1[012])$/.exec(e.code);
   if (fkey) { e.preventDefault(); setView(Number(fkey[1]) - 8 + (e.ctrlKey ? 5 : 0)); }
   if (e.code === 'KeyI' || e.code === 'KeyO') scene.zoomStep(e.code === 'KeyI' ? -1 : 1); // the original's view zoom
-  if (e.code === 'KeyR' && sim) { sim.reset(); scene.snapModel(sim.modelCenter()); } // R: reset in place (OnReset)
+  if (e.code === 'KeyR' && sim) { sim.reset(); scene.snapModel(sim.modelCenter(), sim.scenario); } // R: reset in place (OnReset)
   if (e.code === 'KeyU') void loadAndShare(sourceEl.value); // U: reload from source (OnInit)
 });
 
