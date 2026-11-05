@@ -114,6 +114,20 @@ try {
   await page.getByRole('button', { name: /坂の途中で止まる/ }).click();
   await page.waitForFunction(() => location.hash === '#lesson=incline-hold' && window.__sim?.scenario?.id === 'incline-hold');
   await page.click('#mission-edit');
+  const selected = () => page.locator('#source').evaluate(el => el.value.slice(el.selectionStart, el.selectionEnd));
+  assert.equal(await selected(), '300');
+  for (const [width, height] of [[1440, 900], [390, 844]]) {
+    await page.setViewportSize({width,height});
+    const box = await page.locator('#source').boundingBox();
+    assert.ok(box.width > width * 0.6 && box.height > height * 0.65, JSON.stringify(box));
+    await page.click('#lua-reference');
+    assert.ok(await page.locator('#api-search').isVisible());
+    await page.getByRole('button', {name:'走行画面に戻る'}).click();
+    assert.ok(await page.locator('#builder').isHidden());
+    await page.click('#mission-edit');
+    assert.equal(await selected(), '300');
+    console.log('Hill lesson editing area:', width, height, Math.round(box.width), Math.round(box.height));
+  }
   const source = await page.inputValue('#source');
   await page.fill('#source', source.replace('ENGINE = 300 ', 'ENGINE = math.min(6, (z + 62) * 0.7) * 220 + vz * 220 + 100 '));
   await page.press('#source', 'Control+Enter');

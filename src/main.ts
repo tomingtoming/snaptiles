@@ -129,6 +129,7 @@ const challenge = new ChallengeUI({
   },
   editLesson: () => {
     paused = true;
+    builder.expandLua();
     // Each starter marks its editable assignment with a Japanese Lua comment.
     // If the learner removed the marker, stay at their current selection.
     const match = /^([^\n]*?)--[^\n]*ここを[^\n]*$/m.exec(sourceEl.value);

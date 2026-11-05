@@ -244,20 +244,25 @@ export class BuildPanel {
     const expand = document.getElementById('lua-expand')!;
     expand.onclick = () => {
       const lua = this.luaBlockOffset();
-      document.body.classList.add('lua-wide');
-      reference.setAttribute('aria-expanded', 'false');
+      this.expandLua();
       if (lua === null || this.source.selectionStart < lua) document.getElementById('script-goto')!.click();
       else reveal();
     };
     reference.onclick = () => {
       const open = document.body.classList.toggle('lua-reference-open');
       reference.setAttribute('aria-expanded', String(open));
+      if (open && !this.active) {
+        const tools = document.querySelector<HTMLDetailsElement>('#script-tools')!;
+        if (!tools.open) { tools.open = true; this.restoreClosedTools = true; }
+        this.panel.hidden = false;
+      }
+      if (!open && !this.active) this.panel.hidden = true;
       if (open) search.focus(); else this.source.focus();
     };
     document.getElementById('lua-narrow')!.onclick = () => {
-      document.body.classList.remove('lua-wide', 'lua-reference-open');
-      reference.setAttribute('aria-expanded', 'false');
-      expand.focus();
+      this.collapseLua();
+      if (this.active) expand.focus();
+      else document.getElementById('mission-edit')!.focus();
     };
     const errorRow = document.getElementById('script-error')!;
     const paintError = () => {
@@ -271,6 +276,20 @@ export class BuildPanel {
       if (!hit) return;
       this.focusSourceRange(hit.start, hit.end);
     };
+  }
+  private restoreClosedTools = false;
+  expandLua(): void {
+    document.body.classList.add('lua-wide');
+    document.getElementById('lua-narrow')!.textContent = this.active ? '組立画面に戻る' : '走行画面に戻る';
+  }
+  private collapseLua(): void {
+    document.body.classList.remove('lua-wide', 'lua-reference-open');
+    document.getElementById('lua-reference')!.setAttribute('aria-expanded', 'false');
+    if (this.restoreClosedTools) {
+      document.querySelector<HTMLDetailsElement>('#script-tools')!.open = false;
+      this.restoreClosedTools = false;
+    }
+    if (!this.active) this.panel.hidden = true;
   }
   private luaBlockOffset(): number | null {
     try {
@@ -311,7 +330,8 @@ export class BuildPanel {
   }
   close(): void {
     this.active = false; this.panel.hidden = true;
-    this.toggle.setAttribute('aria-pressed', 'false'); document.body.classList.remove('building', 'lua-wide', 'lua-reference-open');
+    this.toggle.setAttribute('aria-pressed', 'false'); document.body.classList.remove('building');
+    this.collapseLua();
     this.scene.selectTile(null);
   }
   private captureSourceView(): void {
