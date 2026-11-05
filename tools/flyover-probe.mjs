@@ -24,6 +24,7 @@ try {
   await page.goto(process.argv[2] + '#plane&c=highland-bank');
   await page.waitForFunction(() => window.__sim?.scenario?.id === 'highland-bank');
   assert.equal(await page.isVisible('#challenge-result'), false);
+  await page.click('#terrain-map summary');
   await page.focus('#view');
   await page.waitForFunction(() => window.__sim.frame >= 45);
   await page.keyboard.down('z');
@@ -32,6 +33,7 @@ try {
   await page.keyboard.down('ArrowDown');
   await page.waitForFunction(() => window.__sim.checkpointPassed);
   await page.keyboard.down('ArrowRight');
+  await page.waitForFunction(() => /緑：ゴール.*水平 .*m・あと.*m上昇/.test(document.querySelector('#terrain-map small').textContent));
   await page.waitForFunction(() => document.getElementById('challenge-result').open, null, { timeout: 25000 });
   await page.keyboard.up('ArrowRight');
   await page.keyboard.up('ArrowDown');

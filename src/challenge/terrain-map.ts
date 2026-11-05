@@ -28,6 +28,13 @@ export function contourPaths(faces: Solid, interval: number): Map<number, string
   return paths;
 }
 
+/** Round outward: a pilot just outside a gate still has a correction to make. */
+export function gateAltitudeGuide(y: number, min: number, max: number): string {
+  if (y < min) return 'あと' + Math.ceil(min - y) + 'm上昇';
+  if (y > max) return 'あと' + Math.ceil(y - max) + 'm下降';
+  return '高度は範囲内';
+}
+
 export class TerrainMap {
   private panel = document.querySelector<HTMLDetailsElement>('#terrain-map')!;
   private svg = this.panel.querySelector('svg')!;
@@ -40,7 +47,7 @@ export class TerrainMap {
   private goal: SVGRectElement | null = null;
   private lastTarget: SVGRectElement | null = null;
 
-  update(s: Scenario | null, core: { position: { x: number; z: number }; vel: { x: number; z: number } } | undefined, passed: boolean): void {
+  update(s: Scenario | null, core: { position: { x: number; y: number; z: number }; vel: { x: number; z: number } } | undefined, passed: boolean): void {
     const bounds = s?.terrainBounds;
     const position = core?.position;
     this.panel.hidden = !bounds || !position;
@@ -73,11 +80,16 @@ export class TerrainMap {
     }
     let text = where;
     if (next) {
-      const [x0, x1, , , z0, z1] = next;
+      const [x0, x1, y0, y1, z0, z1] = next;
       const dx = Math.max(x0 - position.x, 0, position.x - x1);
       const dz = Math.max(z0 - position.z, 0, position.z - z1);
       const distance = Math.round(Math.hypot(dx, dz));
-      text += '　' + (headingForCheckpoint ? '黄：中間' : '緑：ゴール') + 'まで' + distance + 'm';
+      text += '　' + (headingForCheckpoint ? '黄：中間' : '緑：ゴール');
+      if (s.showGateAltitude) {
+        text += '　水平 ' + distance + 'm・' + gateAltitudeGuide(position.y, y0, y1);
+      } else {
+        text += 'まで' + distance + 'm';
+      }
     }
     if (!next && s.runway) {
       const { width, north, south } = s.runway;
