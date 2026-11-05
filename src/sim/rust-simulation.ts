@@ -136,6 +136,8 @@ export class RustSimulation implements SimView {
   readonly waterPasses = new Map<number, { seconds: number; speedKmh: number }>();
   private waterStartFrame = 0;
   bumpRun?: { entryKmh: number; peakVertical: number; crestsCm: number[]; complete: boolean };
+  private climbStart?: { degrees: number; frame: number; entryKmh: number };
+  readonly climbPasses = new Map<number, { seconds: number; entryKmh: number }>();
   brakingEntryKmh?: number;
   groundRange?: number;
   readonly missionProgress: MissionProgress | null;
@@ -298,6 +300,8 @@ export class RustSimulation implements SimView {
       this.sectorFrames.length = 0;
       this.lapStartFrame = this.frame;
     }
+    this.climbStart = undefined;
+    this.climbPasses.clear();
     this.bumpRun = undefined;
     this.waterPasses.clear();
     this.waterStartFrame = this.frame;
@@ -377,7 +381,7 @@ export class RustSimulation implements SimView {
     const stations = this.scenario?.waterStations;
     const trackWater = stations && this.waterPasses.size < stations.distances.length;
     const bumps = this.scenario?.bumpSection;
-    const trackMotion = bumps || trackWater || (test && !this.checkpointPassed) || (rings && this.ringsPassed < rings.length);
+    const trackMotion = this.scenario?.climbs || bumps || trackWater || (test && !this.checkpointPassed) || (rings && this.ringsPassed < rings.length);
     const before = trackMotion ? this.physics.tiles[0]?.position.clone() : undefined;
     this.read();
     if (!this.midFrame) {
@@ -387,6 +391,23 @@ export class RustSimulation implements SimView {
       if (progress?.scenario.mission?.hold.kind === 'clearance' || this.scenario?.shoalDepth) this.groundRange = m._core_ground_range(this.id, 0);
       if (progress && progress.clearedAt === null && core && this.frame <= progress.scenario.timeLimit * FRAME_RATE) {
         progress.step(this.frame, core, this.coreVelocity(), this.groundRange);
+      }
+      if (this.scenario?.climbs && before && core && this.scenario.terrainBounds) {
+        const after = core.position, [left, right] = this.scenario.terrainBounds;
+        if (before.x < left || before.x > right || after.x < left || after.x > right) this.climbStart = undefined;
+        else if (after.z < before.z) {
+          const crossingFrame = (z: number) => this.frame - 1 + (before.z - z) / (before.z - after.z);
+          for (const leg of this.scenario.climbs) {
+            if (before.z > leg.startZ && after.z <= leg.startZ) {
+              this.climbStart = { degrees: leg.degrees, frame: crossingFrame(leg.startZ), entryKmh: Math.hypot(core.vel.x, core.vel.z) * 3.6 };
+            }
+            if (before.z > leg.endZ && after.z <= leg.endZ && this.climbStart?.degrees === leg.degrees) {
+              this.climbPasses.set(leg.degrees, { entryKmh: this.climbStart.entryKmh,
+                seconds: (crossingFrame(leg.endZ) - this.climbStart.frame) / FRAME_RATE });
+              this.climbStart = undefined;
+            }
+          }
+        }
       }
       if (bumps && before && core) {
         const after = core.position;

@@ -228,6 +228,9 @@ export class ChallengeUI {
         else {
           const next = s.climbs.find(leg => z > leg.startZ);
           title += next ? '｜平場・次は ' + next.degrees + '°' : '｜頂上の平場';
+          for (const [degrees, pass] of sim.climbPasses) {
+            title += '｜' + degrees + '° ' + pass.seconds.toFixed(2) + '秒（進入 ' + pass.entryKmh.toFixed(1) + ' km/h）';
+          }
         }
       }
       if (s.bumpSection) {

@@ -37,4 +37,42 @@ try {
   const expected = [6, 12, 18].reduce((height, angle) => height + 24 * Math.tan(angle * Math.PI / 180), 0);
   assert.ok(Math.abs(top - expected) < 0.03, 'summit ' + top);
   console.log('Stock car reached the summit at', top.toFixed(2), 'm.');
+  for (const stop of [false, true]) {
+    await page.reload();
+    await page.waitForFunction(() => window.__sim?.scenario?.id === 'terraced-climb' && window.__sim.frame > 35);
+    await page.focus('#view');
+    const result = await page.evaluate(stop => {
+      const sim = window.__sim, view = document.querySelector('#view'), held = new Set();
+      const press = (code, key, down) => {
+        if (held.has(code) === down) return;
+        if (down) held.add(code); else held.delete(code);
+        view.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', {code, key, bubbles: true}));
+      };
+      const stops = [];
+      let stationary = 0;
+      for (let frame = 0; frame < 4500 && sim.climbPasses.size < 3; frame++) {
+        const {z} = sim.corePosition(), speed = sim.coreVelocity().length();
+        const steering = Math.max(-22, Math.min(22, -2 * sim.corePosition().x - 4 * sim.coreVelocity().x));
+        const handle = sim.env('HANDLE');
+        press('ArrowLeft', 'ArrowLeft', steering < handle - 1);
+        press('ArrowRight', 'ArrowRight', steering > handle + 1);
+        const brake = stop && stops.length < 2 && z < [-38, -76][stops.length];
+        press('ArrowUp', 'ArrowUp', !brake && speed < 7);
+        press('KeyZ', 'z', brake);
+        if (brake && speed < 0.05) {
+          if (++stationary === 30) { stops.push(z); stationary = 0; }
+        } else stationary = 0;
+        sim.step();
+      }
+      press('ArrowUp', 'ArrowUp', false); press('KeyZ', 'z', false);
+      return { stops, end: sim.corePosition().toArray(), passes: Array.from(sim.climbPasses.values()) };
+    }, stop);
+    assert.equal(result.passes.length, 3, JSON.stringify(result));
+    assert.equal(result.stops.length, stop ? 2 : 0);
+    result.stops.forEach((z,i) => assert.ok(z < -36 - i*38 && z > -50 - i*38, 'stop at '+z));
+    await page.waitForFunction(() => document.querySelector('#challenge-banner-text').textContent.includes('18° ') && document.querySelector('#challenge-banner-text').textContent.includes('秒（進入'));
+    console.log(stop ? 'Stopped on landings' : 'Rolling', JSON.stringify(result));
+    await page.evaluate(() => window.__sim.reset());
+    assert.equal(await page.evaluate(() => window.__sim.climbPasses.size), 0);
+  }
 } finally { await browser.close(); }
