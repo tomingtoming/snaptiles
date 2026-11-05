@@ -28,14 +28,16 @@ body { display: grid; grid-template-columns: 380px 1fr; }
 #stage { position: relative; min-width: 0; min-height: 0; }
 #view { width: 100%; height: 100%; display: block; outline: 0; touch-action: none; }
 #hud { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-#flight-readouts { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: fit-content(45%) auto; align-content: start; align-items: start; gap: 6px; padding: 12px; pointer-events: none; }
+#flight-overlay { position: absolute; inset: 0; display: grid; grid-template-rows: fit-content(45%) minmax(0, 1fr) auto; gap: 6px; padding: 12px; pointer-events: none; }
+#map-slot { display: grid; min-height: 0; container-type: size; }
+#flight-readouts { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, max-content) auto; align-content: start; align-items: start; gap: 6px; }
 #vals, #out { margin: 0; padding: 10px 12px; font: 13px/1.4 var(--mono); color: #1d2328; background: rgba(255, 255, 255, 0.55); border-radius: 8px; pointer-events: none; backdrop-filter: blur(4px); }
 #vals { grid-area: 1 / 1; justify-self: start; }
 #out { grid-area: 1 / 2; justify-self: end; white-space: pre-wrap; }
 #vals, #out { min-height: 0; max-height: 100%; max-width: 100%; overflow: hidden; }
 #vals:empty, #out:empty { display: none; }
-#keys { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; flex-wrap: wrap; max-width: calc(100% - 24px); }
-#keys .cap { display: grid; place-items: center; min-width: 44px; height: 44px; padding: 0 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.6); color: #1d2328; font: 600 15px/1 var(--mono); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25); transition: transform 60ms, background 60ms; cursor: pointer; user-select: none; touch-action: none; }
+#keys { display: flex; gap: 6px; flex-wrap: wrap; }
+#keys .cap { pointer-events: auto; display: grid; place-items: center; min-width: 44px; height: 44px; padding: 0 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.6); color: #1d2328; font: 600 15px/1 var(--mono); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25); transition: transform 60ms, background 60ms; cursor: pointer; user-select: none; touch-action: none; }
 #keys .cap[data-down='true'] { background: var(--accent); transform: translateY(2px); box-shadow: none; }
 #keys .cap small { font-size: 9px; font-weight: 500; color: #4a535c; letter-spacing: 0.02em; }
 
@@ -209,11 +211,11 @@ button:disabled { opacity: .4; cursor: default !important; }
 #challenge-banner button { flex: none; white-space: nowrap; min-height: 28px; background: #303840; color: var(--ink); border: 1px solid #59636e; border-radius: 4px; cursor: pointer; }
 .building #challenge-banner { display: none; }
 #challenge-dialog, #challenge-result { width: min(520px, calc(100vw - 32px)); padding: 20px; border: 1px solid #59636e; border-radius: 8px; background: var(--panel); color: var(--ink); }
-#terrain-map { position: absolute; right: 10px; bottom: 76px; z-index: 2; color: white; background: #20272eef; border-radius: 6px; }
+#terrain-map { align-self: end; justify-self: end; max-height: 100%; overflow: auto; pointer-events: auto; z-index: 2; color: white; background: #20272eef; border-radius: 6px; }
 #terrain-map[hidden], .building #terrain-map, .debugging #terrain-map { display: none; }
 #terrain-map[open] { width: min(200px, 49vw); }
 #terrain-map summary { padding: 8px 12px; cursor: pointer; font-size: 13px; }
-#terrain-map svg { display: block; margin-inline: auto; width: min(180px, 38vw); height: min(155px, 25dvh); }
+#terrain-map svg { display: block; margin-inline: auto; width: min(180px, 38vw); height: clamp(32px, calc(100cqh - 104px), 155px); }
 #terrain-map .contour-key[hidden] { display: none; }
 #terrain-map .contour-key { padding-top: 0; }
 #terrain-map .contour-key::before { display: inline-block; width: 14px; border-top: 1px solid #e3e4ae; margin-right: 4px; vertical-align: middle; content: ""; }

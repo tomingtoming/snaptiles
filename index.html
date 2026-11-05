@@ -55,18 +55,22 @@
     <main id="stage">
       <canvas id="view" tabindex="0" aria-label="モデルの操縦・表示画面"></canvas>
       <canvas id="hud"></canvas>
-      <div id="flight-readouts">
-        <pre id="vals"></pre>
-        <pre id="out"></pre>
-        <div id="challenge-banner" hidden role="status"><span id="challenge-banner-text"></span><button id="mission-edit" type="button" title="一時停止して課題の行へ。Ctrl+Enterで試す" hidden>Luaを編集</button><button id="brake-compare" type="button" hidden></button><button id="challenge-quit" type="button">平地に戻る</button></div>
+      <div id="flight-overlay">
+        <div id="flight-readouts">
+          <pre id="vals"></pre>
+          <pre id="out"></pre>
+          <div id="challenge-banner" hidden role="status"><span id="challenge-banner-text"></span><button id="mission-edit" type="button" title="一時停止して課題の行へ。Ctrl+Enterで試す" hidden>Luaを編集</button><button id="brake-compare" type="button" hidden></button><button id="challenge-quit" type="button">平地に戻る</button></div>
+        </div>
+        <div id="map-slot">
+          <details id="terrain-map" hidden>
+            <summary>地形図</summary>
+            <svg role="img" aria-label="上が北。白い点が現在地、矢印が進行方向、黄色が中間地点、緑がゴール"></svg>
+            <small></small>
+            <small class="contour-key" hidden></small>
+          </details>
+        </div>
+        <div id="keys"></div>
       </div>
-      <div id="keys"></div>
-      <details id="terrain-map" hidden>
-        <summary>地形図</summary>
-        <svg role="img" aria-label="上が北。白い点が現在地、矢印が進行方向、黄色が中間地点、緑がゴール"></svg>
-        <small></small>
-        <small class="contour-key" hidden></small>
-      </details>
       <section id="debug" hidden aria-label="デバッグ">
         <div class="debug-bar">
           <button id="debug-start" type="button" aria-label="最初へ" title="最初へ">⏮</button>

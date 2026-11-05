@@ -24,6 +24,17 @@ try {
     assert.equal(await arrow.isVisible(), true);
     await page.keyboard.up(key);
   }
+  for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto(process.argv[2] + '#plane&c=highland-bank');
+    await page.waitForFunction(() => window.__sim?.scenario?.id === 'highland-bank');
+    if (!(await page.locator('#terrain-map').evaluate(el => el.open))) await page.click('#terrain-map summary');
+    const blocked = await page.locator('#keys .cap').evaluateAll(caps => caps.filter(cap => {
+      const r = cap.getBoundingClientRect();
+      return !cap.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+    }).map(cap => cap.textContent));
+    assert.deepEqual(blocked, []);
+  }
   console.log('Highlands map: five contours, stationary dot, forward and reverse bearings.');
 } finally {
   await browser.close();
