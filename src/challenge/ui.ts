@@ -4,12 +4,12 @@
 import type { RustSimulation } from '../sim/rust-simulation';
 import type { Assembly } from '../model/assemble';
 import { FRAME_RATE } from '../sim/sim-view';
-import { SCENARIOS, inGoal, modelCost, type Scenario } from './scenarios';
+import { MISSIONS, SCENARIOS, holds, inGoal, modelCost, type Scenario } from './scenarios';
 
 export interface ChallengeHost {
   sim(): RustSimulation | null;
-  /** reload the current source with the chosen challenge (or none) */
-  reload(): void;
+  /** reload the current source with the chosen challenge (or none); `source` replaces it first (a mission's model) */
+  reload(source?: string): void;
   /** a link to the current model, challenge and run */
   recordLink(): Promise<string>;
 }
@@ -22,6 +22,8 @@ export class ChallengeUI {
   active: Scenario | null = null;
   private cleared: number | null = null;
   private failed = false;
+  /** a mission's consecutive frames in the required state */
+  private held = 0;
   private dialog = $<HTMLDialogElement>('challenge-dialog');
   private result = $<HTMLDialogElement>('challenge-result');
   private banner = $('challenge-banner');
@@ -44,32 +46,35 @@ export class ChallengeUI {
   }
 
   private openDialog(): void {
-    const list = $('challenge-list');
-    list.replaceChildren(...SCENARIOS.map((s) => {
+    const button = (s: Scenario) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.setAttribute('aria-current', String(this.active?.id === s.id));
       const best = this.best(s);
-      b.innerHTML = '';
-      b.append(`${s.title}`);
+      b.append(s.title);
       const small = document.createElement('small');
-      small.textContent = `${s.description} 予算 ${s.budget}・制限 ${s.timeLimit} 秒${best ? `・自己ベスト ${best.time.toFixed(2)} 秒 / コスト ${best.cost}` : ''}`;
+      const limits = s.mission ? `制限 ${s.timeLimit} 秒` : `予算 ${s.budget}・制限 ${s.timeLimit} 秒`;
+      const record = best ? (s.mission ? `・自己ベスト ${best.time.toFixed(2)} 秒` : `・自己ベスト ${best.time.toFixed(2)} 秒 / コスト ${best.cost}`) : '';
+      small.textContent = `${s.description} ${limits}${record}`;
       b.append(small);
       b.addEventListener('click', () => { this.dialog.close(); this.select(s); });
       return b;
-    }));
+    };
+    const heading = (text: string) => { const h = document.createElement('h3'); h.textContent = text; return h; };
+    $('challenge-list').replaceChildren(heading('お題（予算内で組んでゴールへ）'), ...SCENARIOS.map(button), heading('ミッション（Luaで制御の練習。機体はミッションのものに替わります）'), ...MISSIONS.map(button));
     $('challenge-leave').hidden = !this.active;
     this.dialog.showModal();
   }
 
   select(s: Scenario | null): void {
     this.active = s;
-    this.host.reload();
+    this.host.reload(s?.mission?.starter);
   }
 
   /** a new simulation: a fresh start, or the same run re-run to a frame (a clear after that frame is undone) */
   attach(sim: RustSimulation, rewound: boolean): void {
     if (!rewound || this.cleared === null || sim.frame < this.cleared) { this.cleared = null; this.failed = false; }
+    this.held = 0;
     this.update(sim);
   }
 
@@ -77,7 +82,9 @@ export class ChallengeUI {
   afterStep(sim: RustSimulation): void {
     const s = this.active;
     if (!s || sim.scenario !== s || this.cleared !== null || this.failed) return;
-    if (inGoal(s, sim.corePosition())) {
+    const core = sim.physics.tiles[0];
+    if (s.mission && core) this.held = holds(s, { position: core.position, quaternion: core.quaternion }) ? this.held + 1 : 0;
+    if (s.mission ? this.held >= s.mission.hold.seconds * FRAME_RATE : inGoal(s, sim.corePosition())) {
       this.cleared = sim.frame;
       this.showResult(sim, true);
     } else if (sim.frame >= s.timeLimit * FRAME_RATE) {
@@ -93,17 +100,19 @@ export class ChallengeUI {
     if (!s || !sim?.assembly) return;
     const cost = modelCost(sim.assembly);
     const time = (this.cleared ?? sim.frame) / FRAME_RATE;
-    const over = cost > s.budget;
+    const over = !s.mission && cost > s.budget;
     this.banner.classList.toggle('over', over);
     const state = this.cleared !== null ? '・クリア！' : this.failed ? '・時間切れ' : '';
-    const text = `お題：${s.title}｜コスト ${cost} / ${s.budget}${over ? '（予算オーバー・記録なし）' : ''}｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}`;
+    const text = s.mission
+      ? `ミッション：${s.title}｜保持 ${(this.held / FRAME_RATE).toFixed(1)} / ${s.mission.hold.seconds} 秒｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}｜${s.mission.hint}`
+      : `お題：${s.title}｜コスト ${cost} / ${s.budget}${over ? '（予算オーバー・記録なし）' : ''}｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}`;
     if (this.bannerText.textContent !== text) this.bannerText.textContent = text;
   }
 
   /** while building: the cost of the model being edited against the challenge's budget */
   updateBuild(assembly: Assembly | null, building: boolean): void {
     const el = $('build-cost');
-    const s = this.active;
+    const s = this.active?.mission ? null : this.active;
     el.hidden = !s || !building;
     if (!s || !building) return;
     const cost = assembly ? modelCost(assembly) : 0;
@@ -138,7 +147,7 @@ export class ChallengeUI {
     const dl = document.createElement('dl');
     const row = (k: string, v: string) => { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); };
     if (cleared) row('タイム', `${time.toFixed(2)} 秒`);
-    row('コスト', `${cost} / ${s.budget}${within ? '' : '（予算オーバー：記録になりません）'}`);
+    if (!s.mission) row('コスト', `${cost} / ${s.budget}${within ? '' : '（予算オーバー：記録になりません）'}`);
     row('Lua', lua ? '使用' : 'なし');
     if (verified) row('記録', 'リンクの走りをこのブラウザで再計算して確認済み');
     if (best) row('自己ベスト', `${best.time.toFixed(2)} 秒 / コスト ${best.cost}`);

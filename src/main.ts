@@ -7,6 +7,9 @@ import type { SimView } from './sim/sim-view';
 import type { RustSimulation } from './sim/rust-simulation';
 import { decodeRecording, decodeText, encodeRecording, encodeText, type Recording } from './sim/replay';
 import { DebugPanel } from './debug/panel';
+import { SourceView } from './editor/source-view';
+import { Completion } from './editor/completion';
+import { diagnosticLine } from './editor/script';
 import { ChallengeUI } from './challenge/ui';
 import { scenarioById } from './challenge/scenarios';
 import { Sfx } from './audio/sfx';
@@ -69,10 +72,59 @@ const debug = new DebugPanel({
   step: () => { if (sim && !builder?.active) { sim.step(); debug.afterStep(sim); challenge.afterStep(sim); } },
   source: sourceEl,
 });
+// the source editor's gutter (line numbers, breakpoints, errors) and colours
+const errorLine = () => {
+  const msg = statusEl.textContent ?? '';
+  return msg ? diagnosticLine(sourceEl.value, msg) : null;
+};
+/** the live syntax check's error (compiled by the core while typing, never run) */
+let liveError: { line: number; message: string } | null = null;
+const sourceView = new SourceView(sourceEl, {
+  breakpoints: () => debug.breakpointLines(),
+  toggleBreakpoint: (line) => debug.toggleBreakpoint(line),
+  errorLines: () => [...new Set([errorLine()?.line, liveError?.line].filter((n): n is number => !!n))],
+  errorMessage: (line) => (liveError?.line === line ? liveError.message : statusEl.textContent ?? undefined),
+});
+new Completion(sourceEl, sourceView.layer);
+const hintEl = $('source-hint');
+const hintText = hintEl.textContent ?? '';
+let checkTimer = 0;
+let checkGeneration = 0;
+const liveCheck = () => {
+  clearTimeout(checkTimer);
+  checkTimer = window.setTimeout(async () => {
+    const request = ++checkGeneration, text = sourceEl.value;
+    const msg = await (await import('./sim/rust-simulation')).checkSource(text);
+    if (request !== checkGeneration) return;
+    const m = /\bline (\d+):\s*([\s\S]*)/.exec(msg);
+    liveError = msg ? { line: m ? Number(m[1]) : 0, message: msg } : null;
+    hintEl.classList.toggle('error', !!msg);
+    hintEl.textContent = msg ? `文法：${msg}` : hintText;
+  }, 300);
+};
+sourceEl.addEventListener('input', liveCheck);
+// a live Lua edit: the running model keeps going with the new Lua block (Ctrl+Shift+Enter or the button)
+const luaApply = document.createElement('button');
+luaApply.id = 'lua-apply';
+luaApply.type = 'button';
+luaApply.hidden = true;
+luaApply.textContent = 'Luaを反映（続けたまま）';
+luaApply.title = '実行を止めずに、Luaの部分だけ差し替えます（Ctrl+Shift+Enter）。機体・Val・Keyを変えたときは▶で実行し直します';
+sourceView.layer.append(luaApply);
+const applyLua = () => {
+  if (!sim || builder?.active) return;
+  const err = sim.reloadScript(sourceEl.value);
+  statusEl.textContent = err ? err : '';
+  if (!err) { luaApply.hidden = true; statusEl.textContent = ''; }
+};
+luaApply.addEventListener('click', applyLua);
 // challenges: a course, a budget and a goal; the challenge rides in the URL (&c=) with the model and the run
 const challenge = new ChallengeUI({
   sim: () => sim,
-  reload: () => void loadAndShare(sourceEl.value),
+  reload: (source) => {
+    if (source !== undefined) { builder.loadSource(source); refreshSampleButtons(); }
+    void loadAndShare(source ?? sourceEl.value);
+  },
   recordLink: async () => {
     const s = sim!;
     const url = new URL(location.href);
@@ -143,6 +195,7 @@ async function load(source: string, request: number, player: Recording | null = 
     buildKeyCaps(next);
     if (document.activeElement === focusBeforeLoad) canvas.focus({preventScroll: true});
     statusEl.textContent = [...next.model.warnings, next.scriptError].filter(Boolean).join('\n');
+    liveCheck(); // the source may have been set by code (a sample, a link), with no input event
     return true;
   } catch (e) {
     if (next) await next.dispose();
@@ -237,6 +290,11 @@ $('help').addEventListener('click', () => { $<HTMLDialogElement>('help-dialog').
 let paused = false;
 let windLevel = 0;
 sourceEl.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Enter') {
+    e.preventDefault();
+    applyLua();
+    return;
+  }
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     e.preventDefault();
     void loadAndShare(sourceEl.value);
@@ -427,6 +485,8 @@ function frame(now: number): void {
   }
   if (builder?.active) { acc = 0; scene.updateEditorCamera(); }
   if (!builder?.active) { debug.update(sim); challenge.update(sim); }
+  // the live-edit button: running, and the source differs from the running Lua's
+  luaApply.hidden = !sim || !!builder?.active || !sim.model.script || sourceEl.value === sim.currentSource;
   challenge.updateBuild(builder?.assembly ?? null, !!builder?.active);
   scene.render();
 }

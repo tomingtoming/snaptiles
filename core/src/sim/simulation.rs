@@ -185,6 +185,8 @@ pub struct Simulation {
     pub out: Vec<String>,
     /// this simulation's `_RND` generator, swapped in for every call that can run the script (replays repeat exactly)
     rng: std::cell::Cell<u64>,
+    /// the model source as loaded, with the Lua section of the last reload
+    source: String,
 }
 
 impl Simulation {
@@ -224,7 +226,7 @@ impl Simulation {
             pen3: [0.0; 3],
             pen2: [0.0; 2],
         };
-        Ok(Simulation { state: Rc::new(RefCell::new(state)), lua: LuaEngine::new(), rc_script: None, script_error: None, out: Vec::new(), rng: std::cell::Cell::new(0) })
+        Ok(Simulation { state: Rc::new(RefCell::new(state)), lua: LuaEngine::new(), rc_script: None, script_error: None, out: Vec::new(), rng: std::cell::Cell::new(0), source: source.to_string() })
     }
 
     /// Parse and start in one go.
@@ -468,6 +470,44 @@ impl Simulation {
         self.with_rng(|| self.state.borrow_mut().call_api(name, &a).num())
     }
 
+    /// Swap the Lua block for the one in `source` while running (the page's edit): only the Lua section may differ from
+    /// the running model. Physics, Vals and the running globals carry on (see [`LuaEngine::reload`]).
+    pub fn reload_lua(&mut self, source: &str) -> Result<(), String> {
+        let new_model = crate::rc::parse_rc(source).map_err(|e| e.to_string())?;
+        let old_script = self.state.borrow().model.script.clone();
+        let new_script = new_model.script.clone();
+        let (Some(old), Some(new)) = (old_script, new_script) else { return Err("Luaの部分がありません".into()) };
+        if old.lang != ScriptLang::Lua || new.lang != ScriptLang::Lua {
+            return Err("Luaの部分だけ書き換えられます".into());
+        }
+        if without_lua(&self.source) != without_lua(source) {
+            return Err("Luaの部分以外（機体・Val・Key）が変わっています。▶で実行し直してください".into());
+        }
+        self.source = source.to_string();
+        self.state.borrow_mut().model.script = Some(new.clone());
+        let prelude = self.lua_prelude();
+        let state = self.state.clone();
+        crate::sim::seed_random(self.rng.get());
+        self.push_vals_to_lua();
+        let r = self.lua.reload(&new.source, |lua| register_api(lua, state), &prelude, new.first_line as i64 - 1);
+        self.pull_vals_from_lua();
+        self.rng.set(crate::sim::random_state());
+        self.script_error = self.lua.error.clone();
+        self.out = self.lua.out_lines();
+        r
+    }
+
+    /// Evaluate Lua in the running block (the page's console), under this simulation's `_RND` state
+    pub fn eval_lua(&mut self, code: &str) -> Result<String, String> {
+        crate::sim::seed_random(self.rng.get());
+        self.push_vals_to_lua();
+        let r = self.lua.eval(code);
+        self.pull_vals_from_lua();
+        self.rng.set(crate::sim::random_state());
+        self.out = self.lua.out_lines();
+        r
+    }
+
     /// one script API call with any arguments, under this simulation's `_RND` state
     pub fn api_call(&self, name: &str, args: &[Arg]) -> Ret {
         self.with_rng(|| self.state.borrow_mut().call_api(name, args))
@@ -478,9 +518,9 @@ impl Simulation {
         self.lua.watch()
     }
 
-    /// file lines where the Lua block stops for inspection (empty: none, and no line hook)
-    pub fn set_breakpoints(&mut self, lines: Vec<i64>) {
-        *self.lua.breakpoints.borrow_mut() = lines;
+    /// where the Lua block stops for inspection (empty: none, and no line hook); pass counts start again
+    pub fn set_breakpoints(&mut self, breakpoints: Vec<crate::scripting::lua::Breakpoint>) {
+        *self.lua.breakpoints.borrow_mut() = breakpoints;
     }
 
     /// the breakpoint snapshot of the last step (`line US name RS value ...`), if a breakpoint was hit in it
@@ -594,4 +634,15 @@ fn register_api(lua: &Lua, state: Rc<RefCell<SimState>>) -> mlua::Result<()> {
         )?;
     }
     Ok(())
+}
+
+/// the source with the Lua section's inside removed (UTF-16 offsets, as the parser gives them)
+fn without_lua(source: &str) -> String {
+    let Ok(blocks) = crate::rc::find_blocks(source) else { return source.to_string() };
+    let Some(b) = blocks.iter().find(|b| b.name.eq_ignore_ascii_case("lua")) else { return source.to_string() };
+    let units: Vec<u16> = source.encode_utf16().collect();
+    let end = b.offset + b.inner.encode_utf16().count();
+    let mut kept = units[..b.offset].to_vec();
+    kept.extend_from_slice(&units[end.min(units.len())..]);
+    String::from_utf16_lossy(&kept)
 }

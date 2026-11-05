@@ -84,132 +84,135 @@ export const SHELL = {
   PZ: 2,
 } as const;
 export const SHELL_STRIDE = 3;
-/** the script API's functions (`api()` of the simulation), as the core's table names them */
-export type ApiName =
-  | '_ADDBALL'
-  | '_ANALOG'
-  | '_ANGLE'
-  | '_AX'
-  | '_AY'
-  | '_AZ'
-  | '_BASE'
-  | '_BLUE'
-  | '_BRAKE'
-  | '_BYE'
-  | '_CCD'
-  | '_CHIPS'
-  | '_COLOR'
-  | '_DAMPER'
-  | '_DIR'
-  | '_DT'
-  | '_E'
-  | '_EFFECT'
-  | '_EX'
-  | '_EY'
-  | '_EZ'
-  | '_FACE'
-  | '_FPS'
-  | '_FUEL'
-  | '_FUELMAX'
-  | '_FX'
-  | '_FY'
-  | '_FZ'
-  | '_GET'
-  | '_GETREG'
-  | '_GETWIND'
-  | '_GREEN'
-  | '_GX'
-  | '_GY'
-  | '_GZ'
-  | '_H'
-  | '_HAT'
-  | '_HEIGHT'
-  | '_I'
-  | '_IOBJ'
-  | '_KEY'
-  | '_KEYDOWN'
-  | '_KEYUP'
-  | '_LINE2D'
-  | '_LINE3D'
-  | '_LX'
-  | '_LY'
-  | '_LZ'
-  | '_M'
-  | '_ML'
-  | '_MM'
-  | '_MOBJ'
-  | '_MOVE2D'
-  | '_MOVE3D'
-  | '_MR'
-  | '_MX'
-  | '_MY'
-  | '_OPTION'
-  | '_OX'
-  | '_OY'
-  | '_OZ'
-  | '_PARENT'
-  | '_PLAYERARMS'
-  | '_PLAYERCHIPS'
-  | '_PLAYERCOLOR'
-  | '_PLAYERCRUSHES'
-  | '_PLAYERHOSTID'
-  | '_PLAYERID'
-  | '_PLAYERINITS'
-  | '_PLAYERMYID'
-  | '_PLAYERNAME'
-  | '_PLAYERNAME2'
-  | '_PLAYERRESETS'
-  | '_PLAYERS'
-  | '_PLAYERX'
-  | '_PLAYERY'
-  | '_PLAYERYFORCES'
-  | '_PLAYERZ'
-  | '_POWER'
-  | '_QW'
-  | '_QX'
-  | '_QY'
-  | '_QZ'
-  | '_RED'
-  | '_RND'
-  | '_RX'
-  | '_RY'
-  | '_RZ'
-  | '_SET'
-  | '_SETCOLOR'
-  | '_SETOBJCOLOR'
-  | '_SETOBJFIX'
-  | '_SETREG'
-  | '_SETTICKS'
-  | '_SETWIND'
-  | '_SPLIT'
-  | '_SPRING'
-  | '_T'
-  | '_TICKS'
-  | '_TODEG'
-  | '_TOP'
-  | '_TORAD'
-  | '_TYPE'
-  | '_USER1'
-  | '_USER2'
-  | '_VEL'
-  | '_VX'
-  | '_VY'
-  | '_VZ'
-  | '_WEIGHT'
-  | '_WIDTH'
-  | '_WX'
-  | '_WY'
-  | '_WZ'
-  | '_X'
-  | '_XX'
-  | '_XY'
-  | '_XZ'
-  | '_Y'
-  | '_YX'
-  | '_YY'
-  | '_YZ'
-  | '_Z'
-  | '_ZOOM'
-  | '_ZX'
-  | '_ZY'
-  | '_ZZ';
+/** the script API's functions (`api()` of the simulation), as the core's table names them (the editor's completion
+ *  lists them) */
+export const API_NAMES = [
+  '_ADDBALL',
+  '_ANALOG',
+  '_ANGLE',
+  '_AX',
+  '_AY',
+  '_AZ',
+  '_BASE',
+  '_BLUE',
+  '_BRAKE',
+  '_BYE',
+  '_CCD',
+  '_CHIPS',
+  '_COLOR',
+  '_DAMPER',
+  '_DIR',
+  '_DT',
+  '_E',
+  '_EFFECT',
+  '_EX',
+  '_EY',
+  '_EZ',
+  '_FACE',
+  '_FPS',
+  '_FUEL',
+  '_FUELMAX',
+  '_FX',
+  '_FY',
+  '_FZ',
+  '_GET',
+  '_GETREG',
+  '_GETWIND',
+  '_GREEN',
+  '_GX',
+  '_GY',
+  '_GZ',
+  '_H',
+  '_HAT',
+  '_HEIGHT',
+  '_I',
+  '_IOBJ',
+  '_KEY',
+  '_KEYDOWN',
+  '_KEYUP',
+  '_LINE2D',
+  '_LINE3D',
+  '_LX',
+  '_LY',
+  '_LZ',
+  '_M',
+  '_ML',
+  '_MM',
+  '_MOBJ',
+  '_MOVE2D',
+  '_MOVE3D',
+  '_MR',
+  '_MX',
+  '_MY',
+  '_OPTION',
+  '_OX',
+  '_OY',
+  '_OZ',
+  '_PARENT',
+  '_PLAYERARMS',
+  '_PLAYERCHIPS',
+  '_PLAYERCOLOR',
+  '_PLAYERCRUSHES',
+  '_PLAYERHOSTID',
+  '_PLAYERID',
+  '_PLAYERINITS',
+  '_PLAYERMYID',
+  '_PLAYERNAME',
+  '_PLAYERNAME2',
+  '_PLAYERRESETS',
+  '_PLAYERS',
+  '_PLAYERX',
+  '_PLAYERY',
+  '_PLAYERYFORCES',
+  '_PLAYERZ',
+  '_POWER',
+  '_QW',
+  '_QX',
+  '_QY',
+  '_QZ',
+  '_RED',
+  '_RND',
+  '_RX',
+  '_RY',
+  '_RZ',
+  '_SET',
+  '_SETCOLOR',
+  '_SETOBJCOLOR',
+  '_SETOBJFIX',
+  '_SETREG',
+  '_SETTICKS',
+  '_SETWIND',
+  '_SPLIT',
+  '_SPRING',
+  '_T',
+  '_TICKS',
+  '_TODEG',
+  '_TOP',
+  '_TORAD',
+  '_TYPE',
+  '_USER1',
+  '_USER2',
+  '_VEL',
+  '_VX',
+  '_VY',
+  '_VZ',
+  '_WEIGHT',
+  '_WIDTH',
+  '_WX',
+  '_WY',
+  '_WZ',
+  '_X',
+  '_XX',
+  '_XY',
+  '_XZ',
+  '_Y',
+  '_YX',
+  '_YY',
+  '_YZ',
+  '_Z',
+  '_ZOOM',
+  '_ZX',
+  '_ZY',
+  '_ZZ',
+] as const;
+export type ApiName = (typeof API_NAMES)[number];

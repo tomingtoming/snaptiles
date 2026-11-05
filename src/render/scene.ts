@@ -498,7 +498,8 @@ export class SceneView {
     };
     for (const g of s.ground ?? []) solid(g, 0xb9c4b0, false);
     for (const o of s.solids) solid(o, 0x9aa3ab, true);
-    // the goal: a translucent zone with its outline
+    // the goal: a translucent zone with its outline (missions have none)
+    if (!s.goal) return;
     const [x0, x1, y0, y1, z0, z1] = s.goal;
     const geo = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
     const zone = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x43a047, transparent: true, opacity: 0.18, depthWrite: false }));

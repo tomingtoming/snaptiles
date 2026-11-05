@@ -1,7 +1,7 @@
 // The debug panel under the 3D view: a timeline over the recorded run (rewind = re-run to a frame, the core repeats
 // a run exactly), frame stepping, the watch list (Vals and the Lua block's own globals), a graph of chosen values
 // and breakpoints (a step that runs a breakpoint line pauses the page and shows the locals at that line).
-import type { RustSimulation } from '../sim/rust-simulation';
+import type { Breakpoint, RustSimulation } from '../sim/rust-simulation';
 import type { Recording } from '../sim/replay';
 import { FRAME_RATE } from '../sim/sim-view';
 
@@ -39,7 +39,9 @@ export class DebugPanel {
   private plotted: string[] = [];
   /** per frame: the numeric value of every plotted name */
   private history = new Map<number, Map<string, number>>();
-  private breakpoints: number[] = [];
+  private breakpoints: Breakpoint[] = [];
+  private consoleHistory: string[] = [];
+  private consoleIndex = 0;
   private seeking = false;
   private lastWatch = 0;
   /** the run the timeline spans: what a rewind re-runs (kept when rewinding, replaced when the run goes on live) */
@@ -54,11 +56,27 @@ export class DebugPanel {
     $('debug-replay').addEventListener('click', () => void this.seek(0).then(() => this.host.setPaused(false)));
     this.slider.addEventListener('input', () => { this.host.setPaused(true); this.frameLabel.textContent = this.label(Number(this.slider.value)); });
     this.slider.addEventListener('change', () => void this.seek(Number(this.slider.value)));
-    $('debug-bp-add').addEventListener('click', () => this.addBreakpoint(Number(this.bpInput.value)));
-    this.bpInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); this.addBreakpoint(Number(this.bpInput.value)); } });
+    const addFromInputs = (line: number) => {
+      const cond = $<HTMLInputElement>('debug-bp-cond'), after = $<HTMLInputElement>('debug-bp-after');
+      this.addBreakpoint(line, cond.value.trim() || undefined, Number(after.value) || undefined);
+      cond.value = ''; after.value = '';
+    };
+    $('debug-bp-add').addEventListener('click', () => addFromInputs(Number(this.bpInput.value)));
+    for (const id of ['debug-bp-line', 'debug-bp-cond', 'debug-bp-after']) {
+      $(id).addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Enter') { e.preventDefault(); addFromInputs(Number(this.bpInput.value)); } });
+    }
+    const consoleInput = $<HTMLInputElement>('debug-console');
+    consoleInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && consoleInput.value.trim()) { e.preventDefault(); this.runConsole(consoleInput.value.trim()); consoleInput.value = ''; }
+      else if (e.key === 'ArrowUp' && this.consoleHistory.length) {
+        e.preventDefault(); this.consoleIndex = Math.max(0, this.consoleIndex - 1); consoleInput.value = this.consoleHistory[this.consoleIndex];
+      } else if (e.key === 'ArrowDown' && this.consoleHistory.length) {
+        e.preventDefault(); this.consoleIndex = Math.min(this.consoleHistory.length, this.consoleIndex + 1); consoleInput.value = this.consoleHistory[this.consoleIndex] ?? '';
+      }
+    });
     $('debug-bp-caret').addEventListener('click', () => {
       const s = this.host.source;
-      this.addBreakpoint(s.value.slice(0, s.selectionStart).split('\n').length);
+      addFromInputs(s.value.slice(0, s.selectionStart).split('\n').length);
     });
   }
 
@@ -237,26 +255,55 @@ export class DebugPanel {
     g.textBaseline = 'bottom'; g.fillText(String(Math.round(lo * 1000) / 1000), 4, h - 2);
   }
 
-  addBreakpoint(line: number): void {
-    if (!Number.isInteger(line) || line < 1 || this.breakpoints.includes(line)) return;
-    this.breakpoints = [...this.breakpoints, line].sort((a, b) => a - b);
+  /** file lines with a breakpoint (the source view marks them) */
+  breakpointLines(): number[] {
+    return this.breakpoints.map((b) => b.line);
+  }
+
+  toggleBreakpoint(line: number): void {
+    if (this.breakpoints.some((b) => b.line === line)) this.removeBreakpoint(line);
+    else this.addBreakpoint(line);
+  }
+
+  /** a breakpoint at a file line; `condition` (Lua, sees the line's locals) and `after` (stop from that pass on) */
+  addBreakpoint(line: number, condition?: string, after?: number): void {
+    if (!Number.isInteger(line) || line < 1) return;
+    const rest = this.breakpoints.filter((b) => b.line !== line);
+    this.breakpoints = [...rest, { line, condition, after: after && after > 1 ? Math.floor(after) : undefined }].sort((a, b) => a.line - b.line);
     this.applyBreakpoints();
   }
 
   removeBreakpoint(line: number): void {
-    this.breakpoints = this.breakpoints.filter((l) => l !== line);
+    this.breakpoints = this.breakpoints.filter((b) => b.line !== line);
     this.applyBreakpoints();
   }
 
   private applyBreakpoints(): void {
     this.host.sim()?.setBreakpoints(this.breakpoints);
-    this.bpList.replaceChildren(...this.breakpoints.map((line) => {
+    this.bpList.replaceChildren(...this.breakpoints.map((bp) => {
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'bp'; b.textContent = `${line}行 ×`;
-      b.setAttribute('aria-label', `${line}行目のブレークポイントを外す`);
-      b.addEventListener('click', () => this.removeBreakpoint(line));
+      b.type = 'button'; b.className = 'bp';
+      const extra = [bp.condition ? `${bp.condition}` : '', bp.after ? `${bp.after}回目〜` : ''].filter(Boolean).join('・');
+      b.textContent = `${bp.line}行${extra ? `（${extra}）` : ''} ×`;
+      b.setAttribute('aria-label', `${bp.line}行目のブレークポイントを外す`);
+      b.addEventListener('click', () => this.removeBreakpoint(bp.line));
       return b;
     }));
+  }
+
+  /** a console line: evaluated in the running block (recorded, so a rewind repeats it) */
+  private runConsole(code: string): void {
+    const sim = this.host.sim();
+    this.consoleHistory.push(code);
+    this.consoleIndex = this.consoleHistory.length;
+    const log = $('debug-console-log');
+    const line = (cls: string, text: string) => { const d = document.createElement('div'); d.className = cls; d.textContent = text; log.append(d); };
+    line('console-in', `> ${code}`);
+    if (!sim) { line('console-err', '実行中のモデルがありません'); return; }
+    const r = sim.evalLua(code);
+    line(r.ok ? 'console-out' : 'console-err', r.ok ? r.text : `エラー：${r.text}`);
+    while (log.childElementCount > 40) log.firstElementChild!.remove();
+    log.scrollTop = log.scrollHeight;
   }
 
   private showBreak(sim: RustSimulation): void {

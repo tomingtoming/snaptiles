@@ -168,9 +168,12 @@ pub struct LuaEngine {
     pub max_instructions_per_call: u32,
     /// globals that exist before the model's chunk runs (API, libraries, COMPAT): hidden from [`LuaEngine::watch`]
     baseline: Vec<String>,
-    /// file lines of the page's breakpoints, and the snapshot taken at the first one hit in the current call
-    pub breakpoints: Rc<RefCell<Vec<i64>>>,
+    /// the page's breakpoints, and the snapshot taken at the first one hit in the current call
+    pub breakpoints: Rc<RefCell<Vec<Breakpoint>>>,
     pub break_hit: Rc<RefCell<Option<String>>>,
+    /// the model's globals right after its chunk ran (before OnInit): a reload keeps a global's running value unless
+    /// the new chunk starts it differently
+    initial: Vec<(String, Plain)>,
 }
 
 impl Default for LuaEngine {
@@ -191,6 +194,7 @@ impl LuaEngine {
             baseline: Vec::new(),
             breakpoints: Rc::new(RefCell::new(Vec::new())),
             break_hit: Rc::new(RefCell::new(None)),
+            initial: Vec::new(),
         }
     }
 
@@ -264,6 +268,7 @@ impl LuaEngine {
         lua.remove_hook();
         match result {
             Ok(()) => {
+                self.initial = snapshot(&lua, &self.baseline);
                 let g = lua.globals();
                 let is_fn = |name: &str| matches!(g.get::<Value>(name), Ok(Value::Function(_)));
                 self.frame_fn = if is_fn("OnFrame") {
@@ -325,17 +330,25 @@ impl LuaEngine {
 
     fn arm_budget(&self, lua: &Lua) {
         let remaining = Cell::new(self.max_instructions_per_call.max(1) as i64);
-        let breakpoints = self.breakpoints.borrow().clone();
+        let breakpoints = self.breakpoints.clone();
         let mut triggers = HookTriggers::new().every_nth_instruction(QUANTUM);
-        if !breakpoints.is_empty() {
+        if !breakpoints.borrow().is_empty() {
             triggers = triggers.every_line();
         }
         let (hit, line_offset) = (self.break_hit.clone(), self.line_offset);
         let _ = lua.set_hook(triggers, move |lua, debug| {
             if debug.event() == DebugEvent::Line {
                 if hit.borrow().is_none() && debug.source().source.as_deref().is_some_and(|s| s.contains("model")) {
-                    if let Some(line) = debug.current_line().map(|l| l as i64 + line_offset).filter(|l| breakpoints.contains(l)) {
-                        *hit.borrow_mut() = Some(break_snapshot(lua, line));
+                    if let Some(line) = debug.current_line().map(|l| l as i64 + line_offset) {
+                        let mut bps = breakpoints.borrow_mut();
+                        if let Some(bp) = bps.iter_mut().find(|b| b.line == line) {
+                            // the hit count counts every pass; the condition is asked only from the `after`-th pass on
+                            bp.hits += 1;
+                            let stop = bp.hits >= bp.after.max(1) && bp.condition.as_deref().is_none_or(|c| condition_holds(lua, c));
+                            if stop {
+                                *hit.borrow_mut() = Some(break_snapshot(lua, line));
+                            }
+                        }
                     }
                 }
                 return Ok(VmState::Continue);
@@ -347,6 +360,57 @@ impl LuaEngine {
                 Ok(VmState::Continue)
             }
         });
+    }
+
+    /// Replace the running Lua block with `source` (the page's edit while running): the new chunk runs (OnInit does not);
+    /// then each global gets its running value back unless the new chunk starts it differently from the old one (a
+    /// counter keeps counting, an edited constant takes the new value). Breakpoints stay. Err: the new block's error.
+    pub fn reload(&mut self, source: &str, register: impl FnOnce(&Lua) -> mlua::Result<()>, prelude: &str, line_offset: i64) -> Result<(), String> {
+        let (old_initial, running) = match &self.lua {
+            Some(lua) => (self.initial.clone(), snapshot(lua, &self.baseline)),
+            None => (Vec::new(), Vec::new()),
+        };
+        self.load(source, register, prelude, line_offset);
+        if let Some(e) = &self.error {
+            return Err(e.clone());
+        }
+        let Some(lua) = &self.lua else { return Ok(()) };
+        let g = lua.globals();
+        let find = |v: &[(String, Plain)], n: &str| v.iter().find(|(k, _)| k == n).map(|(_, p)| p.clone());
+        for (name, value) in running {
+            let keep = match (find(&old_initial, &name), find(&self.initial, &name)) {
+                (_, None) => true,
+                (old, Some(new)) => old.as_ref() == Some(&new),
+            };
+            if keep {
+                if let Ok(v) = plain_to_lua(lua, &value) {
+                    let _ = g.set(name.as_str(), v);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Evaluate `code` in the running block (the page's console): an expression's values, else a statement's "ok".
+    /// An error does not disable the script.
+    pub fn eval(&mut self, code: &str) -> Result<String, String> {
+        let Some(lua) = &self.lua else { return Err("Luaがありません".into()) };
+        self.arm_budget(lua);
+        let r = (|| -> mlua::Result<String> {
+            match lua.load(format!("return {code}")).set_name("console").into_function() {
+                Ok(f) => {
+                    let vals: mlua::MultiValue = f.call(())?;
+                    let vs: Vec<Value> = vals.into_iter().collect();
+                    Ok(if vs.is_empty() { "nil".into() } else { vs.iter().map(|v| watch_value(lua, v, 1)).collect::<Vec<_>>().join(", ") })
+                }
+                Err(_) => {
+                    lua.load(code).set_name("console").exec()?;
+                    Ok("ok".into())
+                }
+            }
+        })();
+        lua.remove_hook();
+        r.map_err(|e| error_message(&e))
     }
 
     /// the model's own globals (not functions) and their values, sorted by name, for the page's watch list
@@ -465,4 +529,115 @@ fn break_snapshot(lua: &Lua, line: i64) -> String {
         }
     }
     parts.join("\u{1f}")
+}
+
+/// Compile (never run) a Lua block: its syntax error with the file line (`line_offset` as for [`LuaEngine::load`]), or
+/// None. For the editor's check while typing.
+pub fn check_syntax(source: &str, line_offset: i64) -> Option<String> {
+    let lua = Lua::new_with(StdLib::NONE, LuaOptions::default()).ok()?;
+    match lua.load(source.replace('\u{3000}', " ")).set_name("model").into_function() {
+        Ok(_) => None,
+        Err(e) => Some(file_line(&error_message(&e), line_offset)),
+    }
+}
+
+/// A Lua value without identity (a reload copies running globals into a new state): tables deep-copied, at most 8
+/// levels; functions and other references are not kept.
+#[derive(Clone, Debug, PartialEq)]
+enum Plain {
+    Bool(bool),
+    Int(i64),
+    Num(f64),
+    Str(Vec<u8>),
+    Table(Vec<(Plain, Plain)>),
+}
+
+fn to_plain(v: &Value, depth: u32) -> Option<Plain> {
+    match v {
+        Value::Boolean(b) => Some(Plain::Bool(*b)),
+        Value::Integer(i) => Some(Plain::Int(*i)),
+        Value::Number(x) => Some(Plain::Num(*x)),
+        Value::String(s) => Some(Plain::Str(s.as_bytes().to_vec())),
+        Value::Table(t) if depth < 8 => Some(Plain::Table(
+            t.clone().pairs::<Value, Value>().filter_map(|kv| kv.ok()).filter_map(|(k, x)| Some((to_plain(&k, depth + 1)?, to_plain(&x, depth + 1)?))).collect(),
+        )),
+        _ => None,
+    }
+}
+
+fn plain_to_lua(lua: &Lua, p: &Plain) -> mlua::Result<Value> {
+    Ok(match p {
+        Plain::Bool(b) => Value::Boolean(*b),
+        Plain::Int(i) => Value::Integer(*i),
+        Plain::Num(x) => Value::Number(*x),
+        Plain::Str(s) => Value::String(lua.create_string(s)?),
+        Plain::Table(entries) => {
+            let t = lua.create_table()?;
+            for (k, v) in entries {
+                t.raw_set(plain_to_lua(lua, k)?, plain_to_lua(lua, v)?)?;
+            }
+            Value::Table(t)
+        }
+    })
+}
+
+/// the model's own globals (not in `baseline`) that a reload can carry over
+fn snapshot(lua: &Lua, baseline: &[String]) -> Vec<(String, Plain)> {
+    lua.globals()
+        .pairs::<Value, Value>()
+        .filter_map(|kv| kv.ok())
+        .filter_map(|(k, v)| match k {
+            Value::String(s) => {
+                let name = s.to_string_lossy().to_string();
+                if baseline.contains(&name) {
+                    return None;
+                }
+                Some((name, to_plain(&v, 0)?))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+/// A breakpoint: its file line, an optional Lua condition (sees the line's locals and the globals) and the pass from
+/// which it stops (1: every pass). `hits` counts the passes since the breakpoints were set.
+#[derive(Clone, Debug, Default)]
+pub struct Breakpoint {
+    pub line: i64,
+    pub condition: Option<String>,
+    pub after: u32,
+    pub hits: u32,
+}
+
+/// the model function at a hook's stack level, as seen from a call made inside the hook
+fn model_level(getinfo: &mlua::Function) -> Option<i32> {
+    (1..8).find(|&l| matches!(getinfo.call::<Value>((l, "S")), Ok(Value::Table(t)) if t.get::<String>("source").is_ok_and(|s| s.contains("model"))))
+}
+
+/// a breakpoint condition, in an environment of the line's locals over the globals; an error counts as false
+fn condition_holds(lua: &Lua, condition: &str) -> bool {
+    let run = || -> mlua::Result<bool> {
+        let getlocal: mlua::Function = lua.named_registry_value("snaptiles_getlocal")?;
+        let getinfo: mlua::Function = lua.named_registry_value("snaptiles_getinfo")?;
+        let env = lua.create_table()?;
+        if let Some(level) = model_level(&getinfo) {
+            for i in 1..200 {
+                match getlocal.call::<(Value, Value)>((level, i)) {
+                    Ok((Value::String(name), v)) => {
+                        if !name.to_string_lossy().starts_with('(') {
+                            env.raw_set(name, v)?;
+                        }
+                    }
+                    _ => break,
+                }
+            }
+        }
+        let meta = lua.create_table()?;
+        meta.set("__index", lua.globals())?;
+        env.set_metatable(Some(meta))?;
+        let f = lua.load(format!("return {condition}")).set_name("condition").set_environment(env).into_function()?;
+        // Lua truth: everything but nil and false
+        Ok(!matches!(f.call::<Value>(())?, Value::Nil | Value::Boolean(false)))
+    };
+    run().unwrap_or(false)
 }

@@ -96,6 +96,24 @@ class RustPhysics implements PhysicsView {
   }
 }
 
+export interface Breakpoint {
+  line: number;
+  condition?: string;
+  /** stop from this pass on (1: every pass) */
+  after?: number;
+}
+
+/** the model's Lua syntax (compiled, not run): `line N: message`, a parse error, or '' when it compiles */
+export async function checkSource(source: string): Promise<string> {
+  const m = await loadRustCore();
+  const bytes = new TextEncoder().encode(source);
+  const ptr = m._malloc(Math.max(1, bytes.length));
+  m.HEAPU8.set(bytes, ptr);
+  const out = m.UTF8ToString(m._core_check(ptr, bytes.length));
+  m._free(ptr);
+  return out;
+}
+
 export interface SimOptions {
   scenario?: Scenario | null;
   bare?: boolean;
@@ -128,6 +146,10 @@ export class RustSimulation implements SimView {
   frame = 0;
   /** the breakpoint snapshot of the last step, if one was hit: its file line and the locals there */
   breakHit: { line: number; locals: [string, string][] } | null = null;
+  /** the source whose Lua block runs now (`source` until a live Lua edit replaces the block) */
+  currentSource: string;
+  /** the result of the last console line (`evalLua`) */
+  lastEval: { ok: boolean; text: string } | null = null;
 
   readonly scenario: Scenario | null;
   /** bare ground: no course blocks or crates (tests, measurements; the page's `?bare`) */
@@ -136,6 +158,7 @@ export class RustSimulation implements SimView {
   /** a challenge's course replaces the default course (and, when it brings one, the ground) */
   constructor(readonly source: string, private keys: KeyState, options: SimOptions = {}) {
     this.scenario = options.scenario ?? null;
+    this.currentSource = source;
     this.bare = options.bare ?? false;
     this.model = parseRc(source);
     this.physics = new RustPhysics(this, () => this.freeCore());
@@ -207,6 +230,19 @@ export class RustSimulation implements SimView {
   private apply(c: Command): number {
     if (!this.m || this.id < 0) return -1;
     this.recording.commands.push({ ...c, frame: this.frame } as Command);
+    if (c.kind === 'script') {
+      const err = this.callText(this.m._core_reload_script, c.text);
+      if (!err) this.currentSource = c.text;
+      this.lastScriptError = err || null;
+      this.read();
+      return err ? -1 : 0;
+    }
+    if (c.kind === 'eval') {
+      const r = this.callText(this.m._core_eval, c.text);
+      this.lastEval = { ok: r.startsWith('o'), text: r.slice(1) };
+      this.read();
+      return 0;
+    }
     if (c.kind === 'reset') {
       this.resetCore();
       return 0;
@@ -282,6 +318,33 @@ export class RustSimulation implements SimView {
     this.breakHit = hit ? parseBreak(hit) : null;
   }
 
+  /** the reason a live Lua edit was refused, or its block's error (null after one that took) */
+  lastScriptError: string | null = null;
+
+  /** a core call that takes one UTF-8 text and returns a text */
+  private callText(fn: (id: number, ptr: number, len: number) => number, text: string): string {
+    const m = this.m!;
+    const bytes = new TextEncoder().encode(text);
+    const ptr = m._malloc(Math.max(1, bytes.length));
+    m.HEAPU8.set(bytes, ptr);
+    const out = m.UTF8ToString(fn(this.id, ptr, bytes.length));
+    m._free(ptr);
+    return out;
+  }
+
+  /** replace the running Lua block with the one in `source` (recorded, so a rewind or replay repeats it); returns the
+   *  reason when refused (the rest of the source changed, or the new block does not load) */
+  reloadScript(source: string): string | null {
+    this.command({ frame: this.frame, kind: 'script', text: source });
+    return this.lastScriptError;
+  }
+
+  /** evaluate a console line in the running block (recorded like a command) */
+  evalLua(code: string): { ok: boolean; text: string } {
+    this.command({ frame: this.frame, kind: 'eval', text: code });
+    return this.lastEval ?? { ok: false, text: 'コアがありません' };
+  }
+
   /** the Lua block's own globals and their values (sorted by name) */
   luaWatch(): [string, string][] {
     if (!this.m || this.id < 0) return [];
@@ -289,10 +352,11 @@ export class RustSimulation implements SimView {
     return s ? s.split(RECORD_SEP).map((r) => { const i = r.indexOf(TEXT_SEP); return [r.slice(0, i), r.slice(i + 1)] as [string, string]; }) : [];
   }
 
-  /** file lines where the Lua block records its locals (a step always completes) */
-  setBreakpoints(lines: number[]): void {
+  /** where the Lua block records its locals: a file line, an optional Lua condition (the line's locals and the globals)
+   *  and the pass from which it stops (a step always completes) */
+  setBreakpoints(list: Breakpoint[]): void {
     if (!this.m || this.id < 0) return;
-    const bytes = new TextEncoder().encode(lines.join(','));
+    const bytes = new TextEncoder().encode(list.map((b) => [b.line, b.after ?? 1, b.condition ?? ''].join(TEXT_SEP)).join(RECORD_SEP));
     const ptr = this.m._malloc(Math.max(1, bytes.length));
     this.m.HEAPU8.set(bytes, ptr);
     this.m._core_set_breakpoints(this.id, ptr, bytes.length);

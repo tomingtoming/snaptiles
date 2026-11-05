@@ -14,7 +14,7 @@ try {
  const page=await context.newPage();
  await page.goto(base+'#car'); await page.waitForFunction(()=>window.__sim);
  await page.click('#challenge-open');
- assert.equal(await page.locator('#challenge-list button').count(),3);
+ assert.equal(await page.locator('#challenge-list button').count(),5); // 3 challenges, 2 missions
  await page.click('#challenge-list button:has-text("100m走")');
  await page.waitForFunction(()=>window.__sim?.scenario?.id==='sprint');
  assert.match(await page.evaluate(()=>location.hash),/&c=sprint/);
@@ -61,11 +61,17 @@ try {
  await page.fill('#source',MINI); await page.click('#run');
  await page.waitForFunction(()=>!document.body.classList.contains('building'));
  assert.equal(await page.isVisible('#build-cost'),false);
+ // a mission swaps in its own model and shows how long the state has been held
+ await page.click('#challenge-open');
+ await page.click('#challenge-list button:has-text("セグウェイを立たせる")');
+ await page.waitForFunction(()=>window.__sim?.scenario?.id==='balance');
+ assert.match(await page.inputValue('#source'),/ミッション：セグウェイ/);
+ await page.waitForFunction(()=>/ミッション：セグウェイを立たせる｜保持/.test(document.getElementById('challenge-banner').textContent));
  // leaving the challenge
  await page.click('#challenge-quit');
  await page.waitForFunction(()=>window.__sim&&!window.__sim.scenario);
  assert.equal(await page.isVisible('#challenge-banner'),false);
  await page.waitForFunction(()=>!location.hash.includes('&c='));
  assert.ok(await page.evaluate(()=>window.__sim.physics.crates.length)>0);
- console.log(`Challenge: list, banner and over-budget mark, 100m cleared in ${time} s at cost 22, best kept, build-mode cost, record link replays and confirms the clear, leaving restores the course pass`);
+ console.log(`Challenge: list, banner and over-budget mark, 100m cleared in ${time} s at cost 22, best kept, build-mode cost, mission model and hold banner, record link replays and confirms the clear, leaving restores the course pass`);
 }finally{await browser.close();}

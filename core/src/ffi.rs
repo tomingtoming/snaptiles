@@ -298,18 +298,28 @@ pub extern "C" fn core_lua_watch(id: u32) -> *const u8 {
     text_out(&s)
 }
 
-/// Breakpoints of the Lua block as file lines, comma-separated UTF-8 (empty: none). A step that runs one of them
-/// records a snapshot ([`core_break`]); the step itself always completes.
+/// Breakpoints of the Lua block, UTF-8: records `line US after US condition` joined with U+001E (`after`: the pass
+/// from which it stops, empty or 1 for every pass; `condition`: Lua, empty for none). Empty text: no breakpoints. A
+/// step that runs one records a snapshot ([`core_break`]); the step itself always completes.
 ///
 /// # Safety
 /// `ptr` must point to `len` readable bytes.
 #[no_mangle]
 pub unsafe extern "C" fn core_set_breakpoints(id: u32, ptr: *const u8, len: usize) {
     let text = text_in(ptr, len);
-    let lines: Vec<i64> = text.split(',').filter_map(|x| x.trim().parse().ok()).collect();
+    let bps: Vec<crate::scripting::lua::Breakpoint> = text
+        .split(RECORD_SEP)
+        .filter_map(|r| {
+            let mut f = r.split(TEXT_SEP);
+            let line = f.next()?.trim().parse().ok()?;
+            let after = f.next().and_then(|a| a.trim().parse().ok()).unwrap_or(1);
+            let condition = f.next().map(str::trim).filter(|c| !c.is_empty()).map(str::to_string);
+            Some(crate::scripting::lua::Breakpoint { line, condition, after, hits: 0 })
+        })
+        .collect();
     with_slot(id, (), |slot| {
         if let Some(sim) = slot.sim.as_mut() {
-            sim.set_breakpoints(lines);
+            sim.set_breakpoints(bps);
         }
     });
 }
@@ -342,4 +352,64 @@ pub unsafe extern "C" fn core_add_solid(id: u32, ptr: *const f64, n: u32) -> i32
         }
         if added { 0 } else { 1 }
     })
+}
+
+/// The model's Lua syntax check (compiled, not run; no simulation needed): the first error as `line N: message` with
+/// the file line, the model's own parse error, or empty when it compiles. The page calls it while the source is edited.
+///
+/// # Safety
+/// `ptr` must point to `len` readable bytes.
+#[no_mangle]
+pub unsafe extern "C" fn core_check(ptr: *const u8, len: usize) -> *const u8 {
+    let source = text_in(ptr, len);
+    let msg = match crate::rc::parser::parse_rc(&source) {
+        Err(e) => e.to_string(),
+        Ok(model) => match model.script {
+            Some(script) if script.lang == crate::rc::ScriptLang::Lua => {
+                crate::scripting::lua::check_syntax(&script.source, script.first_line as i64 - 1).unwrap_or_default()
+            }
+            _ => String::new(),
+        },
+    };
+    text_out(&msg)
+}
+
+/// Swap the running model's Lua block for the one in `source` (the page's edit while running; the rest of the source
+/// must be unchanged). Returns empty on success, else the reason or the new block's error.
+///
+/// # Safety
+/// `ptr` must point to `len` readable bytes.
+#[no_mangle]
+pub unsafe extern "C" fn core_reload_script(id: u32, ptr: *const u8, len: usize) -> *const u8 {
+    let source = text_in(ptr, len);
+    let msg = with_slot(id, "no simulation".to_string(), |slot| {
+        let r = match slot.sim.as_mut() {
+            Some(sim) => sim.reload_lua(&source).err().unwrap_or_default(),
+            None => "no simulation".into(),
+        };
+        refresh(slot);
+        r
+    });
+    text_out(&msg)
+}
+
+/// Evaluate Lua in the running block (the page's console): `o<values>` or `e<error>`.
+///
+/// # Safety
+/// `ptr` must point to `len` readable bytes.
+#[no_mangle]
+pub unsafe extern "C" fn core_eval(id: u32, ptr: *const u8, len: usize) -> *const u8 {
+    let code = text_in(ptr, len);
+    let msg = with_slot(id, "eno simulation".to_string(), |slot| {
+        let r = match slot.sim.as_mut() {
+            Some(sim) => match sim.eval_lua(&code) {
+                Ok(v) => format!("o{v}"),
+                Err(e) => format!("e{e}"),
+            },
+            None => "eno simulation".into(),
+        };
+        refresh(slot);
+        r
+    });
+    text_out(&msg)
 }

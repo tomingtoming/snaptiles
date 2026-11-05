@@ -102,9 +102,9 @@ fn layout_ts() -> String {
     let mut names: Vec<&str> = snaptiles_core::sim::api().iter().map(|(n, _)| *n).collect();
     names.sort();
     names.dedup();
-    s += "/** the script API's functions (`api()` of the simulation), as the core's table names them */\nexport type ApiName =\n";
-    s += &names.iter().map(|n| format!("  | '{n}'")).collect::<Vec<_>>().join("\n");
-    s += ";\n";
+    s += "/** the script API's functions (`api()` of the simulation), as the core's table names them (the editor's completion\n *  lists them) */\nexport const API_NAMES = [\n";
+    s += &names.iter().map(|n| format!("  '{n}',")).collect::<Vec<_>>().join("\n");
+    s += "\n] as const;\nexport type ApiName = (typeof API_NAMES)[number];\n";
     s
 }
 

@@ -18,7 +18,11 @@ export interface FrameInput {
 export type Command =
   | { frame: number; kind: 'reset' }
   | { frame: number; kind: 'ball'; args: [number, number, number, number, number] }
-  | { frame: number; kind: 'wind'; args: [number, number, number] };
+  | { frame: number; kind: 'wind'; args: [number, number, number] }
+  /** the Lua block replaced while running (the whole source as edited) */
+  | { frame: number; kind: 'script'; text: string }
+  /** a console line evaluated in the running block */
+  | { frame: number; kind: 'eval'; text: string };
 
 export class Recording {
   inputs: FrameInput[] = [];
@@ -60,7 +64,15 @@ export function pack(r: Recording): Packed {
     if (!prev || !sameInput(prev, x)) i.push([f, x.keys, x.mx, x.my, x.ml, x.mr, x.mm, x.width, x.height, ...x.axes]);
     prev = x;
   });
-  const c = r.commands.map((cmd) => cmd.kind === 'reset' ? [cmd.frame, 'r'] : [cmd.frame, cmd.kind === 'ball' ? 'b' : 'w', ...cmd.args]);
+  const c = r.commands.map((cmd) => {
+    switch (cmd.kind) {
+      case 'reset': return [cmd.frame, 'r'];
+      case 'ball': return [cmd.frame, 'b', ...cmd.args];
+      case 'wind': return [cmd.frame, 'w', ...cmd.args];
+      case 'script': return [cmd.frame, 's', cmd.text];
+      case 'eval': return [cmd.frame, 'e', cmd.text];
+    }
+  });
   return { v: 1, n: r.frames, i, c };
 }
 
@@ -81,6 +93,8 @@ export function unpack(p: Packed): Recording {
     if (kind === 'r') r.commands.push({ frame: f, kind: 'reset' });
     else if (kind === 'b') r.commands.push({ frame: f, kind: 'ball', args: [a[0], a[1], a[2], a[3], a[4]] });
     else if (kind === 'w') r.commands.push({ frame: f, kind: 'wind', args: [a[0], a[1], a[2]] });
+    else if (kind === 's') r.commands.push({ frame: f, kind: 'script', text: String(args[0]) });
+    else if (kind === 'e') r.commands.push({ frame: f, kind: 'eval', text: String(args[0]) });
   }
   return r;
 }
