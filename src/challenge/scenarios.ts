@@ -11,6 +11,22 @@ import { FRAME_RATE } from '../sim/sim-view';
 /** a static solid: the convex hull of its points (x, y, z) */
 export type Solid = [number, number, number][];
 
+/** Height of the topmost projected terrain triangle, including the base under the islands. */
+export function chartHeight(faces: Solid, x: number, z: number): number | undefined {
+  let top: number | undefined;
+  for (let i = 0; i < faces.length; i += 3) {
+    const [ax, ay, az] = faces[i], [bx, by, bz] = faces[i + 1], [cx, cy, cz] = faces[i + 2];
+    const det = (bx - ax) * (cz - az) - (cx - ax) * (bz - az);
+    if (Math.abs(det) < 1e-10) continue;
+    const u = ((x - ax) * (cz - az) - (cx - ax) * (z - az)) / det;
+    const v = ((bx - ax) * (z - az) - (x - ax) * (bz - az)) / det;
+    if (u < -1e-8 || v < -1e-8 || u + v > 1 + 1e-8) continue;
+    const height = ay + u * (by - ay) + v * (cy - ay);
+    top = top === undefined ? height : Math.max(top, height);
+  }
+  return top;
+}
+
 export interface Scenario {
   id: string;
   title: string;
@@ -33,7 +49,7 @@ export interface Scenario {
   runway?: { width: number; north: number; south: number };
   contourInterval?: number; // vertical spacing of elevation lines on the map, in metres
   terrainColorRange?: [number, number]; // elevations of the low and high ground colours
-  bumpSection?: { startZ: number; endZ: number; halfWidth: number };
+  bumpSection?: { startZ: number; endZ: number; halfWidth: number; crests: number[] };
   centerStripe?: Solid; // painted triangles along the north-south test line at x=0
   roadPaint?: Solid; // markings on the banked pavement
   asphaltStart?: number; // first paved vertex in the terrain triangle list
@@ -247,19 +263,23 @@ function crossSlopes(): Pick<Scenario, 'ground' | 'terrainFaces' | 'terrainBound
 const sideSlopes = crossSlopes();
 /** Six transverse humps. The left side barely ripples; the right side reaches
  * axle height. A long flat entry and runout allow a repeatable approach. */
-function washboard(): Pick<Scenario, 'ground' | 'terrainFaces' | 'terrainBounds'> {
+function washboard(): Pick<Scenario, 'ground' | 'terrainFaces' | 'terrainBounds' | 'bumpSection'> {
   const xs = [-22, -8, 0, 8, 22];
   const zs = [18, 0, -12];
   const flat = xs.map(() => 0);
   const crest = [0.12, 0.12, 0.32, 0.55, 0.55];
   const heights = [flat, flat, flat];
+  const crests: number[] = [];
   for (let hump = 0; hump < 6; hump++) {
-    zs.push(-15 - hump * 6, -18 - hump * 6);
+    const peakZ = -15 - hump * 6;
+    crests.push(peakZ);
+    zs.push(peakZ, peakZ - 3);
     heights.push(crest, flat);
   }
+  const bumpSection = { startZ: zs[2], endZ: zs[zs.length - 1], halfWidth: 22, crests };
   zs.push(-80);
   heights.push(flat);
-  return heightfield(xs, zs, heights);
+  return { ...heightfield(xs, zs, heights), bumpSection };
 }
 
 /** A kilometre-wide original plateau. Four rounded massifs flank a winding
@@ -365,7 +385,6 @@ export const FREE_DRIVES: Scenario[] = [
     ...washboard(),
     terrainColorRange: [0, 0.5],
     id: 'washboard',
-    bumpSection: { startZ: -12, endZ: -48, halfWidth: 22 },
     title: '波状路',
     description: '前方に6本の起伏。左は12cm、中央は32cm、右は55cm。車輪や足回りを試せます。',
     freeDrive: true,

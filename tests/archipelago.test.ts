@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
-import { aboveLevel, chartHeight } from '../src/challenge/terrain-map';
+import { chartHeight } from '../src/challenge/scenarios';
+import { aboveLevel } from '../src/challenge/terrain-map';
 import { scenarioById, type Solid } from '../src/challenge/scenarios';
 import { KeyState } from '../src/input/keys';
 import { RustSimulation } from '../src/sim/rust-simulation';

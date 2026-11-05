@@ -1,4 +1,4 @@
-import type { Scenario, Solid } from './scenarios';
+import { chartHeight, type Scenario, type Solid } from './scenarios';
 
 import { buoyEnds, ringColor } from './rings';
 
@@ -49,22 +49,6 @@ export function aboveLevel(triangle: Solid, level: number): string {
     }
   }
   return points.length >= 3 ? points.map(p => p.join(',')).join(' ') : '';
-}
-
-/** Height of the topmost projected terrain triangle, including the base under the islands. */
-export function chartHeight(faces: Solid, x: number, z: number): number | undefined {
-  let top: number | undefined;
-  for (let i = 0; i < faces.length; i += 3) {
-    const [ax, ay, az] = faces[i], [bx, by, bz] = faces[i + 1], [cx, cy, cz] = faces[i + 2];
-    const det = (bx - ax) * (cz - az) - (cx - ax) * (bz - az);
-    if (Math.abs(det) < 1e-10) continue;
-    const u = ((x - ax) * (cz - az) - (cx - ax) * (z - az)) / det;
-    const v = ((bx - ax) * (z - az) - (x - ax) * (bz - az)) / det;
-    if (u < -1e-8 || v < -1e-8 || u + v > 1 + 1e-8) continue;
-    const height = ay + u * (by - ay) + v * (cy - ay);
-    top = top === undefined ? height : Math.max(top, height);
-  }
-  return top;
 }
 
 export class TerrainMap {

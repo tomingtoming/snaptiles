@@ -56,7 +56,7 @@ hold; ↑↓←→ move, A/D turn), `tank` (A/D turret, Z fire), and `raft` (↑
 ramp, kerbs, a gate, a wall and crates to knock over.
 
 Choose **地形・お題** beside the samples for original SnapTiles terrain. Free drive
-includes a kilometre-wide plateau with four peaks, a mountain pass and a six-hump washboard. Drive north across all six humps to measure the peak absolute vertical speed of the Core. Select **比較基準にする** to keep it and the entry speed visible while tuning the model in this tab. The humps rise from 12 cm on
+includes a kilometre-wide plateau with four peaks, a mountain pass and a six-hump washboard. Drive north across all six humps to measure the peak absolute vertical speed of the Core. The crest heights list follows your path from the first hump to the sixth. Select **比較基準にする** to keep it and the entry speed visible while tuning the model in this tab. The humps rise from 12 cm on
 the left to 55 cm on the right. The brake track pairs a low-grip blue lane with
 ordinary pavement. Brake at the white line to compare stopping distances. Timed courses include a drive over the pass,
 a steering course, and a flyover with altitude gates. Cross the yellow

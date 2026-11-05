@@ -10,7 +10,8 @@ try {
   await page.waitForFunction(() => window.__sim?.scenario?.id === 'washboard');
   const car = await page.inputValue('#source');
   let baseline;
-  for (const { target, height } of [{ target: 11, height: 0.12 }, { target: 0, height: 0.32 }, { target: -11, height: 0.55 }]) {
+  for (const { target, height } of [{ target: 11, height: 0.12 }, { target: 0, height: 0.32 }, { target: -11, height: 0.55 },
+    { target: "math.max(-11, 11 - math.max(0, math.abs(_Z(0)) - 17) * 1.3)", height: null }]) {
     const driver = `local x = _X(0)
       local vx = (x - (lastX or x)) * 30
       lastX = x
@@ -42,15 +43,23 @@ try {
     assert.ok(run?.complete && run.entryKmh > 0 && observedPeak > 0);
     assert.equal(run.peakVertical, observedPeak);
     await page.waitForFunction(() => document.querySelector('#challenge-banner-text').textContent.includes('上下速度の最大'));
+    const profile = run.crestsCm.every(cm => cm === run.crestsCm[0]) ? run.crestsCm[0] + ' cm × 6' : run.crestsCm.join('→') + ' cm';
     if (!baseline) {
       await page.click('#bump-pin');
-      baseline = '基準 ' + run.peakVertical.toFixed(2) + ' m/s';
+      baseline = '基準 ' + run.peakVertical.toFixed(2) + ' m/s（進入 ' + run.entryKmh.toFixed(1) + ' km/h・山頂 ' + profile + '）';
     }
     await page.waitForFunction(text => document.querySelector('#challenge-banner-text').textContent.includes(text), baseline);
     console.log('Crest', height, 'm; entry', run.entryKmh.toFixed(1), 'km/h; peak', observedPeak.toFixed(2), 'm/s');
+    const banner = await page.textContent('#challenge-banner-text');
+    assert.ok(banner.split('｜基準')[0].includes('山頂 ' + profile), banner);
+    if (height === null) assert.ok(banner.includes(run.crestsCm.join('→')), banner);
     await page.evaluate(() => window.__sim.reset());
     assert.equal(await page.evaluate(() => window.__sim.bumpRun), undefined);
-    assert.ok(peaks.every(h => Math.abs(h - height) < 0.03), 'lane peaks: ' + peaks);
+    assert.equal(run.crestsCm.length, 6);
+    assert.ok(peaks.every((h, i) => Math.abs(h * 100 - run.crestsCm[i]) < 3), 'ray vs crest: ' + peaks);
+    console.log('Crest profile (cm)', run.crestsCm);
+    if (height === null) assert.ok(new Set(run.crestsCm).size >= 3);
+    if (height !== null) assert.ok(peaks.every(h => Math.abs(h - height) < 0.03), 'lane peaks: ' + peaks);
     assert.ok(valleys.every(h => Math.abs(h) < 0.03), 'lane troughs: ' + valleys);
   }
   console.log('Washboard: six crests and troughs at all three lane heights pass');

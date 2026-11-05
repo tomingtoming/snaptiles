@@ -20,11 +20,15 @@ interface Best { time: number; cost: number; sectorDurations?: number[] }
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
+function crestProfile(cm: number[]): string {
+  return cm.every(height => height === cm[0]) ? cm[0] + ' cm × ' + cm.length : cm.join('→') + ' cm';
+}
+
 export class ChallengeUI {
   active: Scenario | null = null;
   private cleared: number | null = null;
   private failed = false;
-  private bumpReference?: { peakVertical: number; entryKmh: number };
+  private bumpReference?: RustSimulation['bumpRun'];
   private terrainMap = new TerrainMap();
   private dialog = $<HTMLDialogElement>('challenge-dialog');
   private result = $<HTMLDialogElement>('challenge-result');
@@ -221,8 +225,9 @@ export class ChallengeUI {
         if (run) title += '｜' + (run.complete ? '通過' : '計測中') + '・進入 ' + run.entryKmh.toFixed(1)
           + ' km/h・上下速度の最大 ' + run.peakVertical.toFixed(2) + ' m/s';
         else title += '｜6本の起伏を北向きに走行';
+        if (run?.crestsCm.length) title += '・山頂 ' + crestProfile(run.crestsCm);
         if (this.bumpReference) title += '｜基準 ' + this.bumpReference.peakVertical.toFixed(2)
-          + ' m/s（進入 ' + this.bumpReference.entryKmh.toFixed(1) + ' km/h）';
+          + ' m/s（進入 ' + this.bumpReference.entryKmh.toFixed(1) + ' km/h・山頂 ' + crestProfile(this.bumpReference.crestsCm) + '）';
       }
       if (s.waterStations) {
         if (($('water-log-dialog') as HTMLDialogElement).open && this.renderedWaterCount !== sim.waterPasses.size) this.renderWaterLog(sim);

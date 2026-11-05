@@ -17,7 +17,7 @@ import {
 } from './core-layout';
 import { Recording, type Command, type FrameInput } from './replay';
 import { advanceRings } from '../challenge/rings';
-import { box, crossesBrakingGate, inBox, MissionProgress, type Scenario, type Solid } from '../challenge/scenarios';
+import { box, chartHeight, crossesBrakingGate, inBox, MissionProgress, type Scenario, type Solid } from '../challenge/scenarios';
 
 let corePromise: Promise<SnapTilesCoreModule> | null = null;
 /** load (once) and instantiate the Emscripten module */
@@ -135,7 +135,7 @@ export class RustSimulation implements SimView {
   lapStartFrame = 0;
   readonly waterPasses = new Map<number, { seconds: number; speedKmh: number }>();
   private waterStartFrame = 0;
-  bumpRun?: { entryKmh: number; peakVertical: number; complete: boolean };
+  bumpRun?: { entryKmh: number; peakVertical: number; crestsCm: number[]; complete: boolean };
   brakingEntryKmh?: number;
   groundRange?: number;
   readonly missionProgress: MissionProgress | null;
@@ -391,11 +391,17 @@ export class RustSimulation implements SimView {
       if (bumps && before && core) {
         const after = core.position;
         if (before.z >= bumps.startZ && after.z < bumps.startZ && Math.abs(before.x) <= bumps.halfWidth) {
-          this.bumpRun = { entryKmh: Math.hypot(core.vel.x, core.vel.z) * 3.6, peakVertical: 0, complete: false };
+          this.bumpRun = { entryKmh: Math.hypot(core.vel.x, core.vel.z) * 3.6, peakVertical: 0, crestsCm: [], complete: false };
         }
         if (this.bumpRun && !this.bumpRun.complete) {
           if (Math.abs(after.x) > bumps.halfWidth || after.z > before.z) this.bumpRun = undefined;
           else {
+            for (const z of bumps.crests) {
+              if (before.z <= z || after.z > z) continue;
+              const x = before.x + (after.x - before.x) * (z - before.z) / (after.z - before.z);
+              const height = chartHeight(this.scenario!.terrainFaces!, x, z);
+              if (height !== undefined) this.bumpRun.crestsCm.push(Math.round(height * 100));
+            }
             this.bumpRun.peakVertical = Math.max(this.bumpRun.peakVertical, Math.abs(core.vel.y));
             this.bumpRun.complete = after.z <= bumps.endZ;
           }
