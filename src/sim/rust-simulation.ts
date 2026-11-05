@@ -16,7 +16,7 @@ import {
   TILE, TILE_STRIDE, type ApiName,
 } from './core-layout';
 import { Recording, type Command, type FrameInput } from './replay';
-import { box, inBox, type Scenario, type Solid } from '../challenge/scenarios';
+import { box, inBox, MissionProgress, type Scenario, type Solid } from '../challenge/scenarios';
 
 let corePromise: Promise<SnapTilesCoreModule> | null = null;
 /** load (once) and instantiate the Emscripten module */
@@ -129,6 +129,7 @@ export class RustSimulation implements SimView {
   scriptError: string | null = null;
   ticks = 0;
   checkpointPassed = false;
+  readonly missionProgress: MissionProgress | null;
   lines3d: number[] = [];
   lines2d: number[] = [];
   zoomFov = 17.19;
@@ -159,6 +160,7 @@ export class RustSimulation implements SimView {
   /** a challenge's course replaces the default course (and, when it brings one, the ground) */
   constructor(readonly source: string, private keys: KeyState, options: SimOptions = {}) {
     this.scenario = options.scenario ?? null;
+    this.missionProgress = this.scenario?.mission ? new MissionProgress(this.scenario) : null;
     this.currentSource = source;
     this.bare = options.bare ?? false;
     this.model = parseRc(source);
@@ -352,6 +354,12 @@ export class RustSimulation implements SimView {
     this.read();
     if (!this.midFrame) {
       this.frame++;
+      const progress = this.missionProgress;
+      const core = this.physics.tiles[0];
+      if (progress && progress.clearedAt === null && core && this.frame <= progress.scenario.timeLimit * FRAME_RATE) {
+        const clearance = progress.scenario.mission?.hold.kind === 'clearance' ? Number(this.apiValue('_H', 0)) : undefined;
+        progress.step(this.frame, core, this.coreVelocity(), clearance);
+      }
       if (!this.checkpointPassed && this.scenario?.checkpoint) {
         this.checkpointPassed = inBox(this.scenario.checkpoint, this.corePosition());
       }

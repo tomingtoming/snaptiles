@@ -61,6 +61,19 @@ try {
   const body = await receiver.textContent('#challenge-result-body');
   assert.match(body, /再計算して確認済み/);
   assert.doesNotMatch(body, /自己ベスト/);
+  await receiver.click('#challenge-result form button');
+  await receiver.click('#debug-toggle');
+  const targetFrame = Math.round(parseFloat(time) * 30) - 30;
+  await receiver.$eval('#debug-timeline', (slider, frame) => {
+    slider.value = String(frame);
+    slider.dispatchEvent(new Event('input'));
+    slider.dispatchEvent(new Event('change'));
+  }, targetFrame);
+  await receiver.waitForFunction(frame => window.__sim.frame === frame, targetFrame);
+  assert.match(await receiver.textContent('#challenge-banner'), /保持 3.0 \/ 4 秒/);
+  for (let i = 0; i < 30; i++) await receiver.evaluate(() => document.getElementById('debug-forward').click());
+  assert.equal(await receiver.locator('#challenge-result-body dd').first().textContent(), time);
+  assert.equal(await receiver.locator('#challenge-result').evaluate(el => el.open), true);
   console.log('Terrain following: world altitude timed out; downward range cleared the same course:', body);
 } finally {
   await browser.close();

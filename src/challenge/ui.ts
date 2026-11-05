@@ -5,7 +5,7 @@ import type { RustSimulation } from '../sim/rust-simulation';
 import { TerrainMap } from './terrain-map';
 import type { Assembly } from '../model/assemble';
 import { FRAME_RATE } from '../sim/sim-view';
-import { FREE_DRIVES, MISSIONS, SCENARIOS, MissionProgress, scenarioById, costBreakdown, inGoal, modelCost, type Scenario } from './scenarios';
+import { FREE_DRIVES, MISSIONS, SCENARIOS, scenarioById, costBreakdown, inGoal, modelCost, type Scenario } from './scenarios';
 
 export interface ChallengeHost {
   sim(): RustSimulation | null;
@@ -25,12 +25,6 @@ export class ChallengeUI {
   private cleared: number | null = null;
   private failed = false;
   private terrainMap = new TerrainMap();
-  /** a mission's progress (frames held, the pass through its waypoint) */
-  private progress: MissionProgress | null = null;
-  private progressFor(s: Scenario): MissionProgress {
-    if (this.progress?.scenario !== s) this.progress = new MissionProgress(s);
-    return this.progress;
-  }
   private dialog = $<HTMLDialogElement>('challenge-dialog');
   private result = $<HTMLDialogElement>('challenge-result');
   private banner = $('challenge-banner');
@@ -109,9 +103,13 @@ export class ChallengeUI {
     const compare = $('brake-compare');
     compare.hidden = !sim.scenario?.compareRoad;
     compare.textContent = sim.scenario?.compareRoad?.label ?? '';
-    if (!rewound || this.cleared === null || sim.frame < this.cleared) { this.cleared = null; this.failed = false; }
-    if (!rewound) this.progress = null;
-    else this.progress?.rewind(sim.frame);
+    if (rewound && sim.missionProgress) {
+      this.cleared = sim.missionProgress.clearedAt;
+      this.failed = this.cleared === null && sim.frame >= sim.missionProgress.scenario.timeLimit * FRAME_RATE;
+    } else if (!rewound || this.cleared === null || sim.frame < this.cleared) {
+      this.cleared = null;
+      this.failed = false;
+    }
     this.update(sim);
   }
 
@@ -119,10 +117,8 @@ export class ChallengeUI {
   afterStep(sim: RustSimulation): void {
     const s = this.active;
     if (!s || s.freeDrive || sim.scenario !== s || this.cleared !== null || this.failed) return;
-    const core = sim.physics.tiles[0];
-    const clearance = s.mission?.hold.kind === 'clearance' ? Number(sim.apiValue('_H', 0)) : undefined;
     const done = s.mission
-      ? !!core && this.progressFor(s).step(sim.frame, { position: core.position, quaternion: core.quaternion }, sim.coreVelocity(), clearance)
+      ? sim.missionProgress?.clearedAt != null
       : (!s.checkpoint || sim.checkpointPassed) && inGoal(s, sim.corePosition());
     if (done) {
       this.cleared = sim.frame;
@@ -158,7 +154,7 @@ export class ChallengeUI {
     const zone = !sim.checkpointPassed && s.checkpoint ? s.checkpoint : s.goal;
     const altitude = s.showGateAltitude && zone ? `（高度${zone[2]}〜${zone[3]}m）` : '';
     const text = s.mission
-      ? `ミッション：${s.title}｜${s.mission.via ? (this.progress?.visitedAt != null ? '折り返し済み｜' : '折り返しはまだ｜') : ''}保持 ${((this.progress?.scenario === s ? this.progress.held : 0) / FRAME_RATE).toFixed(1)} / ${s.mission.hold.seconds} 秒｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}｜${s.mission.hint}`
+      ? `ミッション：${s.title}｜${s.mission.via ? (sim.missionProgress?.visitedAt != null ? '折り返し済み｜' : '折り返しはまだ｜') : ''}保持 ${((sim.missionProgress?.held ?? 0) / FRAME_RATE).toFixed(1)} / ${s.mission.hold.seconds} 秒｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}｜${s.mission.hint}`
       : `お題：${s.title}｜コスト ${cost} / ${s.budget}${over ? '（予算オーバー・記録なし）' : ''}｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}${checkpoint}${altitude}`;
     if (this.bannerText.textContent !== text) this.bannerText.textContent = text;
   }

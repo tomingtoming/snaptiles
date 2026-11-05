@@ -561,20 +561,16 @@ export function inBox([x0, x1, y0, y1, z0, z1]: number[], p: { x: number; y: num
  *  frames in a row it has held the state since */
 export class MissionProgress {
   held = 0;
+  clearedAt: number | null = null;
   /** the frame the Core first entered `via`, or null */
   visitedAt: number | null = null;
   constructor(readonly scenario: Scenario) {}
-  /** this frame's state; true once the hold has lasted long enough */
-  step(frame: number, core: { position: { x: number; y: number; z: number }; quaternion: { x: number; z: number } }, velocity: { x: number; y: number; z: number }, clearance?: number): boolean {
+  /** Track consecutive frames until the required hold is complete. */
+  step(frame: number, core: { position: { x: number; y: number; z: number }; quaternion: { x: number; z: number } }, velocity: { x: number; y: number; z: number }, clearance?: number): void {
     const m = this.scenario.mission!;
     if (m.via && this.visitedAt === null && inBox(m.via, core.position)) this.visitedAt = frame;
     const ready = !m.via || this.visitedAt !== null;
     this.held = ready && holds(this.scenario, core, velocity, clearance) ? this.held + 1 : 0;
-    return this.held >= m.hold.seconds * FRAME_RATE;
-  }
-  /** a re-run to `frame`: the hold starts over, a pass through `via` after that frame is undone */
-  rewind(frame: number): void {
-    this.held = 0;
-    if (this.visitedAt !== null && this.visitedAt >= frame) this.visitedAt = null;
+    if (this.held >= m.hold.seconds * FRAME_RATE) this.clearedAt = frame;
   }
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { RustSimulation } from '../src/sim/rust-simulation';
 import { KeyState } from '../src/input/keys';
-import { MISSIONS, MissionProgress } from '../src/challenge/scenarios';
+import { MISSIONS } from '../src/challenge/scenarios';
 
 // Every mission fails with its starting model and clears with a short solution, so a physics change cannot leave a
 // lesson unsolvable (or solved without any Lua).
@@ -19,12 +19,9 @@ async function framesToClear(source: string, mission: (typeof MISSIONS)[number])
   const sim = new RustSimulation(source, new KeyState(new EventTarget()), { scenario: mission });
   try {
     await sim.start();
-    const progress = new MissionProgress(mission);
     for (let f = 0; f < mission.timeLimit * 30; f++) {
       sim.step();
-      const core = sim.physics.tiles[0];
-      const clearance = mission.mission?.hold.kind === 'clearance' ? Number(sim.apiValue('_H', 0)) : undefined;
-      if (progress.step(sim.frame, { position: core.position, quaternion: core.quaternion }, sim.coreVelocity(), clearance)) return sim.frame;
+      if (sim.missionProgress?.clearedAt != null) return sim.frame;
       expect(sim.scriptError).toBeNull();
     }
     return -1;
