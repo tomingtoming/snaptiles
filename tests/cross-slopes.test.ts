@@ -40,6 +40,7 @@ it.each([false, true])('stock car traverses the slalom using steering: %s', asyn
       const { x } = sim.corePosition(), v = sim.coreVelocity();
       const wanted = steer ? Math.max(-22, Math.min(22, (next.center[0] - x) * 2.2 - v.x * 4)) : 0;
       const handle = sim.env('HANDLE');
+      if (handle === undefined) throw new Error('Stock car steering control is missing');
       press(0, sim.frame > 45 && -v.z < 7);
       press(2, wanted < handle - 1.5);
       press(3, wanted > handle + 1.5);

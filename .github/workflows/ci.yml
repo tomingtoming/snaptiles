@@ -16,7 +16,11 @@ jobs:
         timeout-minutes: 2
       - run: bun run test:editor
         timeout-minutes: 10
-      - run: bun run test:terrain
+      - name: Ground terrain and braking
+        run: node tools/editor-ci.mjs terrain-ground
+        timeout-minutes: 5
+      - name: Flight courses and navigation
+        run: node tools/editor-ci.mjs terrain-flight
         timeout-minutes: 5
       - run: bun run test:editor:firefox
         timeout-minutes: 3
