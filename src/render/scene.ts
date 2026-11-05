@@ -530,6 +530,7 @@ export class SceneView {
           if (h <= 0) tint.lerpColors(seabed, sand, THREE.MathUtils.smoothstep(h, -2 * s.shoalDepth, 0));
           else if (h < 1) tint.lerpColors(sand, valley, h);
         }
+        if (s.asphaltStart !== undefined && i >= s.asphaltStart) tint.setHex(0x555b61);
         tint.toArray(colors, i * 3);
       });
       geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -583,10 +584,12 @@ export class SceneView {
       surface.computeVertexNormals();
       addMesh(surface, 0xffffff, false);
     }
-    if (s.centerStripe) {
+    const markings = s.roadPaint ?? s.centerStripe;
+    if (markings) {
       const marks = new THREE.BufferGeometry();
-      marks.setAttribute('position', new THREE.Float32BufferAttribute(s.centerStripe.flat(), 3));
+      marks.setAttribute('position', new THREE.Float32BufferAttribute(markings.flat(), 3));
       marks.computeVertexNormals();
+      if (s.roadPaint) marks.translate(0, 0.035, 0);
       addMesh(marks, 0xfff3ce, false);
     }
     for (const surface of s.surfaces ?? []) addMesh(hull(box(...surface.bounds)), surface.color, false);

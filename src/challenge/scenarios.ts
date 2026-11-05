@@ -2,6 +2,7 @@
 // any model within the budget and bring its Core into the goal; the run's time and the model's cost are the scores.
 // Courses lie toward −Z, where the samples drive under ↑. A run is recorded from its first step, so a record link
 // (model + run + challenge) is re-run and checked in the receiver's browser.
+import { bankedOval } from './oval';
 import type { CourseRing } from './rings';
 import { hoverModel } from '../samples/hover';
 import type { Assembly } from '../model/assemble';
@@ -33,6 +34,8 @@ export interface Scenario {
   contourInterval?: number; // vertical spacing of elevation lines on the map, in metres
   terrainColorRange?: [number, number]; // elevations of the low and high ground colours
   centerStripe?: Solid; // painted triangles along the north-south test line at x=0
+  roadPaint?: Solid; // markings on the banked pavement
+  asphaltStart?: number; // first paved vertex in the terrain triangle list
   terrainFaces?: Solid; // exposed triangles of a continuous terrain, in draw order
   /** Rectangular road surfaces. Bounds use the same x/y/z pairs as box(). */
   surfaces?: { bounds: [number, number, number, number, number, number]; grip: number; color: number }[];
@@ -322,6 +325,7 @@ export const FREE_DRIVES: Scenario[] = [
   towBasin(),
   islands,
   slickBrakeTrack,
+  bankedOval(),
   {
     ...sideSlopes,
     id: 'cross-slopes',

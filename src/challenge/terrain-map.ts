@@ -247,6 +247,7 @@ export class TerrainMap {
       const face = document.createElementNS(NS, 'polygon');
       face.setAttribute('points', triangle.map(([x, , z]) => x + ',' + z).join(' '));
       face.setAttribute('fill', `hsl(${99 - 66 * level} 28% ${34 + 14 * level}%)`);
+      if (s.asphaltStart !== undefined && i >= s.asphaltStart) face.setAttribute('fill', '#61676b');
       fragment.append(face);
       if (s.shoalDepth && s.water) {
         for (const [cutoff, fill] of [[s.water[4] - s.shoalDepth, '#6cc5be'], [s.water[4], face.getAttribute('fill')!]] as const) {
