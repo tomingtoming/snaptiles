@@ -54,8 +54,8 @@ it.each([[0, -1], [1, 1], [2, -1], [3, 1]])('keeps the raft upright with control
 
 it.each([[0, 0.006], [1200, 3.239], [2400, 6.046], [3600, 8.386]])(
   'reproduces the measured towing speed at frame 180, thrust %i', async (power, original) => {
-    const control = '\nLua {\nticks=0\nfunction OnFrame()\nticks=ticks+1\nif ticks>=90 then THRUST=' + power + ' end\nend\n}';
-    const sim = new RustSimulation(RAFT + control, new KeyState(new EventTarget()), { scenario: scenarioById('tow-basin') });
+    const control = 'ticks=(ticks or 0)+1\n if ticks>=90 then THRUST=' + power + ' end\n  PORT = THRUST + TURN';
+    const sim = new RustSimulation(RAFT.replace('PORT = THRUST + TURN', control), new KeyState(new EventTarget()), { scenario: scenarioById('tow-basin') });
     try {
       await sim.start();
       for (let frame = 0; frame < 180; frame++) sim.step();
