@@ -565,6 +565,14 @@ export class SceneView {
       edges.position.copy(mesh.position);
       this.scenarioGroup.add(mesh, edges);
     };
+    for (const ring of s.rings ?? []) {
+      const tube = Math.max(0.35, ring.radius * 0.045);
+      const geometry = new THREE.TorusGeometry(ring.radius + tube, tube, 8, 64);
+      const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffc141 }));
+      mesh.position.set(...ring.center);
+      mesh.rotation.y = -ring.heading * Math.PI / 180;
+      this.scenarioGroup.add(mesh);
+    }
     if (s.goal) zone(s.goal, 0x43a047, 0x2e7d32);
     if (s.checkpoint) zone(s.checkpoint, 0xfdd835, 0xf9a825);
     if (s.mission?.via) zone(s.mission.via, 0xfdd835, 0xf9a825);

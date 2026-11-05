@@ -16,6 +16,7 @@ import {
   TILE, TILE_STRIDE, type ApiName,
 } from './core-layout';
 import { Recording, type Command, type FrameInput } from './replay';
+import { advanceRings } from '../challenge/rings';
 import { box, crossesBrakingGate, inBox, MissionProgress, type Scenario, type Solid } from '../challenge/scenarios';
 
 let corePromise: Promise<SnapTilesCoreModule> | null = null;
@@ -129,6 +130,7 @@ export class RustSimulation implements SimView {
   scriptError: string | null = null;
   ticks = 0;
   checkpointPassed = false;
+  ringsPassed = 0;
   brakingEntryKmh?: number;
   groundRange?: number;
   readonly missionProgress: MissionProgress | null;
@@ -354,7 +356,9 @@ export class RustSimulation implements SimView {
   private afterCore(): void {
     const m = this.m!;
     const test = this.scenario?.brakingTest;
-    const before = test && !this.checkpointPassed ? this.physics.tiles[0]?.position.clone() : undefined;
+    const rings = this.scenario?.rings;
+    const trackMotion = (test && !this.checkpointPassed) || (rings && this.ringsPassed < rings.length);
+    const before = trackMotion ? this.physics.tiles[0]?.position.clone() : undefined;
     this.read();
     if (!this.midFrame) {
       this.frame++;
@@ -364,6 +368,7 @@ export class RustSimulation implements SimView {
       if (progress && progress.clearedAt === null && core && this.frame <= progress.scenario.timeLimit * FRAME_RATE) {
         progress.step(this.frame, core, this.coreVelocity(), this.groundRange);
       }
+      if (rings && before && core) this.ringsPassed = advanceRings(rings, this.ringsPassed, before, core.position);
       if (!this.checkpointPassed && this.scenario?.checkpoint) {
         if (!test) {
           this.checkpointPassed = inBox(this.scenario.checkpoint, this.corePosition());

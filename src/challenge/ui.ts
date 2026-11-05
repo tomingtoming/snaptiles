@@ -124,7 +124,7 @@ export class ChallengeUI {
   afterStep(sim: RustSimulation): void {
     const s = this.active;
     if (!s || s.freeDrive || sim.scenario !== s || this.cleared !== null || this.failed) return;
-    const done = s.mission
+    const done = s.rings ? sim.ringsPassed === s.rings.length : s.mission
       ? sim.missionProgress?.clearedAt != null
       : (!s.checkpoint || sim.checkpointPassed) && inGoal(s, sim.corePosition())
         && (!s.brakingTest || sim.coreVelocity().length() * 3.6 <= s.brakingTest.stopKmh);
@@ -169,6 +169,10 @@ export class ChallengeUI {
       driving = sim.checkpointPassed
         ? `｜${measured}緑枠内で${s.brakingTest.stopKmh}km/h以下`
         : `｜${measured}黄色に${s.brakingTest.entryKmh}km/h以上で進入${slow ? '（速度不足）' : ''}`;
+    }
+    if (s.rings) {
+      const next = s.rings[sim.ringsPassed];
+      driving = next ? `｜次はリング ${sim.ringsPassed + 1} / ${s.rings.length}（中心高度${next.center[1]}m）` : '｜全リング通過';
     }
     const zone = !sim.checkpointPassed && s.checkpoint ? s.checkpoint : s.goal;
     const altitude = s.showGateAltitude && zone ? `（高度${zone[2]}〜${zone[3]}m）` : '';

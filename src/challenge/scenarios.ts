@@ -2,6 +2,7 @@
 // any model within the budget and bring its Core into the goal; the run's time and the model's cost are the scores.
 // Courses lie toward −Z, where the samples drive under ↑. A run is recorded from its first step, so a record link
 // (model + run + challenge) is re-run and checked in the receiver's browser.
+import type { FlightRing } from './rings';
 import { hoverModel } from '../samples/hover';
 import type { Assembly } from '../model/assemble';
 import { FRAME_RATE } from '../sim/sim-view';
@@ -35,6 +36,7 @@ export interface Scenario {
   goal?: [number, number, number, number, number, number];
   checkpoint?: Scenario['goal'];
   showGateAltitude?: boolean;
+  rings?: FlightRing[];
   /** a mission (a Lua lesson): its starting model, and the state the model has to hold for `seconds` */
   mission?: {
     starter: string;
@@ -327,6 +329,20 @@ export const SCENARIOS: Scenario[] = [
     solids: [],
     checkpoint: [-16, -3, 0, 12, -42, -26],
     goal: [4, 20, 0, 8, -114, -91],
+  },
+  {
+    ...plateau,
+    id: 'highland-rings',
+    title: '四峰高原のリング飛行',
+    description: '北へ離陸し、空中の円を1番から順に通ります。標準のplaneはZで加速、↓で上昇。1番を抜けたら→で右に傾けます。',
+    budget: 100,
+    timeLimit: 50,
+    solids: [],
+    rings: [
+      { center: [-2, 8, -91], radius: 7, heading: 0 },
+      { center: [-4, 23, -239], radius: 13, heading: 5 },
+      { center: [23, 43, -427], radius: 18, heading: 13 },
+    ],
   },
   {
     ...plateau,
