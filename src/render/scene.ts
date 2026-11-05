@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ringColor } from '../challenge/rings';
 import { TILE, TILE_T, type TileInstance, type ValEnv } from '../model/assemble';
 import { evalExpr, exprIsConstant } from '../rc/expr';
 import { wheelRadius } from '../model/assemble';
@@ -480,6 +481,14 @@ export class SceneView {
   private crateMeshes: THREE.Mesh[] = [];
   private courseMeshes: THREE.Mesh[] = [];
   private scenarioGroup = new THREE.Group();
+  private ringMaterials: THREE.MeshBasicMaterial[] = [];
+  private visibleRingCount = -1;
+
+  setRingProgress(passed: number): void {
+    if (this.visibleRingCount === passed) return;
+    this.visibleRingCount = passed;
+    this.ringMaterials.forEach((m, index) => m.color.set(ringColor(index, passed)));
+  }
 
   /** a challenge's course in place of the default one (null: back to the default course) */
   setScenario(s: Scenario | null): void {
@@ -494,6 +503,8 @@ export class SceneView {
       this.scenarioGroup.remove(c);
       c.traverse((o) => { if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); } });
     }
+    this.ringMaterials = [];
+    this.visibleRingCount = -1;
     if (!s) return;
     const addMesh = (geometry: THREE.BufferGeometry, color: number, shadow: boolean) => {
       const material = new THREE.MeshStandardMaterial({ color, roughness: 0.95, vertexColors: geometry.hasAttribute('color') });
@@ -568,11 +579,14 @@ export class SceneView {
     for (const ring of s.rings ?? []) {
       const tube = Math.max(0.35, ring.radius * 0.045);
       const geometry = new THREE.TorusGeometry(ring.radius + tube, tube, 8, 64);
-      const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffc141 }));
+      const material = new THREE.MeshBasicMaterial();
+      this.ringMaterials.push(material);
+      const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(...ring.center);
       mesh.rotation.y = -ring.heading * Math.PI / 180;
       this.scenarioGroup.add(mesh);
     }
+    this.setRingProgress(0);
     if (s.goal) zone(s.goal, 0x43a047, 0x2e7d32);
     if (s.checkpoint) zone(s.checkpoint, 0xfdd835, 0xf9a825);
     if (s.mission?.via) zone(s.mission.via, 0xfdd835, 0xf9a825);

@@ -1,5 +1,7 @@
 import type { Scenario, Solid } from './scenarios';
 
+import { ringColor } from './rings';
+
 const NS = 'http://www.w3.org/2000/svg';
 
 /** Intersect the existing terrain triangles with horizontal planes.
@@ -45,9 +47,11 @@ export class TerrainMap {
   private course: Scenario | null = null;
   private checkpoint: SVGRectElement | null = null;
   private goal: SVGRectElement | null = null;
+  private ringMarkers: SVGCircleElement[] = [];
+  private visibleRingCount = -1;
   private lastTarget: SVGRectElement | null = null;
 
-  update(s: Scenario | null, core: { position: { x: number; y: number; z: number }; vel: { x: number; z: number } } | undefined, passed: boolean): void {
+  update(s: Scenario | null, core: { position: { x: number; y: number; z: number }; vel: { x: number; z: number } } | undefined, passed: boolean, ringsPassed: number): void {
     const bounds = s?.terrainBounds;
     const position = core?.position;
     this.panel.hidden = !bounds || !position;
@@ -91,7 +95,20 @@ export class TerrainMap {
         text += 'まで' + distance + 'm';
       }
     }
-    if (!next && s.runway) {
+    if (s.rings) {
+      if (this.visibleRingCount !== ringsPassed) {
+        this.visibleRingCount = ringsPassed;
+        this.ringMarkers.forEach((marker, index) => marker.setAttribute('stroke', ringColor(index, ringsPassed)));
+      }
+      const ring = s.rings[ringsPassed];
+      if (ring) {
+        const [rx, ry, rz] = ring.center;
+        text += `　リング${ringsPassed + 1}まで水平 ${Math.round(Math.hypot(rx - position.x, rz - position.z))}m・中心高度${ry}m`;
+      } else {
+        text += '　全リング通過';
+      }
+    }
+    if (!next && !s.rings && s.runway) {
       const { width, north, south } = s.runway;
       const dx = Math.max(-width / 2, Math.min(width / 2, position.x)) - position.x;
       const dz = Math.max(north, Math.min(south, position.z)) - position.z;
@@ -152,6 +169,19 @@ export class TerrainMap {
       const { width, north, south } = s.runway;
       zone([-width / 2, width / 2, 0, 0, north, south], '#e9e1c1');
     }
+    this.visibleRingCount = -1;
+    this.ringMarkers = (s.rings ?? []).map((ring, index) => {
+      const marker = document.createElementNS(NS, 'circle');
+      marker.setAttribute('cx', String(ring.center[0]));
+      marker.setAttribute('cy', String(ring.center[2]));
+      marker.setAttribute('r', String(Math.max(ring.radius, pad * 0.65)));
+      marker.setAttribute('fill', 'none');
+      marker.setAttribute('stroke-width', '2');
+      marker.setAttribute('vector-effect', 'non-scaling-stroke');
+      marker.setAttribute('aria-label', 'リング' + (index + 1));
+      fragment.append(marker);
+      return marker;
+    });
     this.lastTarget = null;
     this.checkpoint = s.checkpoint ? zone(s.checkpoint, '#ffc747') : null;
     this.goal = s.goal ? zone(s.goal, '#70f8a0') : null;

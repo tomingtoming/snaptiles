@@ -488,6 +488,7 @@ function frame(now: number): void {
     }
     if (n === 4) acc = 0;
     scene.sync(sim.physics);
+    scene.setRingProgress(sim.ringsPassed);
     scene.updateDynamic(sim.env);
     scene.setLines3d(sim.lines3d);
     scene.syncProjectiles(sim.physics.projectiles);

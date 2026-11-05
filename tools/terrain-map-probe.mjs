@@ -35,6 +35,40 @@ try {
     }).map(cap => cap.textContent));
     assert.deepEqual(blocked, []);
   }
+  await page.setViewportSize({ width: 1000, height: 720 });
+  await page.goto(process.argv[2] + '#plane&c=highland-rings');
+  await page.waitForFunction(() => window.__sim?.scenario?.id === 'highland-rings');
+  if (!(await page.locator('#terrain-map').evaluate(el => el.open))) await page.click('#terrain-map summary');
+  const activeRing = () => page.locator('#terrain-map circle[stroke="#ffc747"]').getAttribute('aria-label');
+  assert.equal(await activeRing(), 'リング1');
+  await page.focus('#view');
+  await page.waitForFunction(() => window.__sim.frame >= 45);
+  await page.keyboard.down('z');
+  await page.waitForFunction(() => window.__sim.env('THROTTLE') === 60000);
+  await page.keyboard.up('z');
+  await page.keyboard.down('ArrowDown');
+  await page.waitForFunction(() => window.__sim.ringsPassed === 1);
+  await page.keyboard.down('ArrowRight');
+  assert.equal(await activeRing(), 'リング2');
+  await page.waitForFunction(() => window.__sim.ringsPassed === 2);
+  assert.equal(await activeRing(), 'リング3');
+  await page.waitForFunction(() => document.getElementById('challenge-result').open);
+  await page.keyboard.up('ArrowRight');
+  await page.keyboard.up('ArrowDown');
+  assert.match(await page.textContent('#challenge-result-title'), /クリア！ 四峰高原のリング飛行/);
+  await page.click('#challenge-result form button');
+  await page.click('#debug-toggle');
+  await page.$eval('#debug-timeline', slider => {
+    slider.value = '190';
+    slider.dispatchEvent(new Event('input'));
+    slider.dispatchEvent(new Event('change'));
+  });
+  await page.waitForFunction(() => window.__sim.frame === 190);
+  assert.equal(await page.evaluate(() => window.__sim.ringsPassed), 1);
+  await page.click('#debug-toggle');
+  assert.equal(await activeRing(), 'リング2');
+  assert.match(await page.textContent('#terrain-map small'), /リング2まで水平/);
+  console.log('Three flight rings cleared; rewinding restored ring 2 on the map.');
   console.log('Highlands map: five contours, stationary dot, forward and reverse bearings.');
 } finally {
   await browser.close();

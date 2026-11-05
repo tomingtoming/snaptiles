@@ -4,6 +4,12 @@ export interface FlightRing {
   heading: number; // degrees clockwise from north
 }
 
+/** Shared colours for the 3D hoops and the map symbols. */
+export function ringColor(index: number, passed: number): string {
+  if (index === passed) return '#ffc747';
+  return index < passed ? '#788787' : '#8ed4b0';
+}
+
 interface Point { x: number; y: number; z: number }
 
 /** Cross ring planes in order along this frame's motion. Testing the intersection
