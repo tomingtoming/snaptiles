@@ -547,3 +547,10 @@ step response and every other run unchanged and makes Talon walk under Up like t
 runs above 1 18 → 17, median 0.29 → 0.28, upright mismatches 10 → 9 (`SPRING_ZETA_LOAD`, `World::grounded_tiles`).
 The two-legged landing rigs keep rebounding in SnapTiles (both feet are down, so the rule does not apply): the
 original's absorption there is still unexplained.
+
+
+## 2026-11-05: original water response, isolated flat-ground trials
+
+The earlier terrain comparison inferred a sea threshold near y=49 from a moving car on a drop. A single unpowered Core on generated, level floors does not show a transition at that height. With floors at 2, 15, 35 and 65 m, it fell about 0.49 m between frames 1 and 10 and settled at floor height (within 0.005 m). On a −15 m floor it rose freely at 0.841 m/s from frames 20 to 180. With a −2 m floor it rose toward y≈−0.45 m and oscillated. These are world-coordinate measurements; the equilibrium position of the Core is not a measurement of the exact surface plane.
+
+Probe: `tools/orig-harness/water-probe.py`, quarantined B26 executable SHA-256 `872ee04f7b432afa169542718c4447172abf9cd28478bea8872d4305622ef199`. The probe uses disposable copies of the game and Wine prefix in an offline WSL namespace. Raw 180-frame CSVs: `quarantine/original/runs/water_core_20261105_s57` and `water_core_near_zero_20261105_s57` in the local model archive.
