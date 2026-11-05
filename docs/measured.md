@@ -284,9 +284,7 @@ speed loss. Two dead ends worth remembering: forces added inside a rapier query 
 
 **Tier 1, terrain** (`tools/orig-harness/terrains.json`, `rc_terrain.sh` / `tools/terrain-compare.ts`,
 ranked by `terraindiff.py`): the Basic car at Engine 2500 over 12 generated lands. Lessons for the probe
-itself: below about y = 49 the original's sea starts (a 1 m drop and the 30° ramp's far side were
-underwater at a 50 m base; `LAND_BASE=150` re-runs), and its land stops colliding near z = 210 (compare
-before z = 200). Remaining differences, largest first:
+itself: the drop and ramp at a 50 m base prompted reruns at 150 m. The later Core trials below do not support the inferred sea threshold at y=49. Land stops colliding near z = 210 in these runs (compare before z = 200). Remaining differences, largest first:
 
 | scene | original | SnapTiles | status |
 |---|---|---|---|
@@ -554,3 +552,5 @@ original's absorption there is still unexplained.
 The earlier terrain comparison inferred a sea threshold near y=49 from a moving car on a drop. A single unpowered Core on generated, level floors does not show a transition at that height. With floors at 2, 15, 35 and 65 m, it fell about 0.49 m between frames 1 and 10 and settled at floor height (within 0.005 m). On a −15 m floor it rose freely at 0.841 m/s from frames 20 to 180. With a −2 m floor it rose toward y≈−0.45 m and oscillated. These are world-coordinate measurements; the equilibrium position of the Core is not a measurement of the exact surface plane.
 
 Probe: `tools/orig-harness/water-probe.py`, quarantined B26 executable SHA-256 `872ee04f7b432afa169542718c4447172abf9cd28478bea8872d4305622ef199`. The probe uses disposable copies of the game and Wine prefix in an offline WSL namespace. Raw 180-frame CSVs: `quarantine/original/runs/water_core_20261105_s57` and `water_core_near_zero_20261105_s57` in the local model archive.
+
+Four symmetric arms were then attached to the same Core. At frame 20 above the -15 m floor, vertical speeds in m/s were +0.841 with four Chips, +1.428 with four Frames, -1.492 with four Weights and -3.027 with four option-3 Weights. These are instantaneous speeds before floor contact. Both Weight rigs reached the floor. Raw runs: quarantine/original/runs/water_{chips,frames,weights,heavy}_20261105_s58.
