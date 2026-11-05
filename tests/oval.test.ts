@@ -36,7 +36,15 @@ it.each(['banked-oval', 'oval-lap'])('completes a clockwise lap of %s using the 
       sim.step();
     }
     expect(target).toBe(targets.length);
-    if (id === 'oval-lap') expect(sim.ringsPassed).toBe(8);
+    if (id === 'oval-lap') {
+      expect(sim.ringsPassed).toBe(8);
+      expect(sim.sectorFrames).toHaveLength(4);
+      expect(sim.sectorFrames.every((frame, i, all) => frame > (all[i - 1] ?? 0))).toBe(true);
+      sim.reset();
+      expect(sim.lapStartFrame).toBe(sim.frame);
+      expect(sim.sectorFrames).toEqual([]);
+      expect(sim.ringsPassed).toBe(0);
+    }
     expect(worstOffset).toBeLessThan(6);
   } finally { await sim.dispose(); }
 });

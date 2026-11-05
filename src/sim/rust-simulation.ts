@@ -131,6 +131,8 @@ export class RustSimulation implements SimView {
   ticks = 0;
   checkpointPassed = false;
   ringsPassed = 0;
+  readonly sectorFrames: number[] = [];
+  lapStartFrame = 0;
   readonly waterPasses = new Map<number, { seconds: number; speedKmh: number }>();
   private waterStartFrame = 0;
   brakingEntryKmh?: number;
@@ -290,6 +292,11 @@ export class RustSimulation implements SimView {
 
   private resetCore(): void {
     if (!this.assembly || !this.m || this.id < 0) return;
+    if (this.scenario?.sectors) {
+      this.ringsPassed = 0;
+      this.sectorFrames.length = 0;
+      this.lapStartFrame = this.frame;
+    }
     this.waterPasses.clear();
     this.waterStartFrame = this.frame;
     this.m._core_reset(this.id);
@@ -392,7 +399,12 @@ export class RustSimulation implements SimView {
           });
         }
       }
-      if (rings && before && core) this.ringsPassed = advanceRings(rings, this.ringsPassed, before, core.position);
+      if (rings && before && core) {
+        this.ringsPassed = advanceRings(rings, this.ringsPassed, before, core.position);
+        const sectors = this.scenario?.sectors;
+        while (sectors && this.sectorFrames.length < sectors.length &&
+          sectors[this.sectorFrames.length].gate <= this.ringsPassed) this.sectorFrames.push(this.frame);
+      }
       if (!this.checkpointPassed && this.scenario?.checkpoint) {
         if (!test) {
           this.checkpointPassed = inBox(this.scenario.checkpoint, this.corePosition());

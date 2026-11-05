@@ -302,6 +302,13 @@ export class ChallengeUI {
     const dl = document.createElement('dl');
     const row = (k: string, v: string) => { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); };
     if (cleared) row('タイム', `${time.toFixed(2)} 秒`);
+    if (s.sectors) {
+      if (sim.lapStartFrame) row('リセットまで', (sim.lapStartFrame / FRAME_RATE).toFixed(2) + ' 秒');
+      sim.sectorFrames.forEach((frame, index) => {
+        const previous = sim.sectorFrames[index - 1] ?? sim.lapStartFrame;
+        row(s.sectors![index].name, ((frame - previous) / FRAME_RATE).toFixed(2) + ' 秒');
+      });
+    }
     if (!s.mission) row('コスト', `${cost} / ${s.budget}${within ? '' : '（予算オーバー：記録になりません）'}`);
     if (cleared && s.brakingTest && sim.brakingEntryKmh !== undefined) {
       row('進入速度', sim.brakingEntryKmh.toFixed(1) + ' km/h');

@@ -45,6 +45,7 @@ export interface Scenario {
   checkpoint?: Scenario['goal'];
   showGateAltitude?: boolean;
   rings?: CourseRing[];
+  sectors?: { gate: number; name: string }[]; // one-based end gate of each timed section
   /** a mission (a Lua lesson): its starting model, and the state the model has to hold for `seconds` */
   mission?: {
     starter: string;
@@ -377,6 +378,10 @@ export const SCENARIOS: Scenario[] = [
     ...oval, freeDrive: false, id: 'oval-lap', title: 'バンク周回タイムアタック',
     description: '右回りに黄色いリングを順に抜け、白いスタートラインに戻るまでのタイムを競います。',
     budget: 45, timeLimit: 90,
+    sectors: [
+      { gate: 2, name: 'スタート → 北カーブ' }, { gate: 4, name: '北カーブ → 東直線' },
+      { gate: 6, name: '東直線 → 南カーブ' }, { gate: 8, name: '南カーブ → ゴール' },
+    ],
     rings: [
       { center: [0, 2, -36], heading: 0, radius: 6 },
       { center: [24, 2, -60], heading: 90, radius: 6 },
