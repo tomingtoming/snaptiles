@@ -1,7 +1,7 @@
 # Emscripten build: one ES module (snaptiles_core.js + .wasm) exporting the core_* functions of src/ffi.rs.
 [target.wasm32-unknown-emscripten]
 rustflags = [
-  "-C", "link-args=-sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=web,node -sINVOKE_RUN=0 -sALLOW_MEMORY_GROWTH=1 -sEXPORT_NAME=SnapTilesCore -sEXPORTED_RUNTIME_METHODS=UTF8ToString,HEAPU8,HEAPF64 -sEXPORTED_FUNCTIONS=_malloc,_free,_core_create,_core_free,_core_load,_core_reset,_core_set_input,_core_set_axes,_core_add_ball,_core_set_wind,_core_step,_core_state_ptr,_core_state_len,_core_error,_core_out,_core_val_names,_core_tile_body_mass,_core_api,_core_lua_watch,_core_set_breakpoints,_core_break,_core_add_solid,_core_add_surface,_core_check,_core_reload_script,_core_eval,_core_step_line",
+  "-C", "link-args=-sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=web,node -sINVOKE_RUN=0 -sALLOW_MEMORY_GROWTH=1 -sEXPORT_NAME=SnapTilesCore -sEXPORTED_RUNTIME_METHODS=UTF8ToString,HEAPU8,HEAPF64 -sEXPORTED_FUNCTIONS=_malloc,_free,_core_create,_core_free,_core_load,_core_reset,_core_set_input,_core_set_axes,_core_add_ball,_core_set_wind,_core_step,_core_state_ptr,_core_state_len,_core_error,_core_out,_core_val_names,_core_ground_range,_core_tile_body_mass,_core_api,_core_lua_watch,_core_set_breakpoints,_core_break,_core_add_solid,_core_add_surface,_core_check,_core_reload_script,_core_eval,_core_step_line",
 ]
 
 # Lua 5.4 seeds its string hashes from the clock and heap addresses: with a fixed seed the order of `pairs` over a

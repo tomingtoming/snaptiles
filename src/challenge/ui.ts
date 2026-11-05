@@ -153,8 +153,14 @@ export class ChallengeUI {
     const checkpoint = s.checkpoint ? (!sim.checkpointPassed ? '｜黄色の中間地点へ' : '｜中間地点通過・緑のゴールへ') : '';
     const zone = !sim.checkpointPassed && s.checkpoint ? s.checkpoint : s.goal;
     const altitude = s.showGateAltitude && zone ? `（高度${zone[2]}〜${zone[3]}m）` : '';
+    let hint = s.mission?.hint;
+    if (s.mission?.hold.kind === 'clearance' && sim.groundRange !== undefined) {
+      const range = sim.groundRange;
+      const height = sim.corePosition().y.toFixed(1);
+      hint = `標高 _Y ${height}m｜対地高 _H ${range < 0 ? '範囲外' : range.toFixed(1) + 'm'}（目標 ${s.mission.hold.min}〜${s.mission.hold.max}m）`;
+    }
     const text = s.mission
-      ? `ミッション：${s.title}｜${s.mission.via ? (sim.missionProgress?.visitedAt != null ? '折り返し済み｜' : '折り返しはまだ｜') : ''}保持 ${((sim.missionProgress?.held ?? 0) / FRAME_RATE).toFixed(1)} / ${s.mission.hold.seconds} 秒｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}｜${s.mission.hint}`
+      ? `ミッション：${s.title}｜${s.mission.via ? (sim.missionProgress?.visitedAt != null ? '折り返し済み｜' : '折り返しはまだ｜') : ''}保持 ${((sim.missionProgress?.held ?? 0) / FRAME_RATE).toFixed(1)} / ${s.mission.hold.seconds} 秒｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}｜${hint}`
       : `お題：${s.title}｜コスト ${cost} / ${s.budget}${over ? '（予算オーバー・記録なし）' : ''}｜${time.toFixed(1)} / ${s.timeLimit} 秒${state}${checkpoint}${altitude}`;
     if (this.bannerText.textContent !== text) this.bannerText.textContent = text;
   }

@@ -182,7 +182,7 @@ impl SimState {
     fn linvel_of(&self, a: &Arg) -> Vec3 {
         self.tile_of(a).map_or(Vec3::default(), |t| from_vector(self.world.world.bodies[self.world.tiles[t].body].linvel()))
     }
-    fn h(&self, a: &Arg) -> f64 {
+    pub(crate) fn h(&self, a: &Arg) -> f64 {
         let Some(t) = self.tile_of(a) else { return -100000.0 };
         let p = self.world.pose(t).position;
         // only ground-like things count (collision filter: membership 1, hits group 2), never the model itself

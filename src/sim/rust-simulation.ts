@@ -129,6 +129,7 @@ export class RustSimulation implements SimView {
   scriptError: string | null = null;
   ticks = 0;
   checkpointPassed = false;
+  groundRange?: number;
   readonly missionProgress: MissionProgress | null;
   lines3d: number[] = [];
   lines2d: number[] = [];
@@ -356,9 +357,9 @@ export class RustSimulation implements SimView {
       this.frame++;
       const progress = this.missionProgress;
       const core = this.physics.tiles[0];
+      if (progress?.scenario.mission?.hold.kind === 'clearance') this.groundRange = m._core_ground_range(this.id, 0);
       if (progress && progress.clearedAt === null && core && this.frame <= progress.scenario.timeLimit * FRAME_RATE) {
-        const clearance = progress.scenario.mission?.hold.kind === 'clearance' ? Number(this.apiValue('_H', 0)) : undefined;
-        progress.step(this.frame, core, this.coreVelocity(), clearance);
+        progress.step(this.frame, core, this.coreVelocity(), this.groundRange);
       }
       if (!this.checkpointPassed && this.scenario?.checkpoint) {
         this.checkpointPassed = inBox(this.scenario.checkpoint, this.corePosition());

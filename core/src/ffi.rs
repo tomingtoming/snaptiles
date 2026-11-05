@@ -254,6 +254,12 @@ pub extern "C" fn core_tile_body_mass(id: u32, tile: u32) -> f64 {
     })
 }
 
+/// Read the same downward ground range as Lua's _H without changing the simulation inputs.
+#[no_mangle]
+pub extern "C" fn core_ground_range(id: u32, tile: u32) -> f64 {
+    with_slot(id, -100000.0, |slot| slot.sim.as_ref().map_or(-100000.0, |sim| sim.state().h(&Arg::Num(tile as f64))))
+}
+
 /// Ad-hoc script API call (`sim.api()[name](...)`) for probes, tests and the page's tools, never per frame. `args` is
 /// UTF-8: each argument `n<number>` or `s<text>`, joined with U+001F; the result comes back the same way (`n…`/`s…`).
 ///

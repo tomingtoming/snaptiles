@@ -71,9 +71,31 @@ try {
   }, targetFrame);
   await receiver.waitForFunction(frame => window.__sim.frame === frame, targetFrame);
   assert.match(await receiver.textContent('#challenge-banner'), /保持 3.0 \/ 4 秒/);
+  const instruments = await receiver.evaluate(() => {
+    const sim = window.__sim;
+    return { altitude: Number(sim.apiValue('_Y', 0)), range: Number(sim.apiValue('_H', 0)), measured: sim.groundRange };
+  });
+  assert.equal(instruments.measured, instruments.range);
+  assert.ok(instruments.altitude > instruments.range + 1);
+  const banner = await receiver.textContent('#challenge-banner');
+  assert.ok(banner.includes('標高 _Y ' + instruments.altitude.toFixed(1) + 'm'));
+  assert.ok(banner.includes('対地高 _H ' + instruments.range.toFixed(1) + 'm'));
+  console.log('Instruments one second before finish:', instruments);
   for (let i = 0; i < 30; i++) await receiver.evaluate(() => document.getElementById('debug-forward').click());
   assert.equal(await receiver.locator('#challenge-result-body dd').first().textContent(), time);
   assert.equal(await receiver.locator('#challenge-result').evaluate(el => el.open), true);
+  await page.click('#challenge-result form button');
+  await page.click('#mission-edit');
+  const highFlight = starter.replace('TARGET = 4', 'TARGET = 20');
+  await page.fill('#source', highFlight);
+  await page.keyboard.press('Control+Enter');
+  await page.waitForFunction(source => window.__sim?.source === source, highFlight);
+  await page.evaluate(() => {
+    const step = document.getElementById('debug-forward');
+    for (let i = 0; i < 180 && !(window.__sim.groundRange < 0); i++) step.click();
+  });
+  await page.waitForFunction(() => document.getElementById('challenge-banner').textContent.includes('対地高 _H 範囲外'));
+  assert.ok(await page.evaluate(() => Number(window.__sim.apiValue('_Y', 0)) >= 10));
   console.log('Terrain following: world altitude timed out; downward range cleared the same course:', body);
 } finally {
   await browser.close();

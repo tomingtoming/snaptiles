@@ -21,6 +21,7 @@ export interface SnapTilesCoreModule {
   _core_out(id: number): number;
   _core_val_names(id: number): number;
   _core_tile_body_mass(id: number, tile: number): number;
+  _core_ground_range(id: number, tile: number): number;
   _core_api(id: number, name: number, len: number, args: number, argsLen: number): number;
   _core_lua_watch(id: number): number;
   _core_set_breakpoints(id: number, ptr: number, len: number): void;
