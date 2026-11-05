@@ -377,6 +377,7 @@ const slickBrakeTrack = brakeTrack(false);
 const normalBrakeTrack = brakeTrack(true);
 const offshoreInlet = inlet(true);
 const islands = archipelago();
+const terraces = hillClimb();
 const oval = { ...bankedOval(), compareTerrain: { id: 'oval-lap', label: 'タイムアタックへ' } };
 
 export const FREE_DRIVES: Scenario[] = [
@@ -384,7 +385,7 @@ export const FREE_DRIVES: Scenario[] = [
   towBasin(),
   islands,
   slickBrakeTrack,
-  hillClimb(),
+  terraces,
   oval,
   {
     ...sideSlopes,
@@ -694,6 +695,18 @@ end
 
 /** missions: Lua lessons, easiest first; the starting model is loaded into the editor */
 export const MISSIONS: Scenario[] = [
+  {
+    ...terraces, freeDrive: false, id: 'incline-hold', title: '坂の途中で止まる',
+    description: '2段目の12°坂で、破線の間の緑枠に入り、速さ0.05 m/s以下を3秒保ちます。',
+    budget: 999, timeLimit: 60,
+    goal: [-10, 10, 4, 8, -65, -59],
+    mission: {
+      starter: CAR_LESSON('12°坂の緑枠で3秒止まろう', '目標位置は z = −62。目標までの距離と前後の速度を使って出力を調整しよう。',
+        '  ENGINE = 300                   -- ここを書こう（残りは z + 62、近づいたら vz で減速）'),
+      hold: { kind: 'stop', maxSpeed: 0.05, seconds: 3 },
+      hint: '目標速度は残りの距離 z + 62 に合わせ、上限は6 m/s程度に。速度との差で出力を決め、坂を支える分を足そう。',
+    },
+  },
   {
     id: 'cruise',
     title: '速さを保つ',

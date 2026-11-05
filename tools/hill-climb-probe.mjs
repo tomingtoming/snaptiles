@@ -109,4 +109,22 @@ try {
     await page.evaluate(() => window.__sim.reset());
     assert.equal(await page.evaluate(() => window.__sim.climbPasses.size), 0);
   }
+  await page.click('#challenge-open');
+  await page.click('[data-course-section="course-lessons"]');
+  await page.getByRole('button', { name: /坂の途中で止まる/ }).click();
+  await page.waitForFunction(() => location.hash === '#lesson=incline-hold' && window.__sim?.scenario?.id === 'incline-hold');
+  await page.click('#mission-edit');
+  const source = await page.inputValue('#source');
+  await page.fill('#source', source.replace('ENGINE = 300 ', 'ENGINE = math.min(6, (z + 62) * 0.7) * 220 + vz * 220 + 100 '));
+  await page.press('#source', 'Control+Enter');
+  await page.waitForFunction(() => window.__sim?.source.includes('math.min(6'));
+  const position = await page.evaluate(() => {
+    const sim = window.__sim;
+    while (sim.frame < 1800 && sim.missionProgress.held < 89) sim.step();
+    return {z: sim.corePosition().z, held: sim.missionProgress.held, speed: sim.coreVelocity().length()};
+  });
+  assert.equal(position.held, 89); assert.ok(position.z >= -65 && position.z <= -59 && position.speed <= 0.05);
+  await page.waitForFunction(() => document.querySelector('#challenge-result').open);
+  assert.match(await page.textContent('#challenge-result-title'), /クリア！ 坂の途中で止まる/);
+  console.log('Hill hold mission', position, await page.textContent('#challenge-result-body'));
 } finally { await browser.close(); }
