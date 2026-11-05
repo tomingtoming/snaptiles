@@ -5,6 +5,23 @@ import { verifyCourseReplay } from './verify-course-replay.mjs';
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ permissions: ['clipboard-read', 'clipboard-write'] });
+  await page.goto(process.argv[2] + '#car&c=banked-oval');
+  await page.waitForFunction(() => window.__sim?.scenario?.id === 'banked-oval');
+  const custom = (await page.inputValue('#source')) + '\n// practice setup';
+  await page.fill('#source', custom);
+  await page.focus('#view'); await page.keyboard.down('ArrowUp');
+  await page.waitForFunction(() => window.__sim.corePosition().z < -4);
+  await page.keyboard.up('ArrowUp');
+  await page.getByRole('button', { name: 'タイムアタックへ', exact: true }).click();
+  await page.waitForFunction(() => window.__sim?.scenario?.id === 'oval-lap');
+  const start = await page.evaluate(() => ({ z: window.__sim.corePosition().z, gates: window.__sim.ringsPassed, source: window.__sim.source }));
+  assert.ok(Math.abs(start.z) < 1); assert.equal(start.gates, 0); assert.equal(start.source, custom);
+  await page.click('#challenge-open');
+  assert.equal(await page.locator('#challenge-list button').filter({hasText:'バンク付き周回路'}).count(), 1);
+  await page.locator('#challenge-dialog form button').click();
+  await page.getByRole('button', { name: '自由走行に戻る', exact: true }).click();
+  await page.waitForFunction(() => window.__sim?.scenario?.id === 'banked-oval');
+  assert.equal(await page.inputValue('#source'), custom);
   const runLap = async launch => {
     await page.goto(process.argv[2] + '#car&c=oval-lap');
     await page.waitForFunction(() => window.__sim?.scenario?.id === 'oval-lap');

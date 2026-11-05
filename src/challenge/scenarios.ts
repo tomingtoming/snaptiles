@@ -321,7 +321,7 @@ const slickBrakeTrack = brakeTrack(false);
 const normalBrakeTrack = brakeTrack(true);
 const offshoreInlet = inlet(true);
 const islands = archipelago();
-const oval = bankedOval();
+const oval = { ...bankedOval(), compareTerrain: { id: 'oval-lap', label: 'タイムアタックへ' } };
 
 export const FREE_DRIVES: Scenario[] = [
   inlet(),
@@ -375,7 +375,7 @@ export const FREE_DRIVES: Scenario[] = [
 
 export const SCENARIOS: Scenario[] = [
   {
-    ...oval, freeDrive: false, id: 'oval-lap', title: 'バンク周回タイムアタック',
+    ...oval, freeDrive: false, compareTerrain: { id: oval.id, label: '自由走行に戻る' }, id: 'oval-lap', title: 'バンク周回タイムアタック',
     description: '右回りに黄色いリングを順に抜け、白いスタートラインに戻るまでのタイムを競います。',
     budget: 45, timeLimit: 90,
     sectors: [

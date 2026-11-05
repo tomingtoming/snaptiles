@@ -137,7 +137,7 @@ export class ChallengeUI {
     };
     $('challenge-list').replaceChildren(
       heading('course-free', '自由走行'),
-      ...FREE_DRIVES.map(s => button(this.active?.compareTerrain?.id === s.id ? this.active : s)),
+      ...FREE_DRIVES.map(s => button(this.active?.freeDrive && this.active.compareTerrain?.id === s.id && !FREE_DRIVES.includes(this.active) ? this.active : s)),
       heading('course-trials', 'お題（予算内で組んでゴールへ）'), ...SCENARIOS.map(button),
       heading('course-lessons', 'ミッション（Luaで制御の練習。機体はミッションのものに替わります）'), ...MISSIONS.map(button),
     );
