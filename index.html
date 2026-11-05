@@ -20,6 +20,8 @@
         <input id="model-file" type="file" accept=".rc,.rcd,.txt" hidden />
         <button id="help" type="button" aria-label="使い方" title="使い方">?</button>
         <button id="build" type="button" aria-pressed="false">組む</button>
+        <button id="lua-narrow" type="button">組立画面に戻る</button>
+        <button id="lua-reference" type="button" aria-controls="script-tools" aria-expanded="false">関数・ひな形</button>
         <button id="run" type="button" aria-label="実行" title="実行（ソース欄ではCtrl / ⌘ + Enter）">▶</button>
       </header>
       <section id="builder" hidden aria-label="モデル編集">
@@ -39,7 +41,7 @@
         <details id="appearance"><summary>色</summary><div class="edit-row"><label>部品の色<input id="part-color" type="color" /></label><button id="reset-color" type="button">既定色</button><span id="color-note"></span></div></details>
         <details id="placement"><summary>名前・接続先</summary><button id="name-part" type="button">部品名…</button><button id="move-branch" type="button">枝を移動…</button></details>
         <details id="script-tools"><summary>スクリプト（Lua）</summary>
-          <div class="edit-row"><button id="script-goto" type="button">Luaへ移動</button></div>
+          <div class="edit-row"><button id="script-goto" type="button">Luaへ移動</button><button id="lua-expand" type="button">Luaを広く編集</button></div>
           <div class="edit-row"><label>関数を探す<input id="api-search" type="search" placeholder="例: _KEY、高さ" autocomplete="off" /></label></div>
           <select id="api-list" size="5" aria-label="Luaの関数"></select>
           <p id="api-desc" role="status"></p>
@@ -200,7 +202,7 @@
       <p><strong>モデルの切替を戻す：</strong>ファイルやサンプルを開いた後も、「組む」の取り消しで直前のソース・保存名へ戻れます。これは今開いているページ内の履歴です。残したいモデルはファイルに保存してください。</p>
       <p><strong>接続方向：</strong>N / W / E / Sの追加ボタンに、選んだ部品からその方向へ接続している子の数を表示します。「空き」は子がない方向です。同じ方向への追加・貼り付けもできるため、角度が同じだと部品が重なる場合があります。3D画面の選択部品に出るN / W / E / Sの印を押しても、同じように追加・貼り付けできます。</p>
       <p><strong>複数選択：</strong>3D画面でShift / Ctrl＋クリックすると、部品を選択に加える・外すことができます（タッチでは「複数選択」を押してからタップ）。青い枠が追加で選んだ部品です。種類・角度・色・削除はまとめて変わり、Undoも1回で戻ります。一覧から選ぶか「選択を解除」で1つの選択に戻ります。</p>
-      <p><strong>スクリプト：</strong>「スクリプト（Lua）」の「Luaへ移動」でLuaの部分へ移動します（無ければOnFrameのひな形を追加）。関数を検索して説明を見ながらカーソル位置に挿入でき、値の表示・キー操作・高さや傾きを保つ制御のひな形もあります。エラーの行番号が出たら、ステータスの下の「エラーの行へ」でその行を選択します。</p>
+      <p><strong>スクリプト：</strong>「スクリプト（Lua）」の「Luaへ移動」でLuaの部分へ移動します（無ければOnFrameのひな形を追加）。「Luaを広く編集」を押すと本文が広がり、「関数・ひな形」で挿入ツールを開閉できます。関数を検索して説明を見ながらカーソル位置に挿入でき、値の表示・キー操作・高さや傾きを保つ制御のひな形もあります。エラーの行番号が出たら、ステータスの下の「エラーの行へ」でその行を選択します。</p>
       <p><strong>Luaを書く：</strong>ソース欄の左に行番号が出ます（押すとその行にブレークポイント）。Luaの部分では、入力に合わせて候補が出ます。モデル自身の変数・Val・部品名・APIの関数・Luaの言葉が候補で、↑↓で選んでEnterかTabで入力、Escで閉じます。Ctrl＋Spaceで呼び出せます。文法の誤りは入力中に行番号の赤い印と下の行で知らせます（実行はしません）。実行中にLuaだけ書き換えたら「Luaを反映」（Ctrl＋Shift＋Enter）で、止めずに差し替えられます。変数の値は引き継ぎ、書き換えた初期値だけが新しくなります。</p>
       <p><strong>デバッグ（🐞）：</strong>実行中の走りは毎フレーム記録されています。🐞で開く欄では、ValとLuaの変数を見られます（☐で選ぶとグラフ表示）。|▶ / ◀| または . / , で1コマ進む・戻る。タイムラインをドラッグすると、その時点まで巻き戻せます（記録した入力で最初から計算し直すので、同じ結果になります）。行番号か「カーソル行」でブレークポイントを置くと、その行を実行したフレームで一時停止し、その行のローカル変数を表示します。止まるのはその行を実行する直前で、フレームの途中です（物理はまだ進んでいません）。「次の行」で1行ずつ進め、「このフレームを最後まで」か「続行」で再開します。途中で止まっている間は、コンソールとLuaの差し替えは使えません（記録を再生したときに同じ結果にならないため）。条件（例：<code>t &gt; 30</code>、その行のローカル変数も使える）や「何回目から」も指定できます。欄の左下のコンソールでは、走っているモデルにLuaの式を打ち込めます。書き換え・コンソールも記録されるので、巻き戻しても同じ結果になります。</p>
       <p><strong>地形・お題</strong>で走る場所を選べます。自由走行の「峠」は登坂や旋回、「波状路」は車輪や足回りの試走向けです。「地形図」を開くと、白い点で現在地を確認できます。動いている間、点の矢印が実際に進んでいる方向を指します。</p>

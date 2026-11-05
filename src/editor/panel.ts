@@ -240,6 +240,25 @@ export class BuildPanel {
       else this.source.setSelectionRange(lua, lua);
       reveal();
     };
+    const reference = document.getElementById('lua-reference')!;
+    const expand = document.getElementById('lua-expand')!;
+    expand.onclick = () => {
+      const lua = this.luaBlockOffset();
+      document.body.classList.add('lua-wide');
+      reference.setAttribute('aria-expanded', 'false');
+      if (lua === null || this.source.selectionStart < lua) document.getElementById('script-goto')!.click();
+      else reveal();
+    };
+    reference.onclick = () => {
+      const open = document.body.classList.toggle('lua-reference-open');
+      reference.setAttribute('aria-expanded', String(open));
+      if (open) search.focus(); else this.source.focus();
+    };
+    document.getElementById('lua-narrow')!.onclick = () => {
+      document.body.classList.remove('lua-wide', 'lua-reference-open');
+      reference.setAttribute('aria-expanded', 'false');
+      expand.focus();
+    };
     const errorRow = document.getElementById('script-error')!;
     const paintError = () => {
       const hit = diagnosticLine(this.source.value, this.status.textContent ?? '');
@@ -292,7 +311,7 @@ export class BuildPanel {
   }
   close(): void {
     this.active = false; this.panel.hidden = true;
-    this.toggle.setAttribute('aria-pressed', 'false'); document.body.classList.remove('building');
+    this.toggle.setAttribute('aria-pressed', 'false'); document.body.classList.remove('building', 'lua-wide', 'lua-reference-open');
     this.scene.selectTile(null);
   }
   private captureSourceView(): void {

@@ -14,6 +14,26 @@ try{
  assert.equal(await page.evaluate(()=>document.activeElement.id),'source');
  const caret=await page.evaluate(()=>document.querySelector('#source').selectionStart);
  assert.equal(caret,(body+'Lua {\nfunction OnFrame()\n  ').length);
+ // The expanded layout uses the same textarea, selection, and assembly.
+ for (const [width,height] of [[1440,900],[390,844]]) {
+  await page.setViewportSize({width,height});
+  const part=await page.inputValue('#parts');
+  await page.click('#lua-expand');
+  const box=await page.locator('#source').boundingBox();
+  assert.ok(box.width > width*0.6 && box.height > height*0.65, JSON.stringify(box));
+  assert.equal(await page.evaluate(()=>document.querySelector('#source').selectionStart),caret);
+  await page.keyboard.type('-- edit');await page.keyboard.press('Backspace');
+  assert.match(await page.inputValue('#source'),/-- edi/);
+  for(let i=0;i<6;i++) await page.keyboard.press('Backspace');
+  await page.click('#lua-reference');
+  assert.equal(await page.isVisible('#api-search'),true);
+  await page.click('#lua-reference');
+  await page.click('#lua-narrow');
+  assert.equal(await page.inputValue('#parts'),part);
+  assert.equal(await page.inputValue('#source'),body+'Lua {\nfunction OnFrame()\n  \nend\n}\n');
+  console.log('Lua editing area at', width, height, Math.round(box.width), Math.round(box.height));
+ }
+ await page.setViewportSize({width:1280,height:800});
  // search the reference and insert at the caret
  await page.fill('#api-search','高さ');
  const listed=await page.locator('#api-list option').allTextContents();
@@ -31,7 +51,8 @@ try{
  await page.click('#edit-undo');assert.equal(await page.inputValue('#source'),body+'Lua {\nfunction OnFrame()\n  _H(0)\nend\n}\n');
  // a runtime error names its line; the button outside the builder selects that line
  const broken=body+'Lua {\nfunction OnFrame()\n  P = nosuch.field\nend\n}\n';
- await page.fill('#source',broken);await page.click('#run');
+ await page.fill('#source',broken);await page.click('#lua-expand');await page.click('#run');
+ await page.waitForFunction(()=>!document.body.classList.contains('lua-wide'));
  await page.waitForFunction(()=>/line \d+:/.test(document.querySelector('#status').textContent));
  assert.equal(await page.locator('#script-error').isVisible(),true);
  assert.match(await page.locator('#script-error-text').textContent(),/エラー: 5行目/);
