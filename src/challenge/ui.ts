@@ -16,7 +16,7 @@ export interface ChallengeHost {
   editLesson(): void;
 }
 
-interface Best { time: number; cost: number }
+interface Best { time: number; cost: number; sectorDurations?: number[] }
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -288,25 +288,36 @@ export class ChallengeUI {
     // Results judge the completed frame, including the final one in the recording.
     const verified = !!sim.player && sim.frame > 0 && sim.frame <= sim.player.frames;
     const lua = !!sim.model.script;
+    const previousBest = this.best(s);
+    const sectorDurations = sim.sectorFrames.map((frame, i) => frame - (sim.sectorFrames[i - 1] ?? sim.lapStartFrame));
+    let best = previousBest;
     let note = '';
     if (cleared && within && !verified) {
-      const best = this.best(s);
-      const next: Best = { time: Math.min(time, best?.time ?? Infinity), cost: Math.min(cost, best?.cost ?? Infinity) };
-      if (!best || next.time < best.time || next.cost < best.cost) {
-        note = best ? '自己ベスト更新！' : '初クリア！';
-        try { localStorage.setItem(`snaptiles.challenge.${s.id}`, JSON.stringify(next)); } catch { /* private mode: no best */ }
+      const faster = !best || time < best.time;
+      const cheaper = !best || cost < best.cost;
+      // An old best may lack splits. Only an equally fast or faster lap can supply them.
+      const saveSectors = !!s.sectors && (faster || (time === best?.time && !best.sectorDurations));
+      if (faster || cheaper || saveSectors) {
+        if (faster || cheaper) note = best ? '自己ベスト更新！' : '初クリア！';
+        best = {
+          ...best, time: Math.min(time, best?.time ?? Infinity), cost: Math.min(cost, best?.cost ?? Infinity),
+          ...(saveSectors ? { sectorDurations } : {}),
+        };
+        try { localStorage.setItem(`snaptiles.challenge.${s.id}`, JSON.stringify(best)); } catch { /* private mode */ }
       }
     }
-    const best = this.best(s);
     $('challenge-result-title').textContent = cleared ? (within ? `クリア！ ${s.title}` : `ゴール（予算オーバー）${s.title}`) : `時間切れ ${s.title}`;
     const dl = document.createElement('dl');
     const row = (k: string, v: string) => { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); };
     if (cleared) row('タイム', `${time.toFixed(2)} 秒`);
     if (s.sectors) {
       if (sim.lapStartFrame) row('リセットまで', (sim.lapStartFrame / FRAME_RATE).toFixed(2) + ' 秒');
-      sim.sectorFrames.forEach((frame, index) => {
-        const previous = sim.sectorFrames[index - 1] ?? sim.lapStartFrame;
-        row(s.sectors![index].name, ((frame - previous) / FRAME_RATE).toFixed(2) + ' 秒');
+      sectorDurations.forEach((frames, index) => {
+        const baseline = previousBest?.sectorDurations?.[index];
+        const delta = typeof baseline === 'number' ? frames - baseline : undefined;
+        const comparison = delta === undefined ? '' : delta === 0 ? '（自己最速周と同じ）'
+          : '（自己最速周より' + (Math.abs(delta) / FRAME_RATE).toFixed(2) + (delta < 0 ? ' 秒早い）' : ' 秒遅い）');
+        row(s.sectors![index].name, (frames / FRAME_RATE).toFixed(2) + ' 秒' + comparison);
       });
     }
     if (!s.mission) row('コスト', `${cost} / ${s.budget}${within ? '' : '（予算オーバー：記録になりません）'}`);
