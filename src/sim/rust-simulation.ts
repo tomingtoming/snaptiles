@@ -16,7 +16,7 @@ import {
   TILE, TILE_STRIDE, type ApiName,
 } from './core-layout';
 import { Recording, type Command, type FrameInput } from './replay';
-import { box, entersBrakingGate, inBox, MissionProgress, type Scenario, type Solid } from '../challenge/scenarios';
+import { box, crossesBrakingGate, inBox, MissionProgress, type Scenario, type Solid } from '../challenge/scenarios';
 
 let corePromise: Promise<SnapTilesCoreModule> | null = null;
 /** load (once) and instantiate the Emscripten module */
@@ -129,6 +129,7 @@ export class RustSimulation implements SimView {
   scriptError: string | null = null;
   ticks = 0;
   checkpointPassed = false;
+  brakingEntryKmh?: number;
   groundRange?: number;
   readonly missionProgress: MissionProgress | null;
   lines3d: number[] = [];
@@ -364,9 +365,12 @@ export class RustSimulation implements SimView {
         progress.step(this.frame, core, this.coreVelocity(), this.groundRange);
       }
       if (!this.checkpointPassed && this.scenario?.checkpoint) {
-        this.checkpointPassed = test
-          ? !!before && entersBrakingGate(this.scenario.checkpoint, before, core.position, -core.vel.z * 3.6, test.entryKmh)
-          : inBox(this.scenario.checkpoint, this.corePosition());
+        if (!test) {
+          this.checkpointPassed = inBox(this.scenario.checkpoint, this.corePosition());
+        } else if (before && crossesBrakingGate(this.scenario.checkpoint, before, core.position)) {
+          this.brakingEntryKmh = Math.max(0, -core.vel.z * 3.6);
+          this.checkpointPassed = this.brakingEntryKmh >= test.entryKmh;
+        }
       }
     }
     const hit = m.UTF8ToString(m._core_break(this.id));

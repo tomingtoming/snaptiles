@@ -60,6 +60,24 @@ try {
     console.log(turn ? 'Lateral travel at 0.8 s' : 'Braking distance', { dry, slick });
   }
 
+  await page.goto(process.argv[2] + '#car&c=braking-box');
+  await page.waitForFunction(() => window.__sim?.scenario?.id === 'braking-box');
+  const slow = (await page.inputValue('#source')).replace('out(0, "km/h", v * 3.6)', 'ENGINE = (5 + _VZ(0)) * 200');
+  await page.fill('#source', slow);
+  await page.keyboard.press('Control+Enter');
+  await page.waitForFunction(source => window.__sim?.source === source, slow);
+  await page.evaluate(() => {
+    const step = document.getElementById('debug-forward');
+    for (let i = 0; i < 500 && window.__sim.brakingEntryKmh === undefined; i++) step.click();
+  });
+  await page.waitForFunction(() => document.getElementById('challenge-banner-text').textContent.includes('速度不足'));
+  const slowKmh = await page.evaluate(() => window.__sim.brakingEntryKmh);
+  assert.ok(slowKmh > 0 && slowKmh < 36);
+  await page.click('#brake-retry');
+  await page.waitForFunction(() => window.__sim && window.__sim.frame < 30 && window.__sim.brakingEntryKmh === undefined);
+  assert.equal(await page.inputValue('#source'), slow);
+  assert.equal(await page.isVisible('#brake-retry'), false);
+  console.log('Slow entry measured at', slowKmh.toFixed(1), 'km/h; retry kept the model.');
   for (const brake of [false, true]) {
     await page.goto(process.argv[2] + '#car&c=braking-box');
     await page.reload();

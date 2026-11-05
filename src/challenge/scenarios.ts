@@ -578,15 +578,13 @@ export function holds(
 
 /** Cross the southern face of the braking gate heading down the marked lane.
  * Interpolate the entry point even when a fast vehicle clears the whole box in one frame. */
-export function entersBrakingGate(
+export function crossesBrakingGate(
   gate: NonNullable<Scenario['checkpoint']>,
   before: { x: number; y: number; z: number },
   after: { x: number; y: number; z: number },
-  forwardKmh: number,
-  minimumKmh: number,
 ): boolean {
   const [left, right, low, high, , entry] = gate;
-  if (forwardKmh < minimumKmh || before.z <= entry || after.z > entry) return false;
+  if (before.z <= entry || after.z > entry) return false;
   const t = (entry - before.z) / (after.z - before.z);
   const x = before.x + t * (after.x - before.x);
   const y = before.y + t * (after.y - before.y);

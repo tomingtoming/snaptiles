@@ -39,6 +39,7 @@ export class ChallengeUI {
         heading.focus({ preventScroll: true });
       });
     });
+    $('brake-retry').addEventListener('click', () => this.host.reload());
     $('challenge-open').addEventListener('click', () => this.openDialog());
     $('course-restart').addEventListener('click', () => { this.dialog.close(); this.host.reload(); });
     $('challenge-leave').addEventListener('click', () => { this.dialog.close(); this.select(null); });
@@ -104,6 +105,7 @@ export class ChallengeUI {
       this.dialog.close();
     }
     $('mission-edit').hidden = !sim.scenario?.mission;
+    $('brake-retry').hidden = true;
     const compare = $('brake-compare');
     compare.hidden = !sim.scenario?.compareRoad;
     compare.textContent = sim.scenario?.compareRoad?.label ?? '';
@@ -156,9 +158,17 @@ export class ChallengeUI {
     this.banner.classList.toggle('over', over);
     const state = this.cleared !== null ? '・クリア！' : this.failed ? '・時間切れ' : '';
     const checkpoint = s.checkpoint ? (!sim.checkpointPassed ? '｜黄色の中間地点へ' : '｜中間地点通過・緑のゴールへ') : '';
-    const driving = s.brakingTest
-      ? (sim.checkpointPassed ? `｜緑枠内で${s.brakingTest.stopKmh}km/h以下` : `｜黄色に${s.brakingTest.entryKmh}km/h以上で進入`)
-      : checkpoint;
+    let driving = checkpoint;
+    if (s.brakingTest) {
+      const entry = sim.brakingEntryKmh;
+      const slow = entry !== undefined && !sim.checkpointPassed;
+      $('brake-retry').hidden = !slow;
+      // Round down so a measured 35.99 never reads as a qualifying 36.0.
+      const measured = entry === undefined ? '' : '進入 ' + (Math.floor(entry * 10) / 10).toFixed(1) + 'km/h・';
+      driving = sim.checkpointPassed
+        ? `｜${measured}緑枠内で${s.brakingTest.stopKmh}km/h以下`
+        : `｜${measured}黄色に${s.brakingTest.entryKmh}km/h以上で進入${slow ? '（速度不足）' : ''}`;
+    }
     const zone = !sim.checkpointPassed && s.checkpoint ? s.checkpoint : s.goal;
     const altitude = s.showGateAltitude && zone ? `（高度${zone[2]}〜${zone[3]}m）` : '';
     let hint = s.mission?.hint;
@@ -214,6 +224,10 @@ export class ChallengeUI {
     const row = (k: string, v: string) => { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); };
     if (cleared) row('タイム', `${time.toFixed(2)} 秒`);
     if (!s.mission) row('コスト', `${cost} / ${s.budget}${within ? '' : '（予算オーバー：記録になりません）'}`);
+    if (cleared && s.brakingTest && sim.brakingEntryKmh !== undefined) {
+      row('進入速度', sim.brakingEntryKmh.toFixed(1) + ' km/h');
+      row('停止判定時', (sim.coreVelocity().length() * 3.6).toFixed(2) + ' km/h');
+    }
     row('Lua', lua ? '使用' : 'なし');
     if (verified) row('記録', 'リンクの走りをこのブラウザで再計算して確認済み');
     if (best) row('自己ベスト', `${best.time.toFixed(2)} 秒 / コスト ${best.cost}`);
