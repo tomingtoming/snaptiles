@@ -64,9 +64,13 @@
         <div id="map-slot">
           <details id="terrain-map" hidden>
             <summary>地形図</summary>
-            <svg role="img" aria-label="上が北。白い点が現在地、矢印が進行方向、黄色が中間地点、緑がゴール"></svg>
-            <small></small>
-            <small class="contour-key" hidden></small>
+            <div class="map-content">
+              <svg role="img" aria-label="上が北。白い点が現在地、矢印が進行方向、黄色が中間地点、緑がゴール"></svg>
+              <div class="map-legend">
+                <small></small>
+                <small class="contour-key" hidden></small>
+              </div>
+            </div>
           </details>
         </div>
         <div id="keys"></div>
