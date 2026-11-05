@@ -140,10 +140,11 @@ const challenge = new ChallengeUI({
     const rhs = code.slice(code.indexOf('=') + 1).trimStart();
     builder.focusSourceRange(match.index + code.length - rhs.length, match.index + code.length);
   },
-  recordLink: async () => {
+  recordLink: async (finishFrame) => {
     const s = sim!;
+    const run = s.recording.slice(finishFrame);
     const url = new URL(location.href);
-    url.hash = `m=${await encodeText(s.source)}${s.scenario ? `&c=${s.scenario.id}` : ''}&r=${await encodeRecording(s.recording)}`;
+    url.hash = `m=${await encodeText(s.source)}${s.scenario ? `&c=${s.scenario.id}` : ''}&r=${await encodeRecording(run)}`;
     return url.href;
   },
 });
@@ -679,10 +680,10 @@ async function makeShareLink(): Promise<void> {
   try {
     if (!parseRc(text).body) throw new Error('Body がありません');
     const course = sim?.scenario;
-    const includeRun = run && shareRun.checked;
-    const lesson = includeRun ? null : lessonFragment(text, course);
+    const selectedRun = run && shareRun.checked ? run.slice(run.frames) : null;
+    const lesson = selectedRun ? null : lessonFragment(text, course);
     const fragment = lesson ?? `m=${await encodeHash(text)}${course ? `&c=${course.id}` : ''}`;
-    const recording = includeRun ? await encodeRecording(run) : null;
+    const recording = selectedRun ? await encodeRecording(selectedRun) : null;
     if (request !== shareGeneration || !shareDialog.open) return;
     const url = new URL(location.href);
     url.hash = fragment + (recording ? `&r=${recording}` : '');

@@ -116,12 +116,18 @@ try {
       const measurements = await page.locator('#challenge-result-body dd').allTextContents();
       const stop = await page.evaluate(() => window.__sim.scenario.brakeLine - window.__sim.corePosition().z);
       assert.ok(measurements.includes(stop.toFixed(2) + ' m先'));
+      const finishFrame = await page.evaluate(() => window.__sim.frame);
+      await page.evaluate(() => {
+        for (let i = 0; i < 60; i++) document.getElementById('debug-forward').click();
+      });
+      assert.equal(await page.evaluate(() => window.__sim.frame), finishFrame + 60);
       await page.click('#challenge-copy');
       await page.waitForFunction(() => document.getElementById('challenge-result-status').textContent.includes('コピーしました'));
       const link = await page.evaluate(() => navigator.clipboard.readText());
       const receiver = await browser.newPage();
       await receiver.goto(link);
       await receiver.waitForFunction(() => window.__sim?.replaying);
+      assert.equal(await receiver.evaluate(() => window.__sim.player.frames), finishFrame);
       await receiver.evaluate(() => {
         const step = document.getElementById('debug-forward');
         for (let i = 0; i < 900 && !document.getElementById('challenge-result').open; i++) step.click();

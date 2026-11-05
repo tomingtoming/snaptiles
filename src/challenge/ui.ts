@@ -12,7 +12,7 @@ export interface ChallengeHost {
   /** reload the current source with the chosen challenge (or none); `source` replaces it first (a mission's model) */
   reload(source?: string): void;
   /** a link to the current model, challenge and run */
-  recordLink(): Promise<string>;
+  recordLink(finishFrame: number): Promise<string>;
   editLesson(): void;
 }
 
@@ -51,8 +51,9 @@ export class ChallengeUI {
     $('challenge-quit').addEventListener('click', () => this.select(null));
     $('challenge-retry').addEventListener('click', () => { this.result.close(); this.host.reload(); });
     $('challenge-copy').addEventListener('click', async () => {
+      if (this.cleared === null) return;
       try {
-        await navigator.clipboard.writeText(await this.host.recordLink());
+        await navigator.clipboard.writeText(await this.host.recordLink(this.cleared));
         this.status.textContent = '記録リンクをコピーしました';
       } catch {
         this.status.textContent = 'コピーできませんでした';
