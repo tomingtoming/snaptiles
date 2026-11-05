@@ -19,6 +19,9 @@ jobs:
       - name: Ground terrain and braking
         run: node tools/editor-ci.mjs terrain-ground
         timeout-minutes: 5
+      - name: Inlet, raft and measured water runs
+        run: node tools/editor-ci.mjs terrain-water
+        timeout-minutes: 5
       - name: Flight courses and navigation
         run: node tools/editor-ci.mjs terrain-flight
         timeout-minutes: 5

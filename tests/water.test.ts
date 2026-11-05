@@ -79,3 +79,33 @@ it.each([0, 45, 90])('keeps the raft upright for 150 m when thrust begins at fra
     expect(Math.abs(-sim.coreVelocity().z - 10.969)).toBeLessThan(0.7);
   } finally { await sim.dispose(); }
 });
+
+it('measures every station once, reproduces the log on a replay and restarts timing on reset', async () => {
+  const scenario = scenarioById('tow-basin');
+  const keys = new KeyState(new EventTarget());
+  const live = new RustSimulation(RAFT, keys, { scenario });
+  const replay = new RustSimulation(RAFT, new KeyState(new EventTarget()), { scenario });
+  try {
+    await live.start();
+    keys.press(0);
+    const finish = () => {
+      for (let i = 0; i < 700 && live.waterPasses.size < 6; i++) live.step();
+      return [...live.waterPasses];
+    };
+    const first = finish();
+    expect(first.map(([distance]) => distance)).toEqual([25, 50, 75, 100, 125, 150]);
+    for (let i = 1; i < first.length; i++) {
+      expect(first[i][1].seconds).toBeGreaterThan(first[i - 1][1].seconds);
+      expect(first[i][1].speedKmh).toBeGreaterThan(34);
+    }
+    await replay.start();
+    replay.player = live.recording;
+    while (replay.frame < live.frame) replay.step();
+    expect([...replay.waterPasses]).toEqual(first);
+    live.reset();
+    expect(live.waterPasses.size).toBe(0);
+    const second = finish();
+    expect(second.length).toBe(6);
+    expect(second[0][1].seconds).toBeLessThan(6);
+  } finally { await live.dispose(); await replay.dispose(); }
+});

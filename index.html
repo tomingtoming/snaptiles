@@ -59,7 +59,7 @@
         <div id="flight-readouts">
           <pre id="vals"></pre>
           <pre id="out"></pre>
-          <div id="challenge-banner" hidden role="status"><span id="challenge-banner-text"></span><button id="mission-edit" type="button" title="一時停止して課題の行へ。Ctrl+Enterで試す" hidden>Luaを編集</button><button id="brake-compare" type="button" hidden></button><button id="brake-retry" type="button" hidden>再走</button><button id="challenge-quit" type="button">平地に戻る</button></div>
+          <div id="challenge-banner" hidden role="status"><span id="challenge-banner-text"></span><button id="mission-edit" type="button" title="一時停止して課題の行へ。Ctrl+Enterで試す" hidden>Luaを編集</button><button id="brake-compare" type="button" hidden></button><button id="water-log" type="button" hidden>通過記録</button><button id="brake-retry" type="button" hidden>再走</button><button id="challenge-quit" type="button">平地に戻る</button></div>
         </div>
         <div id="map-slot">
           <details id="terrain-map" hidden>
@@ -110,6 +110,13 @@
         <p class="challenge-costs">コスト：Chip・Frame 1、Rudder・Trim 2、Weight 3、Wheel・RLW 5、Jet・Arm 8、Core・Cowl 0。Luaも使えます（記録に「Lua使用」と出ます）。</p>
       </div>
       <div class="share-actions"><button id="course-restart" type="button">最初から走る</button><button id="challenge-leave" type="button">平地に戻る</button><form method="dialog"><button>閉じる</button></form></div>
+    </dialog>
+    <dialog id="water-log-dialog" aria-labelledby="water-log-title">
+      <h2 id="water-log-title">水路の通過記録</h2>
+      <p>北向きに左右のブイの間を通った時刻と水平速度です。時刻は開始・リセットから測ります。</p>
+      <p id="water-reference-label" hidden></p>
+      <table><thead><tr><th scope="col">距離</th><th scope="col">通過時刻</th><th scope="col">水平速度</th></tr></thead><tbody id="water-log-rows"></tbody></table>
+      <form method="dialog"><button id="water-reference" type="button">この走行を基準にする</button><button id="water-reference-clear" type="button" hidden>基準を外す</button><button>閉じる</button></form>
     </dialog>
     <dialog id="challenge-result" aria-labelledby="challenge-result-title">
       <h2 id="challenge-result-title"></h2>

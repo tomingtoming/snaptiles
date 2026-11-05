@@ -131,6 +131,8 @@ export class RustSimulation implements SimView {
   ticks = 0;
   checkpointPassed = false;
   ringsPassed = 0;
+  readonly waterPasses = new Map<number, { seconds: number; speedKmh: number }>();
+  private waterStartFrame = 0;
   brakingEntryKmh?: number;
   groundRange?: number;
   readonly missionProgress: MissionProgress | null;
@@ -288,6 +290,8 @@ export class RustSimulation implements SimView {
 
   private resetCore(): void {
     if (!this.assembly || !this.m || this.id < 0) return;
+    this.waterPasses.clear();
+    this.waterStartFrame = this.frame;
     this.m._core_reset(this.id);
     this.read(); // default Vals back from the core
     this.assembly = assemble(this.model, this.env) ?? this.assembly; // fresh rest poses, nothing detached
@@ -361,7 +365,9 @@ export class RustSimulation implements SimView {
     const m = this.m!;
     const test = this.scenario?.brakingTest;
     const rings = this.scenario?.rings;
-    const trackMotion = (test && !this.checkpointPassed) || (rings && this.ringsPassed < rings.length);
+    const stations = this.scenario?.waterStations;
+    const trackWater = stations && this.waterPasses.size < stations.distances.length;
+    const trackMotion = trackWater || (test && !this.checkpointPassed) || (rings && this.ringsPassed < rings.length);
     const before = trackMotion ? this.physics.tiles[0]?.position.clone() : undefined;
     this.read();
     if (!this.midFrame) {
@@ -371,6 +377,20 @@ export class RustSimulation implements SimView {
       if (progress?.scenario.mission?.hold.kind === 'clearance') this.groundRange = m._core_ground_range(this.id, 0);
       if (progress && progress.clearedAt === null && core && this.frame <= progress.scenario.timeLimit * FRAME_RATE) {
         progress.step(this.frame, core, this.coreVelocity(), this.groundRange);
+      }
+      if (trackWater && before && core && this.scenario?.water && before.z > core.position.z) {
+        const after = core.position;
+        for (const distance of stations.distances) {
+          if (this.waterPasses.has(distance) || before.z <= -distance || after.z > -distance) continue;
+          const fraction = (before.z + distance) / (before.z - after.z);
+          const x = before.x + fraction * (after.x - before.x);
+          const y = before.y + fraction * (after.y - before.y);
+          if (x < stations.left || x > stations.right || y > this.scenario.water[4] + 1) continue;
+          this.waterPasses.set(distance, {
+            seconds: (this.frame - 1 + fraction - this.waterStartFrame) / FRAME_RATE,
+            speedKmh: Math.hypot(after.x - before.x, after.z - before.z) * FRAME_RATE * 3.6,
+          });
+        }
       }
       if (rings && before && core) this.ringsPassed = advanceRings(rings, this.ringsPassed, before, core.position);
       if (!this.checkpointPassed && this.scenario?.checkpoint) {

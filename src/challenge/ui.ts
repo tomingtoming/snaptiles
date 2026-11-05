@@ -39,6 +39,24 @@ export class ChallengeUI {
         heading.focus({ preventScroll: true });
       });
     });
+    $('water-reference').addEventListener('click', () => {
+      const sim = this.host.sim();
+      if (!sim?.waterPasses.size || !sim.scenario) return;
+      const name = document.querySelector('#samples [aria-current="true"]')?.textContent ?? '編集中の機体';
+      this.waterReference = { name, course: sim.scenario.id, passes: new Map(sim.waterPasses) };
+      this.renderWaterLog(sim);
+    });
+    $('water-reference-clear').addEventListener('click', () => {
+      this.waterReference = undefined;
+      const sim = this.host.sim();
+      if (sim) this.renderWaterLog(sim);
+    });
+    $('water-log').addEventListener('click', () => {
+      const sim = this.host.sim();
+      if (!sim?.scenario?.waterStations) return;
+      this.renderWaterLog(sim);
+      ($('water-log-dialog') as HTMLDialogElement).showModal();
+    });
     $('brake-retry').addEventListener('click', () => this.host.reload());
     $('challenge-open').addEventListener('click', () => this.openDialog());
     $('course-restart').addEventListener('click', () => { this.dialog.close(); this.host.reload(); });
@@ -59,6 +77,40 @@ export class ChallengeUI {
         this.status.textContent = 'コピーできませんでした';
       }
     });
+  }
+
+  private waterReference?: { name: string; course: string; passes: RustSimulation['waterPasses'] };
+  private renderedWaterCount = -1;
+  private renderWaterLog(sim: RustSimulation): void {
+    if (!sim.scenario?.waterStations) return;
+    this.renderedWaterCount = sim.waterPasses.size;
+    const reference = this.waterReference?.course === sim.scenario.id ? this.waterReference : undefined;
+    ($('water-reference') as HTMLButtonElement).disabled = sim.waterPasses.size === 0;
+    $('water-reference-clear').hidden = !reference;
+    $('water-reference-label').hidden = !reference;
+    if (reference) $('water-reference-label').textContent = '基準：' + reference.name + '（' + reference.passes.size + '地点）。下段は基準との差。';
+    const rows = sim.scenario.waterStations.distances.map(distance => {
+      const pass = sim.waterPasses.get(distance);
+      const row = document.createElement('tr');
+      const mark = document.createElement('th');
+      mark.scope = 'row';
+      mark.textContent = distance + ' m';
+      row.append(mark);
+      const base = reference?.passes.get(distance);
+      for (const [field, precision, unit] of [['seconds', 2, '秒'], ['speedKmh', 1, 'km/h']] as const) {
+        const cell = document.createElement('td');
+        cell.textContent = pass ? pass[field].toFixed(precision) + ' ' + unit : '—';
+        if (pass && base) {
+          const difference = Number((pass[field] - base[field]).toFixed(precision));
+          const note = document.createElement('small');
+          note.textContent = (difference > 0 ? '+' : '') + difference.toFixed(precision) + ' ' + unit;
+          cell.append(note);
+        }
+        row.append(cell);
+      }
+      return row;
+    });
+    $('water-log-rows').replaceChildren(...rows);
   }
 
   private openDialog(): void {
@@ -106,6 +158,9 @@ export class ChallengeUI {
       this.dialog.close();
     }
     $('mission-edit').hidden = !sim.scenario?.mission;
+    this.renderedWaterCount = -1;
+    if (!sim.scenario?.waterStations) ($('water-log-dialog') as HTMLDialogElement).close();
+    $('water-log').hidden = !sim.scenario?.waterStations;
     $('brake-retry').hidden = true;
     const compare = $('brake-compare');
     compare.hidden = !sim.scenario?.compareTerrain;
@@ -155,6 +210,7 @@ export class ChallengeUI {
         else title += '｜Core 水面上 ' + (y - level).toFixed(2) + 'm';
       }
       if (s.waterStations) {
+        if (($('water-log-dialog') as HTMLDialogElement).open && this.renderedWaterCount !== sim.waterPasses.size) this.renderWaterLog(sim);
         const z = sim.corePosition().z;
         title += '｜出発点から' + (z > 0 ? '南' : '北') + Math.abs(z).toFixed(1) + 'm';
       }

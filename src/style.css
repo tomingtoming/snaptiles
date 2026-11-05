@@ -87,9 +87,9 @@ button:disabled { opacity: .4; cursor: default !important; }
 
 #parts option:checked { background: #59636e; color: var(--ink); }
 
-#share-dialog, #filename-dialog { width: min(520px, calc(100vw - 32px)); padding: 20px; border: 1px solid #59636e; border-radius: 8px; background: var(--panel); color: var(--ink); }
-#share-dialog::backdrop, #filename-dialog::backdrop { background: #0009; }
-#share-dialog h2, #filename-dialog h2 { margin-top: 0; font-size: 18px; }
+#share-dialog, #filename-dialog, #water-log-dialog { width: min(520px, calc(100vw - 32px)); padding: 20px; border: 1px solid #59636e; border-radius: 8px; background: var(--panel); color: var(--ink); }
+#share-dialog::backdrop, #filename-dialog::backdrop, #water-log-dialog::backdrop { background: #0009; }
+#share-dialog h2, #filename-dialog h2, #water-log-dialog h2 { margin-top: 0; font-size: 18px; }
 #share-url, #filename-input { width: 100%; min-height: 44px; background: #15181c; color: var(--ink); border: 1px solid #59636e; padding: 8px; }
 #share-status { overflow-wrap: anywhere; }
 .share-actions { display: flex; justify-content: space-between; gap: 12px; }
@@ -281,3 +281,12 @@ button:disabled { opacity: .4; cursor: default !important; }
 #challenge-list h3 { margin: 8px 0 0; font-size: 13px; color: var(--dim); font-weight: 600; }
 #source-gutter div.cur { background: #b38f00; color: #111; }
 .break-controls { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+
+#water-log-dialog { max-height: calc(100dvh - 32px); overflow: auto; }
+#water-log-dialog table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+#water-log-dialog th, #water-log-dialog td { text-align: right; padding: 5px 8px; border-bottom: 1px solid #39434b; }
+#water-log-dialog th:first-child, #water-log-dialog td:first-child { text-align: left; }
+#water-log-dialog form { margin-top: 12px; text-align: right; }
+
+#water-log-dialog td small { display: block; color: var(--dim); }
+#water-log-dialog form { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
