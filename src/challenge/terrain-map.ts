@@ -33,16 +33,18 @@ export class TerrainMap {
   private svg = this.panel.querySelector('svg')!;
   private caption = this.panel.querySelector('small')!;
   private legend = this.panel.querySelector<HTMLElement>('.contour-key')!;
+  private direction = document.createElementNS(NS, 'polygon');
   private dot = document.createElementNS(NS, 'circle');
   private course: Scenario | null = null;
   private checkpoint: SVGRectElement | null = null;
   private goal: SVGRectElement | null = null;
   private lastTarget: SVGRectElement | null = null;
 
-  update(s: Scenario | null, position: { x: number; z: number } | undefined, passed: boolean): void {
+  update(s: Scenario | null, core: { position: { x: number; z: number }; vel: { x: number; z: number } } | undefined, passed: boolean): void {
     const bounds = s?.terrainBounds;
+    const position = core?.position;
     this.panel.hidden = !bounds || !position;
-    if (this.panel.hidden || !this.panel.open || !s || !position || !bounds) return;
+    if (this.panel.hidden || !this.panel.open || !s || !core || !position || !bounds) return;
     if (this.course !== s) {
       this.draw(s, bounds);
       this.course = s;
@@ -52,6 +54,14 @@ export class TerrainMap {
     const z = Math.max(north, Math.min(south, position.z));
     this.dot.setAttribute('cx', String(x));
     this.dot.setAttribute('cy', String(z));
+    // Indicate travel over the ground, including reverse and sideslip.
+    // At the map edge the clamped dot already represents an outside position.
+    const moving = x === position.x && z === position.z && Math.hypot(core.vel.x, core.vel.z) >= 0.5;
+    this.direction.style.display = moving ? '' : 'none';
+    if (moving) {
+      const angle = Math.atan2(core.vel.x, -core.vel.z) * 180 / Math.PI;
+      this.direction.setAttribute('transform', `translate(${x} ${z}) rotate(${angle})`);
+    }
     const where = x === position.x && z === position.z ? '白点：現在地' : '白点：範囲外の方向';
     const headingForCheckpoint = !!s.checkpoint && !passed;
     const next = headingForCheckpoint ? s.checkpoint : s.goal;
@@ -133,10 +143,15 @@ export class TerrainMap {
     this.lastTarget = null;
     this.checkpoint = s.checkpoint ? zone(s.checkpoint, '#ffc747') : null;
     this.goal = s.goal ? zone(s.goal, '#70f8a0') : null;
+    this.direction.setAttribute('points', `0,${-2.2 * pad} ${0.6 * pad},0 ${-0.6 * pad},0`);
+    this.direction.setAttribute('fill', 'white');
+    this.direction.setAttribute('stroke', '#1b262a');
+    this.direction.setAttribute('vector-effect', 'non-scaling-stroke');
+    this.direction.setAttribute('class', 'map-direction');
     this.dot.setAttribute('r', String(pad * 0.62));
     this.dot.setAttribute('fill', 'white');
     this.dot.setAttribute('stroke', '#1b262a');
     this.dot.setAttribute('vector-effect', 'non-scaling-stroke');
-    this.svg.replaceChildren(fragment, this.dot);
+    this.svg.replaceChildren(fragment, this.direction, this.dot);
   }
 }
