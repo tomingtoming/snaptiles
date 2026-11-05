@@ -327,6 +327,14 @@ export const FREE_DRIVES: Scenario[] = [
 
 export const SCENARIOS: Scenario[] = [
   {
+    ...offshoreInlet, freeDrive: false, compareTerrain: undefined,
+    id: 'inlet-buoys', title: '入り江のブイ航路',
+    description: '水上で黄色のブイの間を北へ抜け、右前方の緑のブイへ。標準のraftは↑で前進、→で右旋回。',
+    budget: 30, timeLimit: 55,
+    checkpoint: [-3, 3, -1, 0.4, -14, -11],
+    goal: [4, 11, -1, 0.4, -26, -22],
+  },
+  {
     ...slickBrakeTrack,
     freeDrive: false,
     compareTerrain: undefined,

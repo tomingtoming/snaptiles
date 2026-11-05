@@ -259,6 +259,7 @@ for (const s of SAMPLES) {
   b.type = 'button';
   b.textContent = s.name;
   b.addEventListener('click', () => {
+    if (s.startTerrain && !challenge.active) challenge.active = scenarioById(s.startTerrain);
     builder.loadSource(s.source);
     refreshSampleButtons();
     void loadAndShare(s.source);

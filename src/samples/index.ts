@@ -1,3 +1,4 @@
+import { RAFT } from './raft';
 import { CAR } from './car';
 import { PLANE } from './plane';
 import { WALKER } from './walker';
@@ -7,6 +8,7 @@ import { TANK } from './tank';
 export interface Sample {
   name: string;
   source: string;
+  startTerrain?: string;
 }
 
 export const SAMPLES: Sample[] = [
@@ -15,4 +17,5 @@ export const SAMPLES: Sample[] = [
   { name: 'walker', source: WALKER },
   { name: 'hover', source: HOVER },
   { name: 'tank', source: TANK },
+  { name: 'raft', source: RAFT, startTerrain: 'inlet-float' },
 ];

@@ -52,7 +52,7 @@ Samples: `car` (↑↓ drive, ←→ steer), `plane` (Z/X throttle, then it lift
 itself; a Lua autopilot holds height and level wings, ↓↑ climb/descend, ←→ bank; to land, X to
 zero throttle and hold ↑: it flares by itself and brakes once down),
 `walker` (↑ walk, ←→ turn; a Lua gait), `hover` (jets with a Lua attitude
-hold; ↑↓←→ move, A/D turn), `tank` (A/D turret, Z fire). The default course has a
+hold; ↑↓←→ move, A/D turn), `tank` (A/D turret, Z fire), and `raft` (↑↓ forward/reverse, ←→ steer the twin jets). Choosing raft from the default course starts it on the water. The default course has a
 ramp, kerbs, a gate, a wall and crates to knock over.
 
 Choose **地形・お題** beside the samples for original SnapTiles terrain. Free drive
@@ -60,7 +60,7 @@ includes a kilometre-wide plateau with four peaks, a mountain pass and a six-hum
 the left to 55 cm on the right. The brake track pairs a low-grip blue lane with
 ordinary pavement. Brake at the white line to compare stopping distances. Timed courses include a drive over the pass,
 a steering course, and a flyover with altitude gates. Cross the yellow
-checkpoint before the green finish. At **入り江の試走場** (#car&c=tidal-inlet), drive north from the beach to test whether your model floats. Chip and Frame rafts rise in deep water. Weight ballast can sink them. **地形図** opens the map while driving.
+checkpoint before the green finish. At **入り江の試走場** (#car&c=tidal-inlet), drive north from the beach to test whether your model floats. Chip and Frame rafts rise in deep water. Weight ballast can sink them. Select **水上から落とす** to release the current model offshore. In **入り江のブイ航路** (#raft&c=inlet-buoys), drive between the yellow buoys and turn right toward the green pair. **地形図** opens the map while driving.
 
 ## Build visually
 

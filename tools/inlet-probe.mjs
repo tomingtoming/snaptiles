@@ -6,6 +6,14 @@ try {
   const page = await browser.newPage();
   await page.goto(process.argv[2] + '#car');
   await page.waitForFunction(() => window.__sim);
+  await page.getByRole('button', { name: 'raft', exact: true }).click();
+  await page.waitForFunction(() => location.hash === '#raft&c=inlet-float');
+  await page.reload();
+  await page.waitForFunction(() => window.__sim?.scenario?.id === 'inlet-float');
+  assert.match(await page.inputValue('#source'), /双胴艇/);
+  await page.click('#challenge-quit');
+  await page.getByRole('button', { name: 'car', exact: true }).click();
+  await page.waitForFunction(() => location.hash === '#car');
   await page.click('#challenge-open');
   await page.getByRole('button', { name: /入り江の試走場/ }).click();
   await page.waitForFunction(() => window.__sim?.scenario?.id === 'tidal-inlet');

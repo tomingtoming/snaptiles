@@ -1,3 +1,4 @@
+import { RAFT } from '../src/samples/raft';
 import { expect, it } from 'vitest';
 import { scenarioById, type Scenario } from '../src/challenge/scenarios';
 import { KeyState } from '../src/input/keys';
@@ -31,4 +32,22 @@ it('keeps the dry trajectory outside the lake footprint and above its surface', 
   const dry = await release('', undefined);
   expect(await release('', [10, 20, -10, 10, 20])).toBe(dry);
   expect(await release('', [-10, 10, -10, 10, -20])).toBe(dry);
+});
+
+it.each([[0, -1], [1, 1], [2, -1], [3, 1]])('keeps the raft upright with control %i', async (control, direction) => {
+  const keys = new KeyState(new EventTarget());
+  const sim = new RustSimulation(RAFT, keys, { scenario: scenarioById('inlet-float') });
+  try {
+    await sim.start();
+    for (let i = 0; i < 90; i++) sim.step();
+    if (control >= 2) keys.press(0);
+    keys.press(control);
+    for (let i = 0; i < 270; i++) {
+      sim.step();
+      const q = sim.physics.tiles[0].quaternion;
+      expect(1 - 2 * (q.x * q.x + q.z * q.z)).toBeGreaterThan(0.90);
+    }
+    const p = sim.corePosition();
+    expect((control >= 2 ? p.x : p.z) * direction).toBeGreaterThan(2);
+  } finally { await sim.dispose(); }
 });
