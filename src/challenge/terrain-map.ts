@@ -203,6 +203,19 @@ export class TerrainMap {
     this.dot.setAttribute('fill', 'white');
     this.dot.setAttribute('stroke', '#1b262a');
     this.dot.setAttribute('vector-effect', 'non-scaling-stroke');
-    this.svg.replaceChildren(fragment, this.direction, this.dot);
+    // The backdrop and shoulders extend past the playable map. Clip them to
+    // the same rectangle used by the edge marker, including on a narrow course.
+    const boundary = document.createElementNS(NS, 'rect');
+    boundary.setAttribute('x', String(left));
+    boundary.setAttribute('y', String(north));
+    boundary.setAttribute('width', String(width));
+    boundary.setAttribute('height', String(height));
+    const clip = document.createElementNS(NS, 'clipPath');
+    clip.id = 'terrain-map-bounds';
+    clip.append(boundary);
+    const layer = document.createElementNS(NS, 'g');
+    layer.setAttribute('clip-path', 'url(#terrain-map-bounds)');
+    layer.append(fragment);
+    this.svg.replaceChildren(clip, layer, this.direction, this.dot);
   }
 }
