@@ -1,4 +1,5 @@
-import { chromium, firefox, webkit } from 'playwright';
+import { verifyCourseReplay } from './verify-course-replay.mjs';
+import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -50,28 +51,7 @@ try {
     assert.equal(await page.evaluate(() => window.__sim.checkpointPassed), passed);
     assert.match(await page.textContent('#challenge-banner'), passed ? /中間地点通過/ : /黄色の中間地点へ/);
   }
-  // Re-run the same link in the other browser engines. Fast-forward the physics
-  // to just before the finish, then let the normal UI evaluate the goal and time.
-  for (const engine of [firefox, webkit]) {
-    const receiver = await engine.launch();
-    try {
-      const tab = await receiver.newPage();
-      await tab.goto(link);
-      await tab.waitForFunction(() => window.__sim?.replaying, null, { timeout: 30000 });
-      await tab.evaluate(frame => {
-        const sim = window.__sim;
-        while (sim.frame < frame) sim.step();
-      }, Math.round(Number(time) * 30) - 12);
-      const verified = tab.locator('#challenge-result[open]');
-      await verified.waitFor({ timeout: 30000 });
-      const body = await verified.textContent();
-      assert.match(body, /確認済み/);
-      assert.ok(body.includes('タイム' + time + ' 秒'), engine.name() + ': ' + body);
-      console.log(engine.name(), 'verified the ridge turn in', time, 's');
-    } finally {
-      await receiver.close();
-    }
-  }
+  await verifyCourseReplay(link, time);
   // A shortcut enters the finish from the right, missing the left-hand checkpoint.
   await page.goto(base + '#car&c=ridge-turn');
   await page.reload();

@@ -198,6 +198,7 @@ function highlands(): Pick<Scenario, 'ground' | 'terrainFaces' | 'terrainBounds'
 }
 
 const GRASS_RUNWAY = { width: 12, north: -112, south: 8 };
+const plateau = { ...highlands(), terrainColorRange: [4, 105] as [number, number], contourInterval: 25, runway: GRASS_RUNWAY };
 
 function brakeTrack(normal: boolean): Scenario {
   const dry = { grip: 1, color: 0x81888a }, slick = { grip: 0.18, color: 0x90c4d1 };
@@ -227,14 +228,11 @@ const normalBrakeTrack = brakeTrack(true);
 export const FREE_DRIVES: Scenario[] = [
   brakeTrack(false),
   {
-    ...highlands(),
+    ...plateau,
     id: 'highlands',
-    runway: GRASS_RUNWAY,
     title: '四峰高原',
     description: '1km四方の高原。中央の平地から飛び立つか、四つの山の間の谷筋を走れます。',
     freeDrive: true,
-    terrainColorRange: [4, 105],
-    contourInterval: 25,
     budget: Infinity,
     timeLimit: Infinity,
     solids: [],
@@ -314,6 +312,18 @@ export const SCENARIOS: Scenario[] = [
     solids: [],
     checkpoint: [-16, -3, 0, 12, -42, -26],
     goal: [4, 20, 0, 8, -114, -91],
+  },
+  {
+    ...plateau,
+    id: 'highland-bank',
+    title: '四峰高原の旋回飛行',
+    description: '滑走路から北へ離陸し、黄色のゲートで右旋回。谷の先、北東の緑の空域へ。標準のplaneはZで加速、↓で上昇、→で右に傾けます。',
+    budget: 100,
+    timeLimit: 50,
+    showGateAltitude: true,
+    solids: [],
+    checkpoint: [-18, 18, 1, 12, -90, -67],
+    goal: [15, 85, 32, 65, -478, -395],
   },
   {
     ...mountainPass(120),

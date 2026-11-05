@@ -99,6 +99,10 @@ export class ChallengeUI {
 
   /** a new simulation: a fresh start, or the same run re-run to a frame (a clear after that frame is undone) */
   attach(sim: RustSimulation, rewound: boolean): void {
+    if (!rewound) {
+      this.result.close();
+      this.dialog.close();
+    }
     $('mission-edit').hidden = !sim.scenario?.mission;
     const compare = $('brake-compare');
     compare.hidden = !sim.scenario?.compareRoad;
