@@ -219,6 +219,17 @@ export class ChallengeUI {
         else if (y < level) title += '｜Core 水面下 ' + (level - y).toFixed(2) + 'm';
         else title += '｜Core 水面上 ' + (y - level).toFixed(2) + 'm';
       }
+      if (s.climbs && s.terrainBounds) {
+        const { x, z } = sim.corePosition();
+        const [west, east, north, south] = s.terrainBounds;
+        const slope = s.climbs.find(leg => z <= leg.startZ && z > leg.endZ);
+        if (x < west || x > east || z < north || z > south) title += '｜登坂路の外';
+        else if (slope) title += '｜北向き ' + slope.degrees + '°・平場まで ' + Math.ceil(z - slope.endZ) + 'm';
+        else {
+          const next = s.climbs.find(leg => z > leg.startZ);
+          title += next ? '｜平場・次は ' + next.degrees + '°' : '｜頂上の平場';
+        }
+      }
       if (s.bumpSection) {
         const run = sim.bumpRun;
         $('bump-pin').hidden = !run?.complete;

@@ -50,6 +50,7 @@ export interface Scenario {
   contourInterval?: number; // vertical spacing of elevation lines on the map, in metres
   terrainColorRange?: [number, number]; // elevations of the low and high ground colours
   bumpSection?: { startZ: number; endZ: number; halfWidth: number; crests: number[] };
+  climbs?: { startZ: number; endZ: number; degrees: number }[];
   centerStripe?: Solid; // painted triangles along the north-south test line at x=0
   roadPaint?: Solid; // markings on the banked pavement
   asphaltStart?: number; // first paved vertex in the terrain triangle list
@@ -263,6 +264,29 @@ function crossSlopes(): Pick<Scenario, 'ground' | 'terrainFaces' | 'terrainBound
 const sideSlopes = crossSlopes();
 /** Six transverse humps. The left side barely ripples; the right side reaches
  * axle height. A long flat entry and runout allow a repeatable approach. */
+function hillClimb(): Scenario {
+  const xs = [-14, 14], zs = [18, -12], heights = [[0, 0], [0, 0]];
+  let z = -12, y = 0;
+  const climbs = [], roadPaint: Solid = [];
+  for (const degrees of [6, 12, 18]) {
+    const startZ = z;
+    z -= 24;
+    y += 24 * Math.tan(degrees * Math.PI / 180);
+    climbs.push({ startZ, endZ: z, degrees });
+    zs.push(z); heights.push([y, y]);
+    roadPaint.push([-14, y, z - 0.3], [14, y, z - 0.3], [-14, y, z - 0.6],
+      [14, y, z - 0.3], [14, y, z - 0.6], [-14, y, z - 0.6]);
+    z -= degrees === 18 ? 30 : 14;
+    zs.push(z); heights.push([y, y]);
+  }
+  return {
+    ...heightfield(xs, zs, heights), climbs, roadPaint, contourInterval: 2,
+    id: 'terraced-climb', title: '三段の登坂路', freeDrive: true,
+    description: '北へ進むと6°、12°、18°の上り坂が続きます。白線の先は平場。停止してから再発進も試せます。',
+    terrainColorRange: [0, y], budget: Infinity, timeLimit: Infinity, solids: [],
+  };
+}
+
 function washboard(): Pick<Scenario, 'ground' | 'terrainFaces' | 'terrainBounds' | 'bumpSection'> {
   const xs = [-22, -8, 0, 8, 22];
   const zs = [18, 0, -12];
@@ -349,6 +373,7 @@ export const FREE_DRIVES: Scenario[] = [
   towBasin(),
   islands,
   slickBrakeTrack,
+  hillClimb(),
   oval,
   {
     ...sideSlopes,
