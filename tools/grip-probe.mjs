@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 const browser = await chromium.launch();
 try {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ permissions: ['clipboard-read', 'clipboard-write'] });
   const url = process.argv[2] + '#car&c=brake-track';
   async function run(grip, turn) {
     await page.goto(url);
@@ -111,7 +111,27 @@ try {
     await page.keyboard.up(brake ? 'z' : 'ArrowUp');
     assert.ok(outcome.enteredAtSpeed);
     assert.equal(outcome.clear, brake);
-    if (brake) assert.ok(outcome.speedKmh <= 1);
+    if (brake) {
+      assert.ok(outcome.speedKmh <= 1);
+      const measurements = await page.locator('#challenge-result-body dd').allTextContents();
+      const stop = await page.evaluate(() => window.__sim.scenario.brakeLine - window.__sim.corePosition().z);
+      assert.ok(measurements.includes(stop.toFixed(2) + ' m先'));
+      await page.click('#challenge-copy');
+      await page.waitForFunction(() => document.getElementById('challenge-result-status').textContent.includes('コピーしました'));
+      const link = await page.evaluate(() => navigator.clipboard.readText());
+      const receiver = await browser.newPage();
+      await receiver.goto(link);
+      await receiver.waitForFunction(() => window.__sim?.replaying);
+      await receiver.evaluate(() => {
+        const step = document.getElementById('debug-forward');
+        for (let i = 0; i < 900 && !document.getElementById('challenge-result').open; i++) step.click();
+      });
+      const reproduced = await receiver.locator('#challenge-result-body dd').allTextContents();
+      assert.deepEqual(reproduced.slice(0, 5), measurements.slice(0, 5));
+      assert.match(await receiver.textContent('#challenge-result-body'), /再計算して確認済み/);
+      console.log('Recorded braking run reproduced:', reproduced);
+      await receiver.close();
+    }
     console.log(brake ? 'Stopped inside the box:' : 'Driving through did not clear:', outcome);
   }
 } finally {

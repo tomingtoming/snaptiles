@@ -227,6 +227,7 @@ export class ChallengeUI {
     if (cleared && s.brakingTest && sim.brakingEntryKmh !== undefined) {
       row('進入速度', sim.brakingEntryKmh.toFixed(1) + ' km/h');
       row('停止判定時', (sim.coreVelocity().length() * 3.6).toFixed(2) + ' km/h');
+      if (s.brakeLine !== undefined) row('白線からの停止位置', (s.brakeLine - sim.corePosition().z).toFixed(2) + ' m先');
     }
     row('Lua', lua ? '使用' : 'なし');
     if (verified) row('記録', 'リンクの走りをこのブラウザで再計算して確認済み');
