@@ -8,6 +8,12 @@ try {
   const page = await browser.newPage();
   await page.goto(process.argv[2] + '#car&c=washboard');
   await page.waitForFunction(() => window.__sim?.scenario?.id === 'washboard');
+  await page.click('#terrain-map summary');
+  const chart = page.locator('#terrain-map');
+  const nextLine = chart.locator('line[stroke="#ffc747"]');
+  await nextLine.waitFor({ state: 'attached' });
+  assert.equal(await nextLine.getAttribute('aria-label'), '計測入口');
+  assert.equal(await chart.locator('line[aria-label^="山頂"]').count(), 6);
   const car = await page.inputValue('#source');
   let baseline;
   for (const { target, height } of [{ target: 11, height: 0.12 }, { target: 0, height: 0.32 }, { target: -11, height: 0.55 },
@@ -53,7 +59,10 @@ try {
     const banner = await page.textContent('#challenge-banner-text');
     assert.ok(banner.split('｜基準')[0].includes('山頂 ' + profile), banner);
     if (height === null) assert.ok(banner.includes(run.crestsCm.join('→')), banner);
+    await page.waitForFunction(() => document.querySelector('#terrain-map small').textContent.includes('計測終了'));
+    assert.equal(await nextLine.count(), 0);
     await page.evaluate(() => window.__sim.reset());
+    await page.waitForFunction(() => document.querySelector('#terrain-map line[stroke="#ffc747"]')?.getAttribute('aria-label') === '計測入口');
     assert.equal(await page.evaluate(() => window.__sim.bumpRun), undefined);
     assert.equal(run.crestsCm.length, 6);
     assert.ok(peaks.every((h, i) => Math.abs(h * 100 - run.crestsCm[i]) < 3), 'ray vs crest: ' + peaks);
@@ -62,6 +71,11 @@ try {
     if (height !== null) assert.ok(peaks.every(h => Math.abs(h - height) < 0.03), 'lane peaks: ' + peaks);
     assert.ok(valleys.every(h => Math.abs(h) < 0.03), 'lane troughs: ' + valleys);
   }
+  await page.evaluate(() => {
+    const sim = window.__sim;
+    for (let i = 0; i < 1000 && (sim.bumpRun?.crestsCm.length ?? 0) < 2; i++) sim.step();
+  });
+  await page.waitForFunction(() => document.querySelector('#terrain-map line[stroke="#ffc747"]')?.getAttribute('aria-label') === '山頂3');
   console.log('Washboard: six crests and troughs at all three lane heights pass');
 } finally {
   await browser.close();

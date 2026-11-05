@@ -205,7 +205,7 @@ export class ChallengeUI {
   /** every animation frame: the banner */
   update(sim: RustSimulation | null): void {
     const s = this.active;
-    this.terrainMap.update(s, sim?.physics.tiles[0], !!sim?.checkpointPassed, sim?.ringsPassed ?? 0, sim?.groundRange);
+    this.terrainMap.update(s, sim?.physics.tiles[0], !!sim?.checkpointPassed, sim?.ringsPassed ?? 0, sim?.groundRange, sim?.bumpRun);
     this.banner.hidden = !s || !sim;
     if (!s || !sim?.assembly) return;
     if (s.freeDrive) {

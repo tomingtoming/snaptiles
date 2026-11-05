@@ -66,6 +66,8 @@ export class TerrainMap {
   private course: Scenario | null = null;
   private checkpoint: SVGRectElement | null = null;
   private goal: SVGRectElement | null = null;
+  private bumpLines: SVGLineElement[] = [];
+  private nextBumpLine = -1;
   private ringMarkers: SVGElement[] = [];
   private visibleRingCount = -1;
   private lastTarget: SVGRectElement | null = null;
@@ -128,7 +130,7 @@ export class TerrainMap {
     this.survey.textContent = '◇ ' + (x < 0 ? '西' : '東') + Math.abs(x).toFixed(0) + 'm ' + (z > 0 ? '南' : '北') + Math.abs(z).toFixed(0) + 'm｜' + reading;
   }
 
-  update(s: Scenario | null, core: { position: { x: number; y: number; z: number }; vel: { x: number; z: number } } | undefined, passed: boolean, ringsPassed: number, groundRange?: number): void {
+  update(s: Scenario | null, core: { position: { x: number; y: number; z: number }; vel: { x: number; z: number } } | undefined, passed: boolean, ringsPassed: number, groundRange?: number, bumpRun?: { crestsCm: number[]; complete: boolean }): void {
     const bounds = s?.terrainBounds;
     const position = core?.position;
     this.panel.hidden = !bounds || !position;
@@ -160,6 +162,17 @@ export class TerrainMap {
       this.lastTarget = target;
     }
     let text = where;
+    if (s.bumpSection) {
+      const total = s.bumpSection.crests.length;
+      const count = bumpRun?.crestsCm.length ?? 0;
+      const next = bumpRun ? (bumpRun.complete ? total + 2 : count + 1) : 0;
+      if (this.nextBumpLine !== next) {
+        this.nextBumpLine = next;
+        this.bumpLines.forEach((line, i) => line.setAttribute('stroke', ringColor(i, next)));
+      }
+      const target = !bumpRun ? '計測入口' : count < total ? '次の山 ' + (count + 1) + '/' + total : '計測出口';
+      text += bumpRun?.complete ? '　全' + total + '本通過・計測終了' : '　黄線：' + target;
+    }
     if (next) {
       const [x0, x1, y0, y1, z0, z1] = next;
       const dx = Math.max(x0 - position.x, 0, position.x - x1);
@@ -312,6 +325,25 @@ export class TerrainMap {
     if (s.runway) {
       const { width, north, south } = s.runway;
       zone([-width / 2, width / 2, 0, 0, north, south], '#e9e1c1');
+    }
+    this.bumpLines = [];
+    this.nextBumpLine = -1;
+    if (s.bumpSection) {
+      const { startZ, endZ, halfWidth, crests } = s.bumpSection;
+      this.bumpLines = [startZ, ...crests, endZ].map((z, i) => {
+        const line = document.createElementNS(NS, 'line');
+        line.setAttribute('x1', String(-halfWidth));
+        line.setAttribute('x2', String(halfWidth));
+        line.setAttribute('y1', String(z));
+        line.setAttribute('y2', String(z));
+        const boundary = i === 0 || i === crests.length + 1;
+        if (boundary) line.setAttribute('stroke-dasharray', '3 2');
+        line.setAttribute('stroke-width', boundary ? '2' : '1.5');
+        line.setAttribute('vector-effect', 'non-scaling-stroke');
+        line.setAttribute('aria-label', boundary ? (i === 0 ? '計測入口' : '計測出口') : '山頂' + i);
+        fragment.append(line);
+        return line;
+      });
     }
     this.visibleRingCount = -1;
     this.ringMarkers = (s.rings ?? []).map((ring, index) => {
