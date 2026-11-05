@@ -26,6 +26,7 @@ export interface Scenario {
   brakingTest?: { entryKmh: number; stopKmh: number };
   brakeLine?: number; // z of the common braking reference, measured toward north
   water?: [number, number, number, number, number]; // xmin, xmax, zmin, zmax, surface elevation
+  shoalDepth?: number; // highlight submerged terrain within this depth of the surface
   waterStations?: { left: number; right: number; distances: number[] }; // north from z=0
   waterHorizontalDrag?: number; // measured flat-water range; legacy inlets use isotropic drag
   runway?: { width: number; north: number; south: number };
@@ -191,6 +192,26 @@ function towBasin(): Scenario {
   };
 }
 
+function archipelago(): Scenario {
+  const xs = Array.from({ length: 13 }, (_, i) => -90 + 15 * i);
+  const zs = Array.from({ length: 16 }, (_, i) => 45 - 15 * i);
+  // Three exposed islands and a submerged reef. Each row defines centre, radii and peak elevation.
+  const ridges = [[-30, -30, 36, 38, 13], [30, -75, 36, 44, 10],
+    [-30, -120, 42, 38, 8], [45, -120, 28, 26, 2.65]];
+  const heights = zs.map(z => xs.map(x => {
+    const margin = Math.min(75 - Math.abs(x), 30 - z, z + 165);
+    const coast = Math.max(0, Math.min(5, 3 - margin / 4));
+    return Math.max(coast, ...ridges.map(([cx, cz, rx, rz, peak]) =>
+      peak * Math.max(0, 1 - Math.hypot((x - cx) / rx, (z - cz) / rz))));
+  }));
+  return {
+    ...heightfield(xs, zs, heights), id: 'three-islands', title: '三島の海峡',
+    description: '三つの島の間を縫って走れます。北東の浅瀬は水深約0.35m。地形図で深い水路を選べます。',
+    water: [-75, 75, -165, 30, 3], waterHorizontalDrag: 1.27, shoalDepth: 1.2,
+    terrainColorRange: [3, 13], freeDrive: true, budget: Infinity, timeLimit: Infinity, solids: [],
+  };
+}
+
 const pass = mountainPass();
 
 /** Three alternating side slopes. Longitudinal transitions are long enough
@@ -295,9 +316,11 @@ function brakeTrack(normal: boolean): Scenario {
 const slickBrakeTrack = brakeTrack(false);
 const normalBrakeTrack = brakeTrack(true);
 const offshoreInlet = inlet(true);
+const islands = archipelago();
 export const FREE_DRIVES: Scenario[] = [
   inlet(),
   towBasin(),
+  islands,
   slickBrakeTrack,
   {
     ...sideSlopes,
@@ -344,6 +367,16 @@ export const FREE_DRIVES: Scenario[] = [
 ];
 
 export const SCENARIOS: Scenario[] = [
+  {
+    ...islands, freeDrive: false, id: 'island-passage', title: '三島の蛇行航路',
+    description: '左の島を右から、次の島を左から抜け、三つ目の島の東へ。黄色のブイの間を、水面近くで北向きに3回通過します。',
+    budget: 35, timeLimit: 75,
+    rings: [
+      { center: [8, 3, -32], radius: 6, halfHeight: 1.2, heading: 0 },
+      { center: [-19, 3, -76], radius: 7, halfHeight: 1.2, heading: 0 },
+      { center: [11, 3, -126], radius: 10, halfHeight: 1.2, heading: 0 },
+    ],
+  },
   {
     ...offshoreInlet, freeDrive: false, compareTerrain: undefined,
     id: 'inlet-buoys', title: '入り江のブイ航路',

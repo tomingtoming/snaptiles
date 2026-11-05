@@ -195,7 +195,7 @@ export class ChallengeUI {
   /** every animation frame: the banner */
   update(sim: RustSimulation | null): void {
     const s = this.active;
-    this.terrainMap.update(s, sim?.physics.tiles[0], !!sim?.checkpointPassed, sim?.ringsPassed ?? 0);
+    this.terrainMap.update(s, sim?.physics.tiles[0], !!sim?.checkpointPassed, sim?.ringsPassed ?? 0, sim?.groundRange);
     this.banner.hidden = !s || !sim;
     if (!s || !sim?.assembly) return;
     if (s.freeDrive) {
@@ -245,7 +245,8 @@ export class ChallengeUI {
     if (s.rings) {
       const next = s.rings[sim.ringsPassed];
       const height = next && s.showGateAltitude ? `（中心高度${next.center[1]}m）` : '';
-      driving = next ? `｜次はリング ${sim.ringsPassed + 1} / ${s.rings.length}${height}` : '｜全リング通過';
+      const gate = s.water ? 'ブイ' : 'リング';
+      driving = next ? `｜次は${gate} ${sim.ringsPassed + 1} / ${s.rings.length}${height}` : `｜全${gate}通過`;
     }
     const zone = !sim.checkpointPassed && s.checkpoint ? s.checkpoint : s.goal;
     const altitude = s.showGateAltitude && zone ? `（高度${zone[2]}〜${zone[3]}m）` : '';

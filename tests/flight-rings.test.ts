@@ -23,3 +23,12 @@ it('turns the crossing plane with the ring heading', () => {
   expect(advanceRings(course, 0, p(-4, 4, 1), p(4, 4, 1))).toBe(1);
   expect(advanceRings(course, 0, p(4, 4, 1), p(-4, 4, 1))).toBe(0);
 });
+
+it('counts a surface buoy gate only inside its width, height and forward direction', () => {
+  const water: CourseRing[] = [{ center: [0, 3, 0], heading: 0, radius: 6, halfHeight: 1 }];
+  expect(advanceRings(water, 0, p(6, 4, 5), p(6, 4, -5))).toBe(1);
+  expect(advanceRings(water, 0, p(6.1, 3, 5), p(6.1, 3, -5))).toBe(0);
+  expect(advanceRings(water, 0, p(0, 4.1, 5), p(0, 4.1, -5))).toBe(0);
+  expect(advanceRings(water, 0, p(0, 1.9, 5), p(0, 1.9, -5))).toBe(0);
+  expect(advanceRings(water, 0, p(0, 3, -5), p(0, 3, 5))).toBe(0);
+});

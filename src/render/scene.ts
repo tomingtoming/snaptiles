@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ringColor } from '../challenge/rings';
+import { buoyEnds, ringColor } from '../challenge/rings';
 import { TILE, TILE_T, type TileInstance, type ValEnv } from '../model/assemble';
 import { evalExpr, exprIsConstant } from '../rc/expr';
 import { wheelRadius } from '../model/assemble';
@@ -521,9 +521,16 @@ export class SceneView {
       const colors = new Float32Array(s.terrainFaces.length * 3);
       const [low, high] = s.terrainColorRange ?? [2, 14];
       const valley = new THREE.Color(0x88aa69), ridge = new THREE.Color(0xa77e55);
+      const seabed = new THREE.Color(0x174655), sand = new THREE.Color(0xe8d39d);
       const tint = new THREE.Color();
       s.terrainFaces.forEach(([, y], i) => {
-        tint.lerpColors(valley, ridge, THREE.MathUtils.smoothstep(y, low, high)).toArray(colors, i * 3);
+        tint.lerpColors(valley, ridge, THREE.MathUtils.smoothstep(y, low, high));
+        if (s.shoalDepth && s.water) {
+          const h = y - s.water[4];
+          if (h <= 0) tint.lerpColors(seabed, sand, THREE.MathUtils.smoothstep(h, -2 * s.shoalDepth, 0));
+          else if (h < 1) tint.lerpColors(sand, valley, h);
+        }
+        tint.toArray(colors, i * 3);
       });
       geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
       addMesh(geometry, 0xffffff, false);
@@ -535,7 +542,7 @@ export class SceneView {
       const geometry = new THREE.PlaneGeometry(xmax - xmin, zmax - zmin);
       geometry.rotateX(-Math.PI / 2);
       const surface = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
-        color: 0x368baf, roughness: 0.28, transparent: true, opacity: 0.64,
+        color: 0x368baf, roughness: 0.28, transparent: true, opacity: s.shoalDepth ? 0.48 : 0.64,
         depthWrite: false, side: THREE.DoubleSide,
       }));
       surface.position.set((xmin + xmax) / 2, level, (zmin + zmax) / 2);
@@ -608,10 +615,18 @@ export class SceneView {
       this.scenarioGroup.add(mesh, edges);
     };
     for (const ring of s.rings ?? []) {
-      const tube = Math.max(0.35, ring.radius * 0.045);
-      const geometry = new THREE.TorusGeometry(ring.radius + tube, tube, 8, 64);
       const material = new THREE.MeshBasicMaterial();
       this.ringMaterials.push(material);
+      if (ring.halfHeight !== undefined) {
+        for (const [x, z] of buoyEnds(ring)) {
+          const marker = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 8), material);
+          marker.position.set(x, ring.center[1] + 0.2, z);
+          this.scenarioGroup.add(marker);
+        }
+        continue;
+      }
+      const tube = Math.max(0.35, ring.radius * 0.045);
+      const geometry = new THREE.TorusGeometry(ring.radius + tube, tube, 8, 64);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(...ring.center);
       mesh.rotation.y = -ring.heading * Math.PI / 180;

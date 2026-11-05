@@ -1,6 +1,6 @@
 import type { Scenario, Solid } from './scenarios';
 
-import { ringColor } from './rings';
+import { buoyEnds, ringColor } from './rings';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -37,21 +37,36 @@ export function gateAltitudeGuide(y: number, min: number, max: number): string {
   return '高度は範囲内';
 }
 
+/** Project the part of a terrain triangle at or above the given horizontal plane onto the map. */
+export function aboveLevel(triangle: Solid, level: number): string {
+  const points: number[][] = [];
+  for (let i = 0; i < triangle.length; i++) {
+    const a = triangle[i], b = triangle[(i + 1) % triangle.length];
+    if (a[1] >= level) points.push([a[0], a[2]]);
+    if ((a[1] < level && b[1] > level) || (a[1] > level && b[1] < level)) {
+      const t = (level - a[1]) / (b[1] - a[1]);
+      points.push([a[0] + t * (b[0] - a[0]), a[2] + t * (b[2] - a[2])]);
+    }
+  }
+  return points.length >= 3 ? points.map(p => p.join(',')).join(' ') : '';
+}
+
 export class TerrainMap {
   private panel = document.querySelector<HTMLDetailsElement>('#terrain-map')!;
   private svg = this.panel.querySelector('svg')!;
   private caption = this.panel.querySelector('small')!;
   private legend = this.panel.querySelector<HTMLElement>('.contour-key')!;
+  private sounding = this.panel.querySelector<HTMLElement>('.map-sounding')!;
   private direction = document.createElementNS(NS, 'polygon');
   private dot = document.createElementNS(NS, 'circle');
   private course: Scenario | null = null;
   private checkpoint: SVGRectElement | null = null;
   private goal: SVGRectElement | null = null;
-  private ringMarkers: SVGCircleElement[] = [];
+  private ringMarkers: SVGElement[] = [];
   private visibleRingCount = -1;
   private lastTarget: SVGRectElement | null = null;
 
-  update(s: Scenario | null, core: { position: { x: number; y: number; z: number }; vel: { x: number; z: number } } | undefined, passed: boolean, ringsPassed: number): void {
+  update(s: Scenario | null, core: { position: { x: number; y: number; z: number }; vel: { x: number; z: number } } | undefined, passed: boolean, ringsPassed: number, groundRange?: number): void {
     const bounds = s?.terrainBounds;
     const position = core?.position;
     this.panel.hidden = !bounds || !position;
@@ -103,10 +118,10 @@ export class TerrainMap {
       const ring = s.rings[ringsPassed];
       if (ring) {
         const [rx, ry, rz] = ring.center;
-        text += `　リング${ringsPassed + 1}まで水平 ${Math.round(Math.hypot(rx - position.x, rz - position.z))}m`;
+        text += `　${s.water ? 'ブイ' : 'リング'}${ringsPassed + 1}まで水平 ${Math.round(Math.hypot(rx - position.x, rz - position.z))}m`;
         if (s.showGateAltitude) text += `・中心高度${ry}m`;
       } else {
-        text += '　全リング通過';
+        text += s.water ? '　全ブイ通過' : '　全リング通過';
       }
     }
     if (!next && !s.rings && s.runway) {
@@ -122,6 +137,20 @@ export class TerrainMap {
         text += '　滑走路は' + direction + ' ' + metres + 'm';
       }
     }
+    this.sounding.hidden = !s.shoalDepth;
+    if (s.shoalDepth && s.water) {
+      const [xmin, xmax, zmin, zmax, level] = s.water;
+      let reading = '水域外';
+      if (position.x >= xmin && position.x <= xmax && position.z >= zmin && position.z <= zmax) {
+        reading = '海底は測距範囲外';
+        if (groundRange !== undefined && groundRange >= 0) {
+          const depth = level - position.y + groundRange;
+          reading = depth <= 0 ? '陸面：水面より ' + (-depth).toFixed(2) + 'm'
+            : '水深 ' + depth.toFixed(2) + 'm｜Coreから底まで ' + groundRange.toFixed(2) + 'm';
+        }
+      }
+      if (this.sounding.textContent !== reading) this.sounding.textContent = reading;
+    }
     if (this.caption.textContent !== text) this.caption.textContent = text;
   }
 
@@ -130,6 +159,7 @@ export class TerrainMap {
     const pad = Math.max(width, height) * 0.04;
     this.svg.setAttribute('viewBox', [left - pad, north - pad, width + pad * 2, height + pad * 2].join(' '));
     const fragment = document.createDocumentFragment();
+    const coast = document.createElementNS(NS, 'g');
     const faces = s.terrainFaces ?? [];
     const [low, high] = s.terrainColorRange ?? [2, 14];
     for (let i = 0; i < faces.length; i += 3) {
@@ -140,6 +170,16 @@ export class TerrainMap {
       face.setAttribute('points', triangle.map(([x, , z]) => x + ',' + z).join(' '));
       face.setAttribute('fill', `hsl(${99 - 66 * level} 28% ${34 + 14 * level}%)`);
       fragment.append(face);
+      if (s.shoalDepth && s.water) {
+        for (const [cutoff, fill] of [[s.water[4] - s.shoalDepth, '#6cc5be'], [s.water[4], face.getAttribute('fill')!]] as const) {
+          const points = aboveLevel(triangle, cutoff);
+          if (!points) continue;
+          const shore = document.createElementNS(NS, 'polygon');
+          shore.setAttribute('points', points);
+          shore.setAttribute('fill', fill);
+          coast.append(shore);
+        }
+      }
     }
     if (s.water) {
       const [xmin, xmax, zmin, zmax] = s.water;
@@ -150,6 +190,16 @@ export class TerrainMap {
       lake.setAttribute('height', String(zmax - zmin));
       lake.setAttribute('fill', '#3994b2');
       fragment.append(lake);
+      if (s.shoalDepth) {
+        const clip = document.createElementNS(NS, 'clipPath');
+        clip.id = 'terrain-map-coast-clip';
+        const rect = lake.cloneNode(false) as SVGRectElement;
+        rect.removeAttribute('fill');
+        clip.append(rect);
+        coast.setAttribute('clip-path', 'url(#terrain-map-coast-clip)');
+        coast.setAttribute('aria-label', '浅瀬と島');
+        fragment.append(clip, coast);
+      }
       if (s.waterStations) for (const distance of s.waterStations.distances) {
         for (const x of [s.waterStations.left, s.waterStations.right]) {
           const marker = document.createElementNS(NS, 'circle');
@@ -160,7 +210,9 @@ export class TerrainMap {
         }
       }
     }
-    this.legend.hidden = !s.contourInterval;
+    this.legend.hidden = !s.contourInterval && !s.shoalDepth;
+    this.legend.classList.toggle('shoals', !!s.shoalDepth);
+    if (s.shoalDepth) this.legend.textContent = '浅瀬：水深' + s.shoalDepth + 'm以内';
     if (s.contourInterval) {
       this.legend.textContent = `等高線 ${s.contourInterval}m間隔`;
       for (const [level, segments] of contourPaths(faces, s.contourInterval)) {
@@ -200,14 +252,22 @@ export class TerrainMap {
     }
     this.visibleRingCount = -1;
     this.ringMarkers = (s.rings ?? []).map((ring, index) => {
-      const marker = document.createElementNS(NS, 'circle');
-      marker.setAttribute('cx', String(ring.center[0]));
-      marker.setAttribute('cy', String(ring.center[2]));
-      marker.setAttribute('r', String(Math.max(ring.radius, pad * 0.65)));
+      let marker: SVGElement;
+      if (ring.halfHeight !== undefined) {
+        const [[x1, z1], [x2, z2]] = buoyEnds(ring);
+        marker = document.createElementNS(NS, 'line');
+        marker.setAttribute('x1', String(x1)); marker.setAttribute('y1', String(z1));
+        marker.setAttribute('x2', String(x2)); marker.setAttribute('y2', String(z2));
+      } else {
+        marker = document.createElementNS(NS, 'circle');
+        marker.setAttribute('cx', String(ring.center[0]));
+        marker.setAttribute('cy', String(ring.center[2]));
+        marker.setAttribute('r', String(Math.max(ring.radius, pad * 0.65)));
+      }
       marker.setAttribute('fill', 'none');
       marker.setAttribute('stroke-width', '2');
       marker.setAttribute('vector-effect', 'non-scaling-stroke');
-      marker.setAttribute('aria-label', 'リング' + (index + 1));
+      marker.setAttribute('aria-label', (s.water ? 'ブイ' : 'リング') + (index + 1));
       fragment.append(marker);
       return marker;
     });

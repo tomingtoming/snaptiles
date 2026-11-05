@@ -374,7 +374,7 @@ export class RustSimulation implements SimView {
       this.frame++;
       const progress = this.missionProgress;
       const core = this.physics.tiles[0];
-      if (progress?.scenario.mission?.hold.kind === 'clearance') this.groundRange = m._core_ground_range(this.id, 0);
+      if (progress?.scenario.mission?.hold.kind === 'clearance' || this.scenario?.shoalDepth) this.groundRange = m._core_ground_range(this.id, 0);
       if (progress && progress.clearedAt === null && core && this.frame <= progress.scenario.timeLimit * FRAME_RATE) {
         progress.step(this.frame, core, this.coreVelocity(), this.groundRange);
       }

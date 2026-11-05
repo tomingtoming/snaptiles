@@ -1,7 +1,15 @@
 export interface CourseRing {
   center: [number, number, number];
   radius: number; // clear opening, in metres
+  halfHeight?: number; // rectangular opening between water buoys; radius is its half-width
   heading: number; // degrees clockwise from north
+}
+
+export function buoyEnds(ring: CourseRing): [number, number][] {
+  const angle = ring.heading * Math.PI / 180;
+  return [-ring.radius, ring.radius].map(offset => [
+    ring.center[0] + offset * Math.cos(angle), ring.center[2] + offset * Math.sin(angle),
+  ]);
 }
 
 /** Shared colours for the 3D hoops and the map symbols. */
@@ -17,7 +25,7 @@ interface Point { x: number; y: number; z: number }
 export function advanceRings(rings: CourseRing[], passed: number, from: Point, to: Point): number {
   let lastCrossing = -1;
   while (passed < rings.length) {
-    const { center: [cx, cy, cz], heading, radius } = rings[passed];
+    const { center: [cx, cy, cz], heading, radius, halfHeight } = rings[passed];
     const angle = heading * Math.PI / 180;
     const nx = Math.sin(angle), nz = -Math.cos(angle);
     const start = nx * (from.x - cx) + nz * (from.z - cz);
@@ -28,7 +36,8 @@ export function advanceRings(rings: CourseRing[], passed: number, from: Point, t
     const x = from.x + t * (to.x - from.x) - cx;
     const y = from.y + t * (to.y - from.y) - cy;
     const z = from.z + t * (to.z - from.z) - cz;
-    if (x * x + y * y + z * z > radius * radius) break;
+    if (halfHeight !== undefined && Math.abs(y) > halfHeight) break;
+    if (x * x + (halfHeight === undefined ? y * y : 0) + z * z > radius * radius) break;
     passed++;
     lastCrossing = t;
   }
