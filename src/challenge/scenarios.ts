@@ -24,6 +24,7 @@ export interface Scenario {
   compareRoad?: { id: string; label: string };
   brakeLine?: number; // z of the common braking reference, measured toward north
   runway?: { width: number; north: number; south: number };
+  contourInterval?: number; // vertical spacing of elevation lines on the map, in metres
   terrainColorRange?: [number, number]; // elevations of the low and high ground colours
   terrainFaces?: Solid; // exposed triangles of a continuous terrain, in draw order
   /** Rectangular road surfaces. Bounds use the same x/y/z pairs as box(). */
@@ -233,6 +234,7 @@ export const FREE_DRIVES: Scenario[] = [
     description: '1km四方の高原。中央の平地から飛び立つか、四つの山の間の谷筋を走れます。',
     freeDrive: true,
     terrainColorRange: [4, 105],
+    contourInterval: 25,
     budget: Infinity,
     timeLimit: Infinity,
     solids: [],

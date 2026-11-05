@@ -1,11 +1,38 @@
-import type { Scenario } from './scenarios';
+import type { Scenario, Solid } from './scenarios';
 
 const NS = 'http://www.w3.org/2000/svg';
+
+/** Intersect the existing terrain triangles with horizontal planes.
+ * Group segments by elevation so each contour needs just one SVG path. */
+export function contourPaths(faces: Solid, interval: number): Map<number, string> {
+  const paths = new Map<number, string>();
+  if (!(interval > 0)) return paths;
+  for (let i = 0; i < faces.length; i += 3) {
+    const triangle = faces.slice(i, i + 3);
+    const heights = triangle.map(p => p[1]);
+    const low = Math.min(...heights), high = Math.max(...heights);
+    for (let level = (Math.floor(low / interval) + 1) * interval; level <= high; level += interval) {
+      const points: string[] = [];
+      for (let edge = 0; edge < 3; edge++) {
+        const a = triangle[edge], b = triangle[(edge + 1) % 3];
+        if ((a[1] < level) === (b[1] < level)) continue;
+        const t = (level - a[1]) / (b[1] - a[1]);
+        const x = a[0] + t * (b[0] - a[0]), z = a[2] + t * (b[2] - a[2]);
+        points.push(x.toFixed(2) + ' ' + z.toFixed(2));
+      }
+      if (points.length === 2 && points[0] !== points[1]) {
+        paths.set(level, (paths.get(level) ?? '') + 'M' + points[0] + 'L' + points[1]);
+      }
+    }
+  }
+  return paths;
+}
 
 export class TerrainMap {
   private panel = document.querySelector<HTMLDetailsElement>('#terrain-map')!;
   private svg = this.panel.querySelector('svg')!;
   private caption = this.panel.querySelector('small')!;
+  private legend = this.panel.querySelector<HTMLElement>('.contour-key')!;
   private dot = document.createElementNS(NS, 'circle');
   private course: Scenario | null = null;
   private checkpoint: SVGRectElement | null = null;
@@ -73,6 +100,20 @@ export class TerrainMap {
       face.setAttribute('points', triangle.map(([x, , z]) => x + ',' + z).join(' '));
       face.setAttribute('fill', `hsl(${99 - 66 * level} 28% ${34 + 14 * level}%)`);
       fragment.append(face);
+    }
+    this.legend.hidden = !s.contourInterval;
+    if (s.contourInterval) {
+      this.legend.textContent = `等高線 ${s.contourInterval}m間隔`;
+      for (const [level, segments] of contourPaths(faces, s.contourInterval)) {
+        if (level <= 0) continue;
+        const path = document.createElementNS(NS, 'path');
+        path.setAttribute('d', segments);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', '#e3e4ae');
+        path.setAttribute('stroke-width', '0.8');
+        path.setAttribute('vector-effect', 'non-scaling-stroke');
+        fragment.append(path);
+      }
     }
     const zone = ([x0, x1, , , z0, z1]: NonNullable<Scenario['goal']>, fill: string) => {
       const rect = document.createElementNS(NS, 'rect');
