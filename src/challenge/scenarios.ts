@@ -50,7 +50,7 @@ export interface Scenario {
   contourInterval?: number; // vertical spacing of elevation lines on the map, in metres
   terrainColorRange?: [number, number]; // elevations of the low and high ground colours
   bumpSection?: { startZ: number; endZ: number; halfWidth: number; crests: number[] };
-  climbs?: { startZ: number; endZ: number; degrees: number }[];
+  climbs?: { startZ: number; endZ: number; degrees: number; practiceZ: [number, number] }[];
   centerStripe?: Solid; // painted triangles along the north-south test line at x=0
   roadPaint?: Solid; // markings on the banked pavement
   asphaltStart?: number; // first paved vertex in the terrain triangle list
@@ -273,8 +273,9 @@ function hillClimb(): Scenario {
     z -= 24;
     const gradient = Math.tan(degrees * Math.PI / 180);
     // Dashed lines enclose six metres of the incline. Paint follows its collision surface.
-    for (const distance of [9, 15]) {
-      const near = startZ - distance, far = near - 0.18;
+    const practiceZ: [number, number] = [startZ - 9, startZ - 15];
+    for (const near of practiceZ) {
+      const distance = startZ - near, far = near - 0.18;
       const low = y + distance * gradient, high = low + 0.18 * gradient;
       for (let x = -14; x < 14; x += 4) {
         roadPaint.push([x, low, near], [x + 2, low, near], [x, high, far],
@@ -282,7 +283,7 @@ function hillClimb(): Scenario {
       }
     }
     y += 24 * gradient;
-    climbs.push({ startZ, endZ: z, degrees });
+    climbs.push({ startZ, endZ: z, degrees, practiceZ });
     zs.push(z); heights.push([y, y]);
     roadPaint.push([-14, y, z - 0.3], [14, y, z - 0.3], [-14, y, z - 0.6],
       [14, y, z - 0.3], [14, y, z - 0.6], [-14, y, z - 0.6]);

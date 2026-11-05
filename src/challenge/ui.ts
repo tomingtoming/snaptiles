@@ -224,7 +224,15 @@ export class ChallengeUI {
         const [west, east, north, south] = s.terrainBounds;
         const slope = s.climbs.find(leg => z <= leg.startZ && z > leg.endZ);
         if (x < west || x > east || z < north || z > south) title += '｜登坂路の外';
-        else if (slope) title += '｜北向き ' + slope.degrees + '°・平場まで ' + Math.ceil(z - slope.endZ) + 'm';
+        else if (slope) {
+          title += '｜北向き ' + slope.degrees + '°・平場まで ' + Math.ceil(z - slope.endZ) + 'm';
+          const [near, far] = slope.practiceZ;
+          if (z <= near && z >= far) {
+            const northCm = Math.round(-sim.coreVelocity().z * 100);
+            const direction = northCm > 0 ? '上り' : '下り';
+            title += '｜坂道発進・' + (northCm === 0 ? '南北 0 cm/s' : direction + ' ' + Math.abs(northCm) + ' cm/s');
+          }
+        }
         else {
           const next = s.climbs.find(leg => z > leg.startZ);
           title += next ? '｜平場・次は ' + next.degrees + '°' : '｜頂上の平場';
