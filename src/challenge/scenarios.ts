@@ -400,6 +400,7 @@ const normalBrakeTrack = brakeTrack(true);
 const offshoreInlet = inlet(true);
 const islands = archipelago();
 const terraces = hillClimb();
+const canyon = canyonAirfield();
 const oval = { ...bankedOval(), compareTerrain: { id: 'oval-lap', label: 'タイムアタックへ' } };
 
 export const FREE_DRIVES: Scenario[] = [
@@ -408,7 +409,7 @@ export const FREE_DRIVES: Scenario[] = [
   islands,
   slickBrakeTrack,
   terraces,
-  canyonAirfield(),
+  canyon,
   oval,
   {
     ...sideSlopes,
@@ -455,6 +456,16 @@ export const FREE_DRIVES: Scenario[] = [
 ];
 
 export const SCENARIOS: Scenario[] = [
+  {
+    ...canyon, freeDrive: false, id: 'canyon-run', title: '峡谷の低空飛行',
+    description: '滑走路から北へ離陸し、谷を東、西の順に曲がって、出口まで3つのリングをくぐります。',
+    budget: 100, timeLimit: 75, showGateAltitude: true,
+    rings: [
+      { center: [24, 19, -240], radius: 12, heading: 0 },
+      { center: [-16, 20, -360], radius: 13, heading: 0 },
+      { center: [0, 20, -500], radius: 14, heading: 0 },
+    ],
+  },
   {
     ...oval, freeDrive: false, compareTerrain: { id: oval.id, label: '自由走行に戻る' }, id: 'oval-lap', title: 'バンク周回タイムアタック',
     description: '右回りに黄色いリングを順に抜け、白いスタートラインに戻るまでのタイムを競います。',

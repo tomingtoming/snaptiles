@@ -25,4 +25,9 @@ try {
   });
   assert.ok(entrance.z <= -120 && Math.abs(entrance.x) < 24 && entrance.clearance > 2 && entrance.y < 45, JSON.stringify(entrance));
   console.log('Stock plane at canyon entrance', entrance);
+  await page.click('#challenge-open');
+  await page.getByRole('button', {name:/峡谷の低空飛行/}).click();
+  await page.waitForFunction(() => window.__sim?.scenario?.id === 'canyon-run');
+  await page.waitForFunction(() => document.querySelectorAll('#terrain-map circle[aria-label^="リング"]').length === 3);
+  assert.match(await page.textContent('#challenge-banner-text'), /リング 1 \/ 3/);
 } finally { await browser.close(); }
