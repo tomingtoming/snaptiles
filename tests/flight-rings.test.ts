@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
-import { advanceRings, type FlightRing } from '../src/challenge/rings';
+import { advanceRings, type CourseRing } from '../src/challenge/rings';
 
-const ring = (z: number): FlightRing => ({ center: [0, 4, z], radius: 3, heading: 0 });
+const ring = (z: number): CourseRing => ({ center: [0, 4, z], radius: 3, heading: 0 });
 const p = (x: number, y: number, z: number) => ({ x, y, z });
 
 it('counts the circular opening, in the forward direction, including a fast crossing', () => {

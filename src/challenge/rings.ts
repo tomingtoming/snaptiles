@@ -1,4 +1,4 @@
-export interface FlightRing {
+export interface CourseRing {
   center: [number, number, number];
   radius: number; // clear opening, in metres
   heading: number; // degrees clockwise from north
@@ -14,7 +14,7 @@ interface Point { x: number; y: number; z: number }
 
 /** Cross ring planes in order along this frame's motion. Testing the intersection
  * rather than the endpoint catches a fast model passing between two physics samples. */
-export function advanceRings(rings: FlightRing[], passed: number, from: Point, to: Point): number {
+export function advanceRings(rings: CourseRing[], passed: number, from: Point, to: Point): number {
   let lastCrossing = -1;
   while (passed < rings.length) {
     const { center: [cx, cy, cz], heading, radius } = rings[passed];

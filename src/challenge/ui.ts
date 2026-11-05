@@ -176,7 +176,8 @@ export class ChallengeUI {
     }
     if (s.rings) {
       const next = s.rings[sim.ringsPassed];
-      driving = next ? `｜次はリング ${sim.ringsPassed + 1} / ${s.rings.length}（中心高度${next.center[1]}m）` : '｜全リング通過';
+      const height = next && s.showGateAltitude ? `（中心高度${next.center[1]}m）` : '';
+      driving = next ? `｜次はリング ${sim.ringsPassed + 1} / ${s.rings.length}${height}` : '｜全リング通過';
     }
     const zone = !sim.checkpointPassed && s.checkpoint ? s.checkpoint : s.goal;
     const altitude = s.showGateAltitude && zone ? `（高度${zone[2]}〜${zone[3]}m）` : '';

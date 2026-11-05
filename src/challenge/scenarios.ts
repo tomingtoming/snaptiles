@@ -2,7 +2,7 @@
 // any model within the budget and bring its Core into the goal; the run's time and the model's cost are the scores.
 // Courses lie toward −Z, where the samples drive under ↑. A run is recorded from its first step, so a record link
 // (model + run + challenge) is re-run and checked in the receiver's browser.
-import type { FlightRing } from './rings';
+import type { CourseRing } from './rings';
 import { hoverModel } from '../samples/hover';
 import type { Assembly } from '../model/assemble';
 import { FRAME_RATE } from '../sim/sim-view';
@@ -37,7 +37,7 @@ export interface Scenario {
   goal?: [number, number, number, number, number, number];
   checkpoint?: Scenario['goal'];
   showGateAltitude?: boolean;
-  rings?: FlightRing[];
+  rings?: CourseRing[];
   /** a mission (a Lua lesson): its starting model, and the state the model has to hold for `seconds` */
   mission?: {
     starter: string;
@@ -370,8 +370,24 @@ export const SCENARIOS: Scenario[] = [
     goal: [4, 20, 0, 8, -114, -91],
   },
   {
+    ...sideSlopes,
+    id: 'banked-slalom',
+    title: '片勾配のスラローム',
+    description: '左右に傾く試走路で、西・東・西の順に3つのリングをくぐります。白い中央線を目印に、黄色い輪へ操舵してください。',
+    budget: 45,
+    timeLimit: 70,
+    terrainColorRange: [0, 6],
+    solids: [],
+    rings: [
+      { center: [-5.5, 4.2, -37], radius: 3.8, heading: 0 },
+      { center: [5.5, 4.0, -73], radius: 3.8, heading: 0 },
+      { center: [-5.5, 3.7, -108], radius: 3.8, heading: 0 },
+    ],
+  },
+  {
     ...plateau,
     id: 'highland-rings',
+    showGateAltitude: true,
     title: '四峰高原のリング飛行',
     description: '北へ離陸し、空中の円を1番から順に通ります。標準のplaneはZで加速、↓で上昇。1番を抜けたら→で右に傾けます。',
     budget: 100,

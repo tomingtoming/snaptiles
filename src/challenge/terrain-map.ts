@@ -103,7 +103,8 @@ export class TerrainMap {
       const ring = s.rings[ringsPassed];
       if (ring) {
         const [rx, ry, rz] = ring.center;
-        text += `　リング${ringsPassed + 1}まで水平 ${Math.round(Math.hypot(rx - position.x, rz - position.z))}m・中心高度${ry}m`;
+        text += `　リング${ringsPassed + 1}まで水平 ${Math.round(Math.hypot(rx - position.x, rz - position.z))}m`;
+        if (s.showGateAltitude) text += `・中心高度${ry}m`;
       } else {
         text += '　全リング通過';
       }

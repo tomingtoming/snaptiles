@@ -26,3 +26,25 @@ it('the car follows three alternating cross slopes and returns level on the runo
     }
   } finally { await sim.dispose(); }
 });
+
+it.each([false, true])('stock car traverses the slalom using steering: %s', async steer => {
+  const course = scenarioById('banked-slalom')!;
+  const keys = new KeyState(new EventTarget());
+  const sim = new RustSimulation(CAR, keys, { scenario: course });
+  const press = (n: number, on: boolean) => { if (on) keys.press(n); else keys.release(n); };
+  try {
+    await sim.start();
+    while (sim.frame < 1000 && sim.corePosition().z > -135) {
+      const next = course.rings![sim.ringsPassed];
+      if (!next) break;
+      const { x } = sim.corePosition(), v = sim.coreVelocity();
+      const wanted = steer ? Math.max(-22, Math.min(22, (next.center[0] - x) * 2.2 - v.x * 4)) : 0;
+      const handle = sim.env('HANDLE');
+      press(0, sim.frame > 45 && -v.z < 7);
+      press(2, wanted < handle - 1.5);
+      press(3, wanted > handle + 1.5);
+      sim.step();
+    }
+    expect(sim.ringsPassed).toBe(steer ? 3 : 0);
+  } finally { await sim.dispose(); }
+});
