@@ -271,7 +271,17 @@ function hillClimb(): Scenario {
   for (const degrees of [6, 12, 18]) {
     const startZ = z;
     z -= 24;
-    y += 24 * Math.tan(degrees * Math.PI / 180);
+    const gradient = Math.tan(degrees * Math.PI / 180);
+    // Dashed lines enclose six metres of the incline. Paint follows its collision surface.
+    for (const distance of [9, 15]) {
+      const near = startZ - distance, far = near - 0.18;
+      const low = y + distance * gradient, high = low + 0.18 * gradient;
+      for (let x = -14; x < 14; x += 4) {
+        roadPaint.push([x, low, near], [x + 2, low, near], [x, high, far],
+          [x + 2, low, near], [x + 2, high, far], [x, high, far]);
+      }
+    }
+    y += 24 * gradient;
     climbs.push({ startZ, endZ: z, degrees });
     zs.push(z); heights.push([y, y]);
     roadPaint.push([-14, y, z - 0.3], [14, y, z - 0.3], [-14, y, z - 0.6],
@@ -282,7 +292,7 @@ function hillClimb(): Scenario {
   return {
     ...heightfield(xs, zs, heights), climbs, roadPaint, contourInterval: 2,
     id: 'terraced-climb', title: '三段の登坂路', freeDrive: true,
-    description: '北へ進むと6°、12°、18°の上り坂が続きます。白線の先は平場。停止してから再発進も試せます。',
+    description: '北へ進むと6°、12°、18°の上り坂が続きます。坂の途中の破線2本は坂道発進の停止区間。実線の先は平場です。',
     terrainColorRange: [0, y], budget: Infinity, timeLimit: Infinity, solids: [],
   };
 }
