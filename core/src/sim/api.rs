@@ -296,7 +296,7 @@ fn build() -> Vec<(&'static str, ApiFn)> {
         num(match key.as_str() {
             "FUEL" => s.world.fuel.get(&t).copied().unwrap_or(0.0),
             "FUELMAX" => s.world.fuel_max.get(&t).copied().unwrap_or(0.0),
-            "PARENT" => tile.parent.map_or(-1.0, |p| asm.tiles[p].chip_index as f64),
+            "PARENT" => if tile.detached { -1.0 } else { tile.parent.map_or(-1.0, |p| asm.tiles[p].chip_index as f64) },
             "TOP" => {
                 let mut r = t;
                 while let (Some(p), false) = (asm.tiles[r].parent, asm.tiles[r].detached) {
@@ -414,7 +414,7 @@ fn build() -> Vec<(&'static str, ApiFn)> {
     f!("_DIR", |s, a| num(s.tile_of(arg(a, 0)).and_then(|t| s.world.assembly().unwrap().tiles[t].dir).map_or(0.0, |d| dir_code(d) as f64)));
     f!("_PARENT", |s, a| {
         let asm = s.world.assembly();
-        num(s.tile_of(arg(a, 0)).and_then(|t| asm.unwrap().tiles[t].parent).map_or(-1.0, |p| asm.unwrap().tiles[p].chip_index as f64))
+        num(s.tile_of(arg(a, 0)).and_then(|t| { let tile = &asm.unwrap().tiles[t]; if tile.detached { None } else { tile.parent } }).map_or(-1.0, |p| asm.unwrap().tiles[p].chip_index as f64))
     });
     f!("_TOP", |s, a| num(s.top(arg(a, 0))));
     f!("_BYE", |s, a| {

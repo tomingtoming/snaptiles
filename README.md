@@ -182,6 +182,13 @@ wheel's motor gives 0.13 N·m per unit, `_AX/_AZ` are tilts of the chip's own ax
 aerodynamic, tyre and camera models. Scripts run at 30 fps with two physics steps per
 frame. What is still unverified is listed there and in `docs/spec/`.
 
+Strong impacts can detach parts. As measured in B26, collision cuts leave
+`_T(n)` unchanged; Arm hits still reduce durability. `_SETREG("U",1)` prevents
+collision breakage, and reset restores the model. This is calibrated against
+controlled drops, including the stock plane; exact fracture timing and fragment
+trajectories remain approximate. Input recordings from older physics versions
+can produce different crash outcomes.
+
 ## Tests
 
 ```
@@ -194,8 +201,8 @@ bun run test:editor:webkit                    # creation loop in WebKit
 ```
 
 Install browsers first with `bun x playwright install chromium` (and `firefox`/`webkit`).
-The browser suites serve `dist` on an OS-assigned port. Remote CI is disabled; run them
-locally. Automated engines and narrow windows do not establish support on physical mobile
+The browser suites serve `dist` on an OS-assigned port. Run the relevant checks locally
+before pushing; the repository also has a GitHub Actions workflow. Automated engines and narrow windows do not establish support on physical mobile
 devices or Safari on Apple devices. Windows WebKit loses WebGL pixels in screenshots after
 a canvas-size change (`node tools/webkit-resize-diagnostic.mjs` reproduces it without the
 app); workflow assertions still pass there.

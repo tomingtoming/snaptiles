@@ -2304,3 +2304,31 @@ New test: take off, then from 20 s close the throttle and hold ↑ — it touche
 stops, ends upright and loses no chips. Still open: the rollout rocks up to ~0.3–0.5 rad in roll at high ground
 speed (the known high-speed ground instability; neutral ailerons on the ground made it worse). 211 unit tests, all
 43 browser scenarios and both plane probes pass.
+
+## 2026-11-06 — Collision joint failure calibrated against B26
+
+Goal: stock models can lose parts in strong collisions, with the original as
+reference. Isolated black-box drops showed that B26 cuts connections without
+reducing `_T`. Eight six-part configurations, an Unbreakable control and three
+fixed-control stock-plane drops now agree on the broken chip sets. The plane
+survives 100 m, loses one tail connection at 200 m, and three at 300 m. Timing
+and debris motion are approximations; details and reproducible probes are in
+`docs/measured.md`.
+
+Retrospective: the first subtree-energy model passed the simple cross fixtures
+but failed the aircraft, breaking the main fuselage too early. Adding the actual
+stock plane exposed both excessive distant load transmission and CCD compressing
+the joint direction before the failure check. Local contact propagation and
+unstrained attachment directions fixed the observed locations. The intermediate
+200 m aircraft case also failed before the local supporting mass was included;
+it is calibration evidence, not a held-out pass. A spinning-split test found and
+fixed the lost tangential velocity when the body COM changes.
+
+Validation: 70 native tests, 212 Wasm/TypeScript tests, production build, actual
+browser aircraft wall impact/reset, normal canyon entry, and an independent
+before/after visual review. Crash recordings replay all chip poses, parents and
+durability exactly in this build. The first before-image did not show the plane
+because the following camera had not caught up after fast-forwarding; matching
+overhead views taken after rendering fixed the evidence. Native verification
+also needed two existing test-reader fixes (f32 FFI mapping and hover template
+expansion). No original executable or assets are published.

@@ -577,3 +577,113 @@ The exact UTF-8 file saved by the SnapTiles editor was loaded as Basic.txt in th
 The final sample returns the levers toward zero before mixing them on key release. In a 500-frame SnapTiles trace with forward thrust, both steering directions and reverse, all tile positions and quaternion components matched the first export exactly. A version-1 record containing the old model and key inputs also cleared the inlet in 31.50 seconds in Chromium, Firefox and WebKit.
 
 In B26 each run held a single physical arrow key in the private X display after the frame-60 cue. From frames 60 to 180 the forward run moved 21.59 m north and reverse moved 7.99 m south. At frame 90 the yaw angles with left and right were approximately -0.81 and +0.88 rad. The host polls the cue, so input can begin on slightly different frames. Local evidence: `quarantine/original/runs/raft_export_cases_20261106_s76` and `raft_final_{Up,Down,Left,Right}_20261106_s77`.
+
+## Collision joint failure (measured 2026-11-06)
+
+B26 collision failure cuts connections; it does **not** consume Arm durability.
+Every broken chip in these observations retained `_T = 10000`; its `_GET(n,
+"PARENT")` became -1 and `_GET(n,"TOP")` became its own chip number. U=1
+(Unbreakable) prevents these collision cuts. This is separate from shell damage.
+The bundled `Doc/readme15B26.txt` also distinguishes the older Unbreakable-off
+failure threshold from the later introduction of Arm durability. No original
+source or disassembly was read.
+
+### Original procedure and results
+
+`tools/orig-harness/crash-probe.py` uses the existing water probe's disposable
+Wine/Xvfb user/mount/network/PID namespace. Original executable SHA256:
+`872ee04f7b432afa169542718c4447172abf9cd28478bea8872d4305622ef199`.
+It settles the model, clears motion and warps the core at frame 180, then rotates
+by the specified **degrees**. Land is flat at y=0. A=0 removes aerodynamic
+forces for the controlled comparisons; U=0 unless noted. All parts' positions,
+land hits, durability, parent and component root are logged through frame 600.
+
+The six-part self-authored specimen is:
+
+```
+Val {}
+Key {}
+Body { Core(){ N:PART(){ N:PART(){} } S:PART(){} W:PART(){} E:PART(){} } }
+```
+
+PART is Chip(), Frame(), or Weight(). Indices: Core=0, N=1, NN=2, S=3, W=4,
+E=5. Roll 90 puts W above and E below the core. Pitch 90 puts N/NN above and
+S below. Downward speeds are world-position differences × 30, not local `_VY`.
+
+| Model / posture | Height | Downward speed | B26 cut chips (first frame) | SnapTiles cut chips |
+|---|---:|---:|---|---|
+| Weight / roll 90 | 100 m | 43.68 m/s | none (repeated) | none |
+| Weight / roll 90 | 150 m | ~54 m/s | 5 (346) | 5 |
+| Weight / roll 90 | 200 m | 62.29 m/s | 4, 5 (372) | 4, 5 |
+| Weight / roll 90 | 300 m | 76.34 m/s | 4, 5 (415) | 4, 5 |
+| Weight / roll 90, U=1 | 300 m | 76.34 m/s | none | none |
+| Chip / roll 90 | 300 m | 76.34 m/s | none | none |
+| Frame / roll 90 | 300 m | 76.34 m/s | none | none |
+| Weight / flat | 300 m | ~76 m/s | none | none |
+| Weight / pitch 90 | 200 m | ~62 m/s | 1, 3 (372); 2 stays on 1 | 1, 3 |
+| Stock plane, fixed controls / pitch 90 | 100 m | — | none | none |
+| Stock plane, fixed controls / pitch 90 | 200 m | — | 31 (375) | 31 |
+| Stock plane, fixed controls / pitch 90 | 300 m | — | 32 (414); 26, 31 (415) | 26, 31, 32 |
+
+The stock-plane export retains all geometry and Val defaults, removes only its
+Lua autopilot and colors, and rests on its gear before the warp/rotation. The
+first autopilot-on experiment broke parts while still high in the air, so it
+was excluded from collision calibration. The fixed-control 200 m case initially
+rejected the candidate and was subsequently used to refine local supporting
+mass; it is not a held-out success after that refinement. The two extra Weight
+postures were independent geometry checks.
+
+With A=1, Chip and Frame rolled 90 from 30 m reach 23.59 and 23.68 m/s without
+cuts. A nearly horizontal Chip reaches only 6.11 m/s; the preliminary 100 m
+case had not landed at frame 600 and is not counted as crash survival.
+
+Private raw evidence: `D:/snaptiles-models/quarantine/original/runs/crash-*`.
+The fixed aircraft cases are `crash-plane-fixed-h{100,200,300}-p90-a0-u0` and
+include the exact self-authored model bytes. Early six-part runs predate the
+JSON metadata; their names encode part/height/roll/air/U. Example reproduction:
+
+```
+python3 tools/orig-harness/crash-probe.py --height 200 --tilt 90 --air 0 --part Weight --out /tmp/crash-weight-200
+cd core
+cargo run --bin crash -- Weight 200 90
+cargo run --bin crash -- /path/to/fixed-plane.txt 300 0 90
+```
+
+### Implementation and limits
+
+`core/src/physics/impact.rs` is an empirical contact-response approximation.
+It is **not a recovered B26 force equation**. Fixed parts are welded in Rapier,
+whereas B26 has compliant connections. The proxy uses local mass (including an
+immediately supported contacting child), the connected assembly's mass, closing
+velocity along the attachment direction, and at most two connection edges from
+the hit. The score is `0.5 * sqrt(localMass * componentMass) * axialSpeed^2`,
+with a 1.2 factor at the hit and a fitted 350,000 threshold. Remote branches are
+not broken just because their whole subtree is heavy.
+
+Attachment directions are reconstructed without CCD-induced compression.
+When CCD reports several contact layers in one step, the leading layer is
+resolved first (normals within dot 0.95; separation 0.15 m). After a cut,
+uncontacted components retain 70% of incident velocity plus 30% of the solver's
+response, so the rest can continue falling instead of inheriting a whole-body
+stop. These are fitted numerical rules, not independently measured constants.
+Cuts disable power in their detached subtrees, preserve durability, and expose
+correct `_PARENT`, `_GET(...,"PARENT")` and `_TOP` values. Rebuilding a spinning
+body now preserves its velocity field at the new centers of mass.
+
+Observed cut sets agree in the table. The stock-plane 200 m cut is approximately
+five 30 Hz frames earlier than B26; the 300 m tail cuts are within one frame.
+Fragment trajectories and exact force thresholds remain approximate. Airborne
+servo/aerodynamic overload without a contact is not implemented by this change.
+Arbitrary imported models and every impact angle have not been calibrated.
+Old input recordings containing crashes can change under the new physics;
+new recordings replay exactly within this build.
+
+Validation: 70 native Rust tests, 212 TypeScript/Wasm tests, and production build
+pass. The collision suite includes all tabulated cut sets, U=1, unchanged `_T`,
+parent/top queries, reset, and velocity preservation on a spinning split. The
+Wasm suite replays every chip pose and parent/durability value through an encoded
+700-frame crash recording and verifies reset and U=1. Browser probes launch the
+stock plane into an authored test wall, observe separated parts without page
+errors, reset it, and still fly the normal canyon entrance. Independent visual
+review confirms an intact before-image and separated parts afterward; images
+live in ignored `.shots/collision-plane-{before,after}.png`, not the repository.

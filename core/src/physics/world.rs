@@ -522,11 +522,13 @@ impl World {
             return;
         }
         let mut velocities = HashMap::new();
+        let mut previous_com = HashMap::new();
         let mut poses = Vec::with_capacity(self.tiles.len());
         for i in 0..self.tiles.len() {
             let pose = self.pose(i);
             let b = &self.world.bodies[self.tiles[i].body];
             velocities.insert(self.tiles[i].tile, (from_vector(b.linvel()), from_vector(b.angvel())));
+            previous_com.insert(self.tiles[i].tile, from_vector(b.center_of_mass()));
             poses.push((self.tiles[i].tile, pose));
         }
         let mut a = self.assembly.take().unwrap();
@@ -549,7 +551,18 @@ impl World {
         let charges = self.arm_charge.clone();
         let shells = std::mem::take(&mut self.projectiles);
         let tick = self.tick;
-        self.build(a, env, Vec3::default(), BuildOptions { in_place: true, velocities: Some(velocities) });
+        self.build(a, env, Vec3::default(), BuildOptions { in_place: true, velocities: Some(velocities.clone()) });
+        // Splitting changes each rigid body's COM. Keep the velocity field, not
+        // just the old COM velocity, or spinning fragments lose tangential speed.
+        let mut seen = HashSet::new();
+        for tb in &self.tiles {
+            if !seen.insert(tb.body) { continue; }
+            let body = &mut self.world.bodies[tb.body];
+            body.recompute_mass_properties_from_colliders(&self.world.colliders);
+            let (v, w) = velocities[&tb.tile];
+            let offset = from_vector(body.center_of_mass()).sub(previous_com[&tb.tile]);
+            body.set_linvel(to_vector(v.add(Vec3::cross(w, offset))), true);
+        }
         self.arm_charge = charges;
         self.projectiles = shells;
         self.tick = tick;
@@ -745,6 +758,7 @@ impl World {
                 // a tyre is frictionless (it only carries load); grip comes from drive_wheel()
                 let mut cd = cd
                     .mass(js_max(0.1, mass) as f32)
+                    .user_data(super::impact::MODEL_COLLIDER_TAG | tile.id as u128)
                     .friction(if tile.spec.wheel { 0.0 } else { tile.spec.friction as f32 })
                     .collision_groups(groups(MODEL_GROUP))
                     // rapier averages friction by default, so a chip's 0.02 against the ground's 1.0 would act as 0.5:
@@ -1147,9 +1161,11 @@ impl World {
     /// One physics step of `dt`: soft kerbs, the solver (with the kerb filter hook), tyre loads, shells.
     pub fn step(&mut self, env: Env) {
         self.kerb_springs();
+        let before_impact = self.impact_snapshot();
         let Self { world, kerb_pairs, .. } = self;
         world.step_with_events(&KerbHooks { pairs: kerb_pairs }, &());
         self.measure_tyre_loads();
+        if let Some(before) = before_impact { self.break_impact_joints(before, env); }
         self.tick += 1;
         if !self.projectiles.is_empty() {
             self.cull_projectiles(env);

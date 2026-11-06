@@ -43,7 +43,7 @@ fn ffi_functions() -> Vec<(String, Vec<(String, String)>, Option<String>)> {
 /// every C type the ABI uses is a number in JavaScript (pointers are byte offsets into the module's memory)
 fn ts_type(rust: &str) -> &'static str {
     match rust {
-        "u32" | "i32" | "usize" | "f64" | "*const u8" | "*const f64" => "number",
+        "u32" | "i32" | "usize" | "f32" | "f64" | "*const u8" | "*const f64" => "number",
         other => panic!("ffi type {other} has no JavaScript mapping here: add it to tests/bindings.rs"),
     }
 }

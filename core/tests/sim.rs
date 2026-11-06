@@ -16,7 +16,13 @@ fn sample(name: &str) -> String {
     let text = std::fs::read_to_string(&path).unwrap();
     let a = text.find('`').unwrap();
     let b = text.rfind('`').unwrap();
-    text[a + 1..b].to_string()
+    let mut source = text[a + 1..b].to_string();
+    if name == "hover" {
+        assert!(text.contains(", 3, 'local h = _H(0)')"), "update the native hover fixture for its default arguments");
+        source = source.replace("${title}", "hover platform").replace("${targetHeight}", "3").replace("${sensor}", "local h = _H(0)");
+    }
+    assert!(!source.contains("${"), "sample template requires expansion");
+    source
 }
 
 fn course() -> PhysicsOptions {

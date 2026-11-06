@@ -7,6 +7,7 @@
 pub mod math;
 pub mod pose_balance;
 mod arm;
+mod impact;
 mod servo;
 mod wheel;
 mod world;
