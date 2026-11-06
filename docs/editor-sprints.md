@@ -2380,3 +2380,21 @@ it. The shared presentation pose removes the mismatch. The first controlled
 clock blocked startup's own animation frame; enabling it only after startup
 fixed the test harness. This measures pose continuity rather than asserting
 smoothness from a still screenshot or assuming the monitor refresh rate.
+
+## 2026-11-06 — Compare plane speed before reducing its power
+
+The same 30-second scripted plane runs in B26 and SnapTiles exposed early tail
+failure in the original, even before meaningful speed. U=1 gave an intact
+20,000-power comparison (224 vs 595 km/h at 30 s), but the 60,000-power original
+still failed under extreme load. A simple no-air/no-gravity twin Jet then showed
+B26's approximately 140 m/s ceiling at both 20,000 and 60,000 power, with measured
+initial acceleration matching the existing 1/6 N conversion. Fixed controls
+bring mid-speed acceleration closer but do not remove the missing ceiling.
+
+Retrospective: the earlier 500 km/h camera trace was not a measured maximum or
+proof of correct flight physics. Reducing throttle would conceal distinct
+issues: speed limiting, flexible joints/assist response, and A/G flags that
+currently store values without affecting forces. Invalid A/G-off native trials
+are explicitly excluded; the probe now refuses that unsupported comparison.
+Evidence and limitations are in measured.md. Only measurement tooling/docs
+change in this sprint; no uncalibrated physics correction or deployment.

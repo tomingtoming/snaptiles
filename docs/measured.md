@@ -687,3 +687,66 @@ stock plane into an authored test wall, observe separated parts without page
 errors, reset it, and still fly the normal canyon entrance. Independent visual
 review confirms an intact before-image and separated parts afterward; images
 live in ignored `.shots/collision-plane-{before,after}.png`, not the repository.
+
+## 2026-11-06: stock-plane speed and the original's observed 140 m/s ceiling
+
+The current self-authored plane (including its Lua assist) was exported without
+comments/colours. Both engines received exactly the same model text. Power ramps
+by 600 per frame after frame 90 to 20,000 or 60,000 per Jet. A=1, G=1, E=1;
+flat 20 km terrain in B26 and bare ground in SnapTiles. Each run lasts 900 frames
+(30 s), including settling/ramp time. B26 logs are scenario observations; native
+logs are after each simulation frame, so early comparisons can differ by about
+one script frame. Speed is the norm of local VX/VY/VZ, not one component.
+These are observed speeds, not established steady level-flight maxima.
+
+| Per-Jet power / U | B26 at 30 s | SnapTiles at 30 s | Interpretation |
+|---|---:|---:|---|
+| 20,000 / 0 | 15.3 km/h | 595.2 km/h | B26 loses chip 31 at frame 92, later chip 26; invalid top-speed comparison |
+| 60,000 / 0 | 23.5 km/h | 391.7 km/h | B26 similarly breaks; SnapTiles peak 519.5 km/h |
+| 20,000 / 1 | 223.8 km/h | 595.2 km/h | intact in both; B26 peak 281.1, altitude 4.75 m at end; SnapTiles 8.46 m and still accelerating |
+| 60,000 / 1 | 56.7 km/h | 391.7 km/h | B26 reaches 504 km/h transiently then breaks at frame 282; not stable flight |
+
+Unbreakable did not prevent the high-power U=1 run's extreme failure. This does
+not contradict the controlled collision-drop observations: compliant-joint and
+servo overload is another mechanism and is still missing from SnapTiles. The
+low-speed tail failure and different controlled-flight trajectories prevent
+attributing the entire speed gap to a single aerodynamic coefficient.
+
+A symmetric Core + two flat Jets, no script/controls, A=0, G=0, U=1, E=1,
+isolates acceleration and the ceiling in B26. Constant power 20,000 per Jet
+produces 22.1878 m/s at frame 10, 67.2123 at 30 and 134.7428 at 60. The measured
+acceleration over frames 10..30 is 67.5368 m/s²; 2*20000/6 divided by the measured
+98.7133 kg is 67.5357 m/s². Thus the existing 1/6 N per power conversion is
+supported. Velocity then remains about 139.92..140.00 m/s through frame 900.
+At power 60,000 per Jet it reaches the same ceiling sooner (about frame 21)
+and remains bounded by 140 m/s, despite three times the force and no air drag.
+This is an observed velocity ceiling (504 km/h), not an aerodynamic terminal
+speed. Its precise internal per-chip/body implementation is not recovered.
+SnapTiles has no corresponding limit and its normal-air plane exceeds 140 m/s.
+
+A further diagnostic keeps the plane's geometry/Val defaults but replaces the
+assist with only the throttle ramp, disables gravity after the first frame,
+and retains air/U=1. At frames 300/450/600/900, B26 gives
+131.4/243.6/350.0/503.8 km/h; SnapTiles gives 137.3/260.6/385.6/637.8 km/h.
+Both encounter the ground and their passive joint/attitude trajectories differ;
+this is not a clean free-flight drag coefficient measurement. It shows closer
+mid-speed acceleration once feedback control is removed, followed by the missing
+ceiling. Lowering the sample throttle alone does not reproduce the original.
+
+Measurement caveat: SnapTiles currently stores A/G regulation flags but does not
+apply them to aerodynamic forces/gravity. Initial native thrust-only CSVs and
+fixed-plane snap.csv are therefore INVALID controls and excluded. The flight
+binary rejects thrust-only mode; its fixed-plane mode explicitly zeroes the
+physics gravity from frame 2. The final fixed-plane native trace is
+snap-matched.csv (snap-gravity0.csv was an earlier zero-gravity-from-start trial).
+Normal A=1/G=1 plane results above are unaffected by this instrumentation issue.
+
+Reproduction: tools/orig-harness/flight-probe.py --power 20000 --unbreakable 1
+--out <empty-directory>; --mode thrust or fixed-plane selects the controls.
+The native counterpart is cargo run --bin flight -- <plane.txt> 900 1
+[fixed-plane]. All original executions use water-probe.py's offline namespace
+and executable SHA256 check; no original source/assets are included.
+Private raw evidence: D:/snaptiles-models/quarantine/original/runs/flight-*-20261106;
+each directory retains plane.txt and original/plane_base0.csv. The two thrust
+runs are B26-only evidence. Product physics and sample power are unchanged by
+this measurement commit.
