@@ -13,6 +13,7 @@ try {
   await page.getByRole('button', { name: /^制動試験路/ }).click();
   await page.waitForFunction(() => window.__sim?.scenario?.id === 'brake-track');
   await page.evaluate(() => {
+    /** @returns {[number, number, number][]} */
     const box = (x0,x1,y0,y1,z0,z1) => [[x0,y0,z0],[x1,y0,z0],[x0,y1,z0],[x1,y1,z0],[x0,y0,z1],[x1,y0,z1],[x0,y1,z1],[x1,y1,z1]];
     const s = window.__sim.scenario;
     s.ground = [box(-1000,1000,-1,0,-1000,1000)];

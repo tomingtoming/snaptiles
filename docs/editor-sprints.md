@@ -2332,3 +2332,23 @@ because the following camera had not caught up after fast-forwarding; matching
 overhead views taken after rendering fixed the evidence. Native verification
 also needed two existing test-reader fixes (f32 FFI mapping and hover template
 expansion). No original executable or assets are published.
+
+## 2026-11-06 — Switch the stock plane between assist and manual control
+
+C (key 6) now toggles the Lua flight assist once per press, starting ON. The
+runtime output displays the mode. OFF maps arrows directly to elevator and
+ailerons, removes automatic leveling/flare/braking, and leaves throttle/rudder
+controls intact. Pitch/roll history keeps updating while manual; the trim
+integrator freezes and resets on switching. Reset restores assist ON.
+
+Validation: 213 TypeScript/Wasm tests and production build pass. A physics test
+takes off, climbs, holds C to check single-toggle behavior, completes a manual
+360-degree loop above ground with all parts attached, releases the elevator,
+re-enables assist, and resets. The existing canyon route still passes. The
+browser plane probe checks physical C keydown/keyup in addition to takeoff.
+
+Retrospective: reliable takeoff and landing had hidden a control limitation:
+arrows requested climb rate and bank angle instead of directly moving surfaces.
+Keeping that beginner mode while exposing manual controls permits aerobatics.
+The full check also found a missing tuple return annotation in the previous
+collision probe; corrected without changing its runtime behavior.

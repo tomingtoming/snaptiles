@@ -16,6 +16,15 @@ try{
  const takeoff=await page.evaluate(()=>({ticks:window.__sim.ticks,position:window.__sim.corePosition().toArray(),throttle:window.__sim.env('THROTTLE')}));
  assert.ok(takeoff.position[2]<-60);assert.equal(takeoff.throttle,60000);
  await page.screenshot({path:fileURLToPath(new URL('../.shots/plane-takeoff.png',import.meta.url))});
+ await page.focus('#view');await page.keyboard.down('c');
+ await page.waitForFunction(()=>window.__sim.env('ASSIST')===0);
+ const manualTick=await page.evaluate(()=>window.__sim.ticks);
+ await page.waitForFunction(t=>window.__sim.ticks>=t+15,manualTick);
+ assert.equal(await page.evaluate(()=>window.__sim.env('ASSIST')),0);
+ await page.keyboard.up('c');
+ const releasedTick=await page.evaluate(()=>window.__sim.ticks);
+ await page.waitForFunction(t=>window.__sim.ticks>t,releasedTick);
+ await page.keyboard.down('c');await page.waitForFunction(()=>window.__sim.env('ASSIST')===1);await page.keyboard.up('c');
  await page.click('#build');const pending=page.waitForEvent('download');await page.click('#save-model');const downloaded=await pending;
  const stream=await downloaded.createReadStream(),chunks=[];for await(const chunk of stream)chunks.push(chunk);assert.equal(Buffer.concat(chunks).toString(),source);
  assert.equal(await page.inputValue('#source'),source);assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'plane takeoff pass',takeoff,errors}));
