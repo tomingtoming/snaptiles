@@ -750,3 +750,33 @@ Private raw evidence: D:/snaptiles-models/quarantine/original/runs/flight-*-2026
 each directory retains plane.txt and original/plane_base0.csv. The two thrust
 runs are B26-only evidence. Product physics and sample power are unchanged by
 this measurement commit.
+
+## 2026-11-07 — Apply A/G and a measured translation ceiling
+
+A/G now affect forces instead of only storing flags: G restores the configured
+world gravity and wakes sleeping bodies; A controls plate lift/drag, water forces
+and rotor drag. Turning a force off preserves velocity. The flight probe now
+uses these switches, including the original scenario's first-frame gravity.
+The invalid November 6 CSVs above remain invalid historical controls.
+
+Additional isolated B26 tests: diagonal twin Jets (power 60,000, opposing 45-degree
+mounts) reach a resultant speed of 139.98 m/s, rather than 140 on each axis.
+Adding two Weight chips changes mass to 300.3133 kg and delays acceleration,
+but still reaches approximately 140 m/s. Evidence is in private runs
+speed-diagonal-20261107 and speed-ballast-20261107, using the same offline harness.
+The corrected native twin-Jet and ballast fixtures both read 140 m/s at frame 120.
+
+SnapTiles now limits the mass-weighted translation of each connected model to
+140 m/s after each physics step. Every body in that component receives the same
+velocity correction, preserving angular and relative joint motion. Applying the
+limit independently to articulated bodies failed the existing banking test and
+was rejected. This is a calibrated approximation: B26's internal per-chip rule
+and integration order are not recovered. Local rotational velocities can exceed
+the translation limit, and position integration precedes clipping; this is not
+an exact cap on every chip's displacement per frame. Free balls and shells are
+not part of this model limit.
+
+Sample power and assist settings are unchanged. The intact original plane's
+224 km/h result versus the prior 595 km/h result is not explained by a 504 km/h
+ceiling alone. Flexible joint and feedback-control differences remain to be
+isolated before choosing the independent training plane's tuning.

@@ -106,6 +106,8 @@ pub const TYRE_LOAD_CAP: f64 = 30.0;
 pub const TYRE_LOAD_CAP_SUSTAINED: f64 = 3.0;
 /// steps after a touchdown during which the full impact load (TYRE_LOAD_CAP) may be used for grip
 pub const TYRE_TOUCHDOWN_STEPS: u32 = 40;
+/// B26 free-thrust probes at two powers, diagonal thrust and added mass: 140 m/s resultant speed.
+pub const MODEL_MAX_SPEED: f32 = 140.0;
 /// spec: 6 power = 1 N
 pub const JET_NEWTON_PER_POWER: f64 = 1.0 / 6.0; // measured 2026-11-01 (rc_models37.sh): two flat Jets lifting a 98.7 kg core leave the ground at power 3000 each but not 2800 (1/6 N per power: 2904), and climb slowly at 0.163 N/power before the plates' drag grows; the 2026-10-28 0.145 came from a jet-pushed wheeled car whose mass was underestimated. tp-2 hovers on 6 power per newton
 /// plate aero (per 1 m² tile): broadside drag N per (m/s)², and the lift slope N per (m/s)² per sin α.
@@ -368,6 +370,8 @@ impl PhysicsHooks for KerbHooks<'_> {
 
 pub struct World {
     pub world: RapierWorld,
+    /// Gravity restored when regulation G is enabled (including custom test worlds).
+    configured_gravity: f64,
     pub tiles: Vec<TileBody>,
     pub dt: f64,
     pub tick: u64,
@@ -433,6 +437,7 @@ impl World {
         }
         World {
             world,
+            configured_gravity: opts.gravity,
             tiles: Vec::new(),
             dt: 1.0 / 60.0,
             tick: 0,
@@ -978,6 +983,7 @@ impl World {
 
     /// Drive joints toward attribute values, apply wheel torque, jets and air drag.
     pub fn apply_controls(&mut self, env: Env) {
+        let air_enabled = self.regulations.get("A").copied().unwrap_or(1.0) != 0.0;
         let mut seen = HashSet::new();
         for i in 0..self.tiles.len() {
             let h = self.tiles[i].body;
@@ -1077,7 +1083,7 @@ impl World {
             }
             let body = self.tiles[i].body;
 
-            if let Some([xmin, xmax, zmin, zmax, level]) = self.water {
+            if let Some([xmin, xmax, zmin, zmax, level]) = self.water.filter(|_| air_enabled) {
                 let p = pose.position;
                 if p.x >= xmin && p.x <= xmax && p.z >= zmin && p.z <= zmax && p.y < level {
                     let t = self.tile(self.tiles[i].tile);
@@ -1120,7 +1126,7 @@ impl World {
                 }
             }
 
-            if drag > 0.0 {
+            if air_enabled && drag > 0.0 {
                 let v = self.velocity(i, &pose).sub(self.wind); // air speed: the wind the scenario sets
                 // isotropic air resistance per tile (the reference table lists a per-type coefficient:
                 // Chip 1, Weight 1, Arm 0.7, Wheel 0.05, Frame/Jet 0) — caps top speeds
@@ -1160,12 +1166,43 @@ impl World {
 
     /// One physics step of `dt`: soft kerbs, the solver (with the kerb filter hook), tyre loads, shells.
     pub fn step(&mut self, env: Env) {
+        let gravity = if self.regulations.get("G").copied().unwrap_or(1.0) != 0.0 { self.configured_gravity as f32 } else { 0.0 };
+        if self.world.gravity.y != gravity {
+            self.world.gravity.y = gravity;
+            for (_, body) in self.world.bodies.iter_mut() { body.wake_up(true); }
+        }
         self.kerb_springs();
         let before_impact = self.impact_snapshot();
         let Self { world, kerb_pairs, .. } = self;
         world.step_with_events(&KerbHooks { pairs: kerb_pairs }, &());
         self.measure_tyre_loads();
         if let Some(before) = before_impact { self.break_impact_joints(before, env); }
+        // Cap each connected model's translation uniformly; clipping articulated
+        // bodies separately injects relative motion and changes banking/servos.
+        let mut seen = HashSet::new();
+        let mut members = Vec::new();
+        let mut motion: HashMap<usize, (Vec3, f64)> = HashMap::new();
+        for tile in &self.tiles {
+            if !seen.insert(tile.body) { continue; }
+            let root = self.component_root(tile.tile);
+            let body = &self.world.bodies[tile.body];
+            let mass = body.mass() as f64;
+            let entry = motion.entry(root).or_insert((Vec3::default(), 0.0));
+            entry.0 = entry.0.add_scaled(from_vector(body.linvel()), mass);
+            entry.1 += mass;
+            members.push((tile.body, root));
+        }
+        for (velocity, mass) in motion.values_mut() {
+            if *mass > 0.0 { *velocity = velocity.scale(1.0 / *mass); }
+            let speed = velocity.length();
+            *velocity = if speed > MODEL_MAX_SPEED as f64 { velocity.scale(MODEL_MAX_SPEED as f64 / speed - 1.0) } else { Vec3::default() };
+        }
+        for (handle, root) in members {
+            let correction = motion[&root].0;
+            if correction.length_sq() == 0.0 { continue; }
+            let body = &mut self.world.bodies[handle];
+            body.set_linvel(to_vector(from_vector(body.linvel()).add(correction)), true);
+        }
         self.tick += 1;
         if !self.projectiles.is_empty() {
             self.cull_projectiles(env);

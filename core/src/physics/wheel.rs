@@ -191,12 +191,16 @@ impl World {
                 let torque = power * ROTOR_TORQUE;
                 // the drag grows with ω^2.74, so step in small pieces and never past the speed where it balances the motor
                 // (a rotor that touched the ground at speed otherwise overshot and diverged)
-                let cd = ROTOR_DRAG * tb.rotor_mass.powf(ROTOR_DRAG_M);
+                let cd = if self.regulations.get("A").copied().unwrap_or(1.0) != 0.0 { ROTOR_DRAG * tb.rotor_mass.powf(ROTOR_DRAG_M) } else { 0.0 };
                 let inertia = tb.rotor_inertia + WHEEL_INERTIA_SCALE * 0.5 * mass * r * r;
-                let eq = js_sign(torque) * (torque.abs() / cd).powf(1.0 / ROTOR_DRAG_N);
-                for _ in 0..8 {
-                    let next = tb.spin + (self.dt / 8.0) * (torque - cd * tb.spin.abs().powf(ROTOR_DRAG_N) * js_sign(tb.spin)) / inertia;
-                    tb.spin = if (next - eq) * (tb.spin - eq) < 0.0 { eq } else { next };
+                if cd == 0.0 {
+                    tb.spin += self.dt * torque / inertia;
+                } else {
+                    let eq = js_sign(torque) * (torque.abs() / cd).powf(1.0 / ROTOR_DRAG_N);
+                    for _ in 0..8 {
+                        let next = tb.spin + (self.dt / 8.0) * (torque - cd * tb.spin.abs().powf(ROTOR_DRAG_N) * js_sign(tb.spin)) / inertia;
+                        tb.spin = if (next - eq) * (tb.spin - eq) < 0.0 { eq } else { next };
+                    }
                 }
                 if power != 0.0 && !no_reaction && WHEEL_REACTION {
                     let t = normal.scale(torque);

@@ -2398,3 +2398,25 @@ currently store values without affecting forces. Invalid A/G-off native trials
 are explicitly excluded; the probe now refuses that unsupported comparison.
 Evidence and limitations are in measured.md. Only measurement tooling/docs
 change in this sprint; no uncalibrated physics correction or deployment.
+
+## 2026-11-07 — Fix force switches and bound model translation
+
+Following the user's choice to align physics before independently tuning the
+training plane, A/G now actually toggle their forces and connected model
+translation is limited to the B26-measured 140 m/s (504 km/h). Diagonal thrust
+and added ballast retain the original ceiling. The limit preserves relative
+joint motion and angular velocity; sample power and assist are unchanged.
+
+Validation: all 76 native tests and 216 browser-core/unit tests pass, including
+banking, manual C-toggle aerobatics, landing, contact fracture, A/G switching
+and deterministic replay. Production build succeeds. Real-browser probes pass
+for plane takeoff, destructive collision/reset and tracking views A/C/D/E/F/I
+at 60/144 Hz, with no console errors.
+
+Retrospective: clipping each articulated body independently disrupted banking;
+applying one mass-weighted translation correction per connected component
+preserved the existing maneuver tests. This matches the measured ceiling, not
+the unrecovered internal B26 implementation. Step displacement and local
+rotational speeds are not individually capped. The original's flexible joints
+and the sample's feedback response still require comparison; do not equate
+this milestone with matching the original plane's cruising speed.

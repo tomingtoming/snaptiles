@@ -8,6 +8,8 @@ spec.loader.exec_module(water)
 p = argparse.ArgumentParser()
 p.add_argument('--power', type=int, choices=[10000,20000,40000,60000], required=True)
 p.add_argument('--mode', choices=['plane','thrust','fixed-plane'], default='plane')
+p.add_argument('--angle', type=float, default=0)
+p.add_argument('--ballast', action='store_true')
 p.add_argument('--unbreakable', type=int, choices=[0,1], default=0)
 p.add_argument('--out', type=Path, required=True)
 a = p.parse_args()
@@ -21,6 +23,9 @@ if a.mode == 'fixed-plane':
  source = re.split(r'(?m)^Lua',source)[0] + 'Lua { local n=0 function OnFrame() n=n+1 THROTTLE=math.min(' + str(a.power) + ', math.max(0,n-90)*600) end }\n'
 if a.mode == 'thrust':
  source = 'Val { POWER(default=' + str(a.power) + ',min=0,max=60000) }\nKey {}\nBody { Core(){ N:Jet(power=POWER){} S:Jet(power=POWER){} } }\n'
+if a.mode == 'thrust':
+ source = source.replace('N:Jet(power=POWER)', 'N:Jet(power=POWER,angle=' + str(a.angle) + ')').replace('S:Jet(power=POWER)', 'S:Jet(power=POWER,angle=' + str(-a.angle) + ')')
+ if a.ballast: source = source.replace('Core(){', 'Core(){ W:Weight(){} E:Weight(){} ')
 model = a.out / 'plane.txt'
 model.write_text(source, encoding='utf-8')
 terrain = a.out / 'terrain.json'
@@ -53,4 +58,4 @@ water.subprocess.run=run_land
 observations=a.out/'original'
 sys.argv=[sys.argv[0],'0','--frames','900','--model-file',str(model),'--out',str(observations)]
 water.main()
-(a.out/'case.json').write_text(json.dumps({'mode':a.mode,'power':a.power,'unbreakable':a.unbreakable,'frames':900,'air':0 if a.mode == 'thrust' else 1,'gravity':1 if a.mode == 'plane' else 0,'ramp_start':None if a.mode == 'thrust' else 90,'ramp_per_frame':None if a.mode == 'thrust' else 600,'exe_sha256':water.EXPECTED},indent=2))
+(a.out/'case.json').write_text(json.dumps({'mode':a.mode,'angle':a.angle,'ballast':a.ballast,'power':a.power,'unbreakable':a.unbreakable,'frames':900,'air':0 if a.mode == 'thrust' else 1,'gravity':1 if a.mode == 'plane' else 0,'ramp_start':None if a.mode == 'thrust' else 90,'ramp_per_frame':None if a.mode == 'thrust' else 600,'exe_sha256':water.EXPECTED},indent=2))
