@@ -2352,3 +2352,31 @@ arrows requested climb rate and bank angle instead of directly moving surfaces.
 Keeping that beginner mode while exposing manual controls permits aerobatics.
 The full check also found a missing tuple return annotation in the previous
 collision probe; corrected without changing its runtime behavior.
+
+## 2026-11-06 — Smooth the model and tracking cameras between physics frames
+
+Report: tracking views stutter above about 30 km/h. There is no 30 km/h camera
+threshold. The model jumped at the 30 Hz script/physics boundary while the chase
+camera eased every rendered frame. The current production build reproduced this:
+in each 72-frame sample, 36 frames at 60 Hz and 57 at 144 Hz reused the unchanged
+model pose. This is a deterministic render-clock test, not a hardware FPS claim.
+
+Rendering now interpolates position, orientation and wheel spin between the last
+two simulation states. Camera centre/core/rotation come from that same visible
+pose. Physics, inputs and recordings stay unchanged; presentation trails by one
+30 Hz step (up to 33 ms). Pause/resume, reset, model changes and external stepping
+clear stale history; warps over 100 m snap instead of streaking through space.
+Other free objects and Lua debug lines still use their existing discrete updates.
+
+Validation: 215 unit tests; constant motion at 10/30/60/180 km/h at 60/144 Hz;
+rotation/spin/warp/reset checks. The browser clock probe verifies all intervening
+frames move in views A/C/D/E/F/I and fixed cameras retain their core-relative
+position, including pause/resume/reset. The old production build gives zero
+intervening pose changes with this same probe. Existing camera laws and key/zoom
+bindings pass. Collision and plane-control probes cover adjacent runtime paths.
+
+Retrospective: smoothing only the camera would leave the model jumping beneath
+it. The shared presentation pose removes the mismatch. The first controlled
+clock blocked startup's own animation frame; enabling it only after startup
+fixed the test harness. This measures pose continuity rather than asserting
+smoothness from a still screenshot or assuming the monitor refresh rate.

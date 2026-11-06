@@ -2,6 +2,7 @@ import { downloadFilename } from './editor/document';
 import { parseRc } from './rc/parser';
 import { BuildPanel } from './editor/panel';
 import { SceneView } from './render/scene';
+import { modelFrame, type ModelFrame } from './render/interpolation';
 import { KeyState, KEY_TABLE } from './input/keys';
 import type { SimView } from './sim/sim-view';
 import type { RustSimulation } from './sim/rust-simulation';
@@ -396,7 +397,7 @@ window.addEventListener('keydown', (e) => {
   const fkey = /^F(8|9|1[012])$/.exec(e.code);
   if (fkey) { e.preventDefault(); setView(Number(fkey[1]) - 8 + (e.ctrlKey ? 5 : 0)); }
   if (e.code === 'KeyI' || e.code === 'KeyO') scene.zoomStep(e.code === 'KeyI' ? -1 : 1); // the original's view zoom
-  if (e.code === 'KeyR' && sim) { sim.reset(); scene.snapModel(sim.modelCenter(), sim.scenario); } // R: reset in place (OnReset)
+  if (e.code === 'KeyR' && sim) { previousModel = undefined; acc = 0; sim.reset(); scene.snapModel(sim.modelCenter(), sim.scenario); } // R: reset in place (OnReset)
   if (e.code === 'KeyU') void loadAndShare(sourceEl.value); // U: reload from source (OnInit)
 });
 
@@ -467,6 +468,9 @@ canvas.addEventListener('wheel', (e) => {
 canvas.tabIndex = 0;
 
 // ---- main loop ----
+let previousModel: ModelFrame | undefined;
+let presentationSim: RustSimulation | null = null;
+let presentationTick = -1;
 let acc = 0;
 let last = performance.now();
 function frame(now: number): void {
@@ -475,13 +479,15 @@ function frame(now: number): void {
   acc += frameSeconds;
   last = now;
   if (sim && !builder?.active) {
+    if (presentationSim !== sim || presentationTick !== sim.ticks) previousModel = undefined;
     keys.pollGamepad();
     const FIXED = sim.frameDt();
     let n = 0;
-    if (paused) acc = 0;
+    if (paused) { acc = 0; previousModel = undefined; }
     // a key held during a replay takes the run over from there (it keeps recording)
     if (sim.replaying && keys.anyDown()) sim.player = null;
     while (acc >= FIXED && n < 4) {
+      previousModel = modelFrame(sim.physics);
       sim.step();
       acc -= FIXED;
       n++;
@@ -489,7 +495,9 @@ function frame(now: number): void {
       challenge.afterStep(sim);
     }
     if (n === 4) acc = 0;
-    scene.sync(sim.physics);
+    presentationSim = sim; presentationTick = sim.ticks;
+    const visibleModel = modelFrame(sim.physics, previousModel, paused ? 1 : acc / FIXED);
+    scene.sync(sim.physics, visibleModel);
     scene.setRingProgress(sim.ringsPassed);
     scene.updateDynamic(sim.env);
     scene.setLines3d(sim.lines3d);
@@ -497,12 +505,12 @@ function frame(now: number): void {
     drawHud(sim.lines2d, sim);
     scene.onboardFov = sim.zoomFov;
     if (scene.viewMode === 'orbit') scene.setView(VIEWS[viewIndex].mode); // back from the editor
-    const core = sim.physics.tiles[0] ? sim.physics.pose(sim.physics.tiles[0]) : undefined;
-    if (core) scene.followModel({ center: sim.modelCenter(), core: core.position, quat: core.quaternion, velocity: sim.coreVelocity() }, frameSeconds);
+    const core = visibleModel.core;
+    if (core) scene.followModel({ center: visibleModel.center, core: core.position, quat: core.quaternion, velocity: sim.coreVelocity() }, frameSeconds);
     updateOverlay(sim);
     updateSound(sim);
   }
-  if (builder?.active) { acc = 0; scene.updateEditorCamera(); }
+  if (builder?.active) { previousModel = undefined; acc = 0; scene.updateEditorCamera(); }
   if (!builder?.active) { debug.update(sim); challenge.update(sim); }
   // the live-edit button: running, and the source differs from the running Lua's
   luaApply.hidden = !sim || !!builder?.active || !sim.model.script || sourceEl.value === sim.currentSource;

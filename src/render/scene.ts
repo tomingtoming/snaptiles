@@ -3,6 +3,7 @@ import { buoyEnds, ringColor } from '../challenge/rings';
 import { TILE, TILE_T, type TileInstance, type ValEnv } from '../model/assemble';
 import { evalExpr, exprIsConstant } from '../rc/expr';
 import { wheelRadius } from '../model/assemble';
+import type { ModelFrame } from './interpolation';
 import type { PhysicsView } from '../sim/sim-view';
 import { COURSE, CRATES } from '../model/course';
 import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js';
@@ -641,7 +642,7 @@ export class SceneView {
     if (s.mission?.via) zone(s.mission.via, 0xfdd835, 0xf9a825);
   }
   private ballMeshes: THREE.Mesh[] = [];
-  sync(world: PhysicsView): void {
+  sync(world: PhysicsView, frame?: ModelFrame): void {
     while (this.ballMeshes.length < world.balls.length) {
       const b = world.balls[this.ballMeshes.length];
       const m = new THREE.Mesh(new THREE.SphereGeometry(b.radius, 24, 16), new THREE.MeshStandardMaterial({ color: new THREE.Color(...b.color), roughness: 0.5 }));
@@ -670,10 +671,10 @@ export class SceneView {
     for (const tb of world.tiles) {
       const v = this.views.get(tb.tile.id);
       if (!v) continue;
-      const pose = world.pose(tb, this.tmpPose);
+      const pose = frame?.poses.get(tb.tile.id) ?? world.pose(tb, this.tmpPose);
       v.mesh.position.copy(pose.position);
       v.mesh.quaternion.copy(pose.quaternion);
-      if (tb.tile.spec.wheel) v.mesh.quaternion.multiply(this.spinQuat.setFromAxisAngle(SPIN_AXIS, tb.spinAngle));
+      if (tb.tile.spec.wheel) v.mesh.quaternion.multiply(this.spinQuat.setFromAxisAngle(SPIN_AXIS, frame?.poses.get(tb.tile.id)?.spinAngle ?? tb.spinAngle));
       if (tb.tile.spec.jet) v.material.emissiveIntensity = Math.min(1.5, Math.abs(tb.jetPower) / 20000);
     }
   }
