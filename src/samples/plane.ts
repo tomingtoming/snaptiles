@@ -1,10 +1,12 @@
 export const PLANE = `// jet plane with a Lua autopilot: Z/X throttle (it lifts off by itself), ↓↑ climb/descend, ←→ bank, A/D rudder.
 // C toggles flight assist (starts ON). OFF: arrows directly move the elevator/ailerons for loops and rolls.
+// Assist eases jet thrust above 234 km/h for practice. Manual mode gives direct throttle.
 // With assist ON, release the arrows to hold height and level the wings. To land: X to zero throttle and hold ↑ to descend;
 // it flares near the ground by itself, and on the ground with zero throttle it keeps the nose down and brakes.
 Val
 {
   ASSIST(default=1, min=0, max=1, step=0)
+  JET_SCALE(default=1, min=0, max=1, step=0)
   THROTTLE(default=0, min=0, max=60000, step=0)
   CLIMB(default=0, min=-10, max=10, step=1)
   BANK(default=0, min=-45, max=45, step=3)
@@ -29,7 +31,7 @@ Body
   Core(color=#f2b705){
     N:Chip(){
       N:Trim(angle=90){ E:Chip(){ E:Wheel(){ } } }
-      N:Chip(){ N:Chip(color=#2b2b2b){ N:Jet(power=THROTTLE, angle=90, color=#ff6a3d){ } N:Jet(power=-THROTTLE, angle=-90, color=#ff6a3d){ } } }
+      N:Chip(){ N:Chip(color=#2b2b2b){ N:Jet(power=THROTTLE*JET_SCALE, angle=90, color=#ff6a3d){ } N:Jet(power=-THROTTLE*JET_SCALE, angle=-90, color=#ff6a3d){ } } }
     }
     S:Chip(){
       W:Chip(){ W:Chip(){ W:Chip(){ W:Trim(angle=-AIL){ } } } W:Chip(angle=90){ W:Wheel(brake=BRAKE){ } } }
@@ -71,6 +73,8 @@ Lua
     local err = climb - vy
     local rolling = THROTTLE == 0 and h < 2.2
     local speed = math.sqrt(_VX(0)^2 + _VY(0)^2 + _VZ(0)^2)
+    -- Assisted cruise: keep takeoff thrust, then ease the jets down from 65 to 85 m/s.
+    JET_SCALE = ASSIST == 1 and math.max(0, math.min(1, (85 - speed) / 20)) or 1
     if ASSIST == 1 and h >= 2.2 and speed > 40 then trim = math.max(-5, math.min(15, trim + 0.03 * err)) end -- learns only in flight
     local target = math.max(-10, math.min(20, trim + 2 * err))
     -- landing roll: on the ground with the throttle closed, nose down and brake
@@ -88,8 +92,7 @@ Lua
       AIL = 20 * (_KEY(3) - _KEY(2))
       BRAKE = 0
     end
-    local v = math.sqrt(_VX(0)^2 + _VY(0)^2 + _VZ(0)^2)
-    out(0, "km/h", v * 3.6)
+    out(0, "km/h", speed * 3.6)
     out(1, "alt", _Y(0))
     out(2, "C: assist", ASSIST == 1 and "ON" or "OFF")
   end

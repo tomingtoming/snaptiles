@@ -780,3 +780,30 @@ Sample power and assist settings are unchanged. The intact original plane's
 224 km/h result versus the prior 595 km/h result is not explained by a 504 km/h
 ceiling alone. Flexible joint and feedback-control differences remain to be
 isolated before choosing the independent training plane's tuning.
+
+## Training-plane cruise and recorded control comparison
+
+The intact 20,000-power B26 flight provides a 900-frame record of jet power and
+surface angle commands. Replaying chip 8 power, chip 27 elevator, minus chip 14
+aileron and chip 32 rudder on the same pre-tuning geometry in SnapTiles gives:
+
+| Frame | B26 (km/h) | SnapTiles live assist | SnapTiles recorded controls |
+| ---: | ---: | ---: | ---: |
+| 300 | 140.6 | 148.3 | 150.7 |
+| 450 | 231.9 | 244.0 | 260.8 |
+| 600 | 226.7 | 356.4 | 234.6 |
+| 900 | 223.8 | 504.0 | 191.1 |
+
+The replay used the original CSV from flight-p20000-u1-20261106, initial
+geometry from that run, U=1 and brake zero. At frame 900 the core heights were
+4.75, 8.15 and 1.41 m respectively. The controller's response accounts for
+a substantial change in speed. Recorded commands do not reproduce the
+original trajectory. These runs include ground contact and do not isolate
+joint compliance from aerodynamic or contact forces.
+
+The stock training plane now tapers jet power between 65 and 85 m/s with
+assist on. In the same flat-field throttle ramp it reaches 299.5 km/h at 30 s
+and 299.9 at 60 s with 20,000 commanded power. At 60,000 it reaches 304.0 km/h
+at both points. C gives direct throttle and manual control. The 65/85 settings
+are training-plane design choices. The engine's independently measured model
+translation ceiling is 140 m/s.

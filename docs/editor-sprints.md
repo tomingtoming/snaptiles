@@ -2420,3 +2420,15 @@ the unrecovered internal B26 implementation. Step displacement and local
 rotational speeds are not individually capped. The original's flexible joints
 and the sample's feedback response still require comparison; do not equate
 this milestone with matching the original plane's cruising speed.
+
+## Training-plane cruise after the B26 speed calibration
+
+Recorded B26 controls narrowed the assisted speed gap and exposed a different
+flight path (see measured.md). Tuning the sample in Lua lets the player keep
+full takeoff thrust and opt into direct throttle with C. Full assisted power
+settles near 304 km/h in the level-flight fixture.
+
+Retrospective: the 55–75 m/s taper failed the takeoff drift and landing sink
+checks. The 60–80 trial still failed the banked-flight test. The 65–85 range
+passed the existing takeoff, banking and landing requirements. A browser-core
+regression now checks cruise speed and the return to full jet power on C.

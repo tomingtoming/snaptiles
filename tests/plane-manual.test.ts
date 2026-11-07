@@ -37,3 +37,24 @@ it('toggles assist once per C press and flies a manual loop', async () => {
     sim.reset(); expect(sim.env('ASSIST')).toBe(1);
   } finally { await sim.dispose(); }
 }, 30000);
+
+it('settles into assisted cruise at full throttle and returns full jet power on C', async () => {
+  const keys = new KeyState(new EventTarget());
+  const sim = new RustSimulation(PLANE, keys, { bare: true });
+  try {
+    await sim.start();
+    keys.press(4);
+    for (let frame = 0; frame < 900; frame++) sim.step();
+    keys.release(4);
+    const kmh = sim.coreVelocity().length() * 3.6;
+    expect(kmh).toBeGreaterThan(250);
+    expect(kmh).toBeLessThan(310);
+    expect(sim.env('THROTTLE')).toBe(60000);
+    expect(sim.env('JET_SCALE')).toBeLessThan(0.5);
+    keys.press(6);
+    sim.step();
+    expect(sim.env('JET_SCALE')).toBe(1);
+  } finally {
+    await sim.dispose();
+  }
+});
